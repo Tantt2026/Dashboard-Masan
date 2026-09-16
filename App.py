@@ -474,7 +474,3 @@ with tab_mbs:
             st.info("👆 Vui lòng Upload file `Data_Cat.xlsx` hoặc `Data_Brand.xlsx` ở thanh Sidebar bên trái để xem data thô MBS!")
         else:
             st.info("📌 Chế độ xem công khai: Chưa có dữ liệu thô Tracking MBS mới được tải lên bởi Admin.")
-### Tóm tắt thay đổi:
-- **Mật khẩu Admin mặc định:** `admin123` (bạn có thể thay đổi biến `ADMIN_PASSWORD = "admin123"` ở đầu file bất kỳ lúc nào).
-- **Trạng thái mặc định:** Người ngoài khi mở link sẽ ở chế độ **"👁️ CHẾ ĐỘ XEM (CHỈ ĐỌC)"**, xem toàn bộ báo cáo & lọc dữ liệu mà không thấy nút Upload.
-- **Khi bạn truy cập:** Bấm vào **"🔐 Đăng Nhập Admin"** ở Sidebar bên trái -> Nhập `admin123` -> Thanh Upload Data Excel sẽ lập tức hiện ra cho bạn làm việc. Bấm **"🔒 Đăng Xuất Admin"** khi kết thúc.
