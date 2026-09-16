@@ -123,17 +123,17 @@ with head_col2:
                 st.rerun()
             st.markdown("---")
             
-            u_sales = st.file_uploader("📂 Tải lên File Bán Hàng (Data.xlsx)", type=["xlsx", "csv"], key="u_sales")
+            u_sales = st.file_uploader("📂 Tải lên File Bán Hàng (DanhSachChiTietDonHang.xlsx)", type=["xlsx", "csv"], key="u_sales")
             if u_sales: 
                 st.session_state['df_sales_file'] = u_sales
                 st.success("Đã nạp file bán hàng thành công!")
 
-# --- TỰ ĐỘNG TÌM FILE BÁN HÀNG HOẶC DÙNG SESSION ---
+# --- TỰ ĐỘNG TÌM FILE BÁN HÀNG HOẶC DÙNG SESSION (GIỮ NGUYÊN CODE_1) ---
 def find_available_sales_file():
     if st.session_state['df_sales_file'] is not None:
         return st.session_state['df_sales_file']
     for f in os.listdir('.'):
-        if any(kw in f.lower() for kw in ['ban_hang', 'sales', 'don_hang', 'chitietdonhang', 'data']):
+        if any(kw in f.lower() for kw in ['ban_hang', 'sales', 'don_hang', 'chitietdonhang', 'data_sales', 'data']):
             return f
     return None
 
@@ -184,35 +184,48 @@ st.markdown("---")
 selected_date = date_filter
 date_str = selected_date.strftime("%d/%m")
 
-# --- ĐỌC VÀ CHUẨN HÓA FILE SALES THEO CHUẨN CODE_1 (HEADER DÒNG 3) ---
+# --- ĐỌC VÀ CHUẨN HÓA FILE SALES (GIỮ NGUYÊN CODE_1, FIX CHUẨN CỘT MÃ CH) ---
 df_sales = None
 if file_sales is not None:
     try:
-        is_excel = str(file_sales).endswith(('.xlsx', '.xls')) or (hasattr(file_sales, 'name') and file_sales.name.endswith(('.xlsx', '.xls')))
-        # Đọc chuẩn header=3 theo đúng cấu trúc Code_1 cho file Data.xlsx
-        df_sales = pd.read_excel(file_sales, header=3) if is_excel else pd.read_csv(file_sales, header=3)
+        raw_peek = pd.read_excel(file_sales, header=None, nrows=10) if str(file_sales).endswith(('.xlsx', '.xls')) or (hasattr(file_sales, 'name') and file_sales.name.endswith(('.xlsx', '.xls'))) else pd.read_csv(file_sales, header=None, nrows=10)
+        real_header_row = 0
+        for idx, row in raw_peek.iterrows():
+            row_str = " ".join([str(val).lower() for val in row.values])
+            if any(k in row_str for k in ['sản phẩm', 'product', 'sku', 'item', 'tên sp', 'mã ch', 'outlet code']):
+                real_header_row = idx
+                break
+                
+        df_sales = pd.read_excel(file_sales, header=real_header_row) if str(file_sales).endswith(('.xlsx', '.xls')) or (hasattr(file_sales, 'name') and file_sales.name.endswith(('.xlsx', '.xls'))) else pd.read_csv(file_sales, header=real_header_row)
         df_sales.columns = [str(c).strip() for c in df_sales.columns]
         
         def find_col(keywords):
             for kw in keywords:
                 for col in df_sales.columns:
-                    if kw.lower() in col.lower():
+                    if kw.lower() == col.lower(): # Ưu tiên khớp chính xác tuyệt đối trước
+                        return col
+            for kw in keywords:
+                for col in df_sales.columns:
+                    if kw.lower() in col.lower() and 'chuyến' not in col.lower():
                         return col
             return None
 
-        date_c = find_col(['ngày tạo đơn hàng', 'ngày', 'date', 'created', 'time', 'ngay'])
+        date_c = find_col(['ngày', 'date', 'created', 'time', 'ngay'])
         df_sales['ORDER_DATE'] = pd.to_datetime(df_sales[date_c], errors='coerce').dt.date.fillna(selected_date) if date_c else selected_date
         
-        ch_c = find_col(['mã ch', 'outlet', 'customer', 'cust', 'khách hàng', 'shipto', 'ship-to'])
-        df_sales['OUTLET_CODE'] = df_sales[ch_c].astype(str).str.strip() if ch_c else df_sales.iloc[:, 16].astype(str).str.strip()
+        ch_c = find_col(['mã ch', 'mã khách hàng', 'outlet code', 'customer code', 'shipto'])
+        if not ch_c:
+            # Fallback lấy đúng cột 16 nếu file Data.xlsx chuẩn
+            ch_c = df_sales.columns[16] if len(df_sales.columns) > 16 else df_sales.columns[0]
+        df_sales['OUTLET_CODE'] = df_sales[ch_c].astype(str).str.strip()
             
         rep_c = find_col(['mã nvbh', 'mã nv', 'nvbh', 'sm', 'saleman', 'nhân viên'])
         df_sales['REP_CODE'] = df_sales[rep_c].astype(str).str.strip() if rep_c else ""
 
-        ord_c = find_col(['mã đơn hàng', 'đơn hàng', 'order', 'số hd', 'so_hd', 'invoice', 'so_don'])
+        ord_c = find_col(['đơn hàng', 'order', 'số hd', 'so_hd', 'invoice', 'so_don'])
         df_sales['ORDER_ID'] = df_sales[ord_c].astype(str).str.strip() if ord_c else df_sales['OUTLET_CODE'] + "_" + df_sales['ORDER_DATE'].astype(str)
             
-        prod_c = find_col(['tên sản phẩm', 'sản phẩm', 'product', 'sku', 'tên sp', 'item', 'mặt hàng'])
+        prod_c = find_col(['sản phẩm', 'product', 'sku', 'tên sp', 'item', 'mặt hàng'])
         df_sales['PROD_NAME'] = df_sales[prod_c].astype(str).str.strip() if prod_c else ""
         
         qty_c = find_col(['tổng chẵn', 'số lượng', 'quantity', 'qty', 'sl', 'thùng', 'kg'])
@@ -253,7 +266,7 @@ if file_kpi_target is not None:
     except Exception as e:
         pass
 
-# --- ĐỌC VÀ CHUẨN HÓA FILE MCP (MAP CHUẨN DOANH SỐ MTD TỪ FILE SALES) ---
+# --- ĐỌC VÀ CHUẨN HÓA FILE MCP (MAP DOANH SỐ MTD TỪ FILE SALES) ---
 df_mcp = None
 if file_mcp is not None:
     try:
@@ -265,7 +278,7 @@ if file_mcp is not None:
         if ch_mcp: df_mcp['OUTLET_CODE'] = df_mcp[ch_mcp[0]].astype(str).str.strip()
         if kentu_mcp: df_mcp['CHANNEL_L1'] = df_mcp[kentu_mcp[0]].astype(str).str.strip()
         
-        # Mapping Doanh Số MTD chính xác chuẩn Code_1
+        # Mapping Doanh Số MTD chuẩn xác sang file MCP
         if df_sales is not None and 'ORDER_DATE' in df_sales.columns and 'OUTLET_CODE' in df_sales.columns:
             df_sales_mtd = df_sales[df_sales['ORDER_DATE'] <= selected_date].copy()
             df_sales_mtd['OUTLET_CODE_STR'] = df_sales_mtd['OUTLET_CODE'].astype(str).str.strip()
@@ -361,7 +374,7 @@ tab_kpi, tab_mcp, tab_mbs_cat, tab_mbs_brand = st.tabs([
 ])
 
 # ==========================================
-# TAB 1: BÁO CÁO KPI
+# TAB 1: BÁO CÁO KPI (GIỮ NGUYÊN 100% CÁCH CHẠY CỦA CODE_1)
 # ==========================================
 with tab_kpi:
     curr_targets = targets_from_file.get(kpi_filter, DEFAULT_TARGETS.get(kpi_filter, {r[0]: 30 for r in REPS_LIST}))
