@@ -6,7 +6,7 @@ import numpy as np
 # --- CONFIG TRANG WEB ---
 st.set_page_config(page_title="TRACKING KPI - MASAN CONSUMER", layout="wide")
 
-# --- CUSTOM CSS: HEADER BẢNG XANH DƯƠNG CHỮ ĐỎ & BOLD 100% NỘI DUNG ---
+# --- CUSTOM CSS: TÔ MÀU XANH DƯƠNG HEADER BẢNG CHỮ ĐỎ & BOLD 100% NỘI DUNG ---
 st.markdown("""
 <style>
     /* Bold toàn bộ chữ trên trang web */
@@ -52,34 +52,18 @@ st.markdown("""
         text-transform: uppercase;
     }
     
-    /* CSS ÉP TÔ MÀU XANH DƯƠNG NỀN & CHỮ MÀU ĐỎ CHO HEADER BẢNG STREAMLIT */
+    /* CSS CANH CHỈNH ĐỂ TÔ MÀU ĐÚNG BẢNG STREAMLIT (BACKGROUND XANH DƯƠNG, CHỮ ĐỎ ĐẬM) */
     [data-testid="stDataFrame"] div[role="columnheader"] {
         background-color: #034EA2 !important;
-        color: #FF0000 !important;
-        font-weight: 900 !important;
     }
     [data-testid="stDataFrame"] div[role="columnheader"] * {
         color: #FF0000 !important;
         font-weight: 900 !important;
+        font-size: 14px !important;
     }
     [data-testid="stDataFrame"] div[role="gridcell"] {
         font-weight: 900 !important;
         color: #0F172A !important;
-    }
-    
-    th {
-        background-color: #034EA2 !important;
-        color: #FF0000 !important;
-        font-weight: 900 !important;
-        text-align: center !important;
-        padding: 10px !important;
-        border: 1px solid #cbd5e1;
-    }
-    td {
-        border: 1px solid #cbd5e1;
-        padding: 8px;
-        text-align: center;
-        font-weight: 900 !important;
     }
     
     .comment-box {
@@ -439,7 +423,16 @@ with tab_kpi:
         table_rows.append(["-", "TỔNG CỘNG", "SS Trương Thanh Tân Total", tot_target, tot_day, tot_mtd, f"{tot_pct:.1f}%"])
 
         df_kpi = pd.DataFrame(table_rows, columns=["STT", "Mã NVBH", "Tên NVBH", "Chỉ Tiêu KPI", f"Thực Hiện {date_str}", "MTD", "% MTD"])
-        st.dataframe(df_kpi.style.map(highlight_mtd, subset=["% MTD"]), use_container_width=True, hide_index=True)
+        
+        # HIỂN THỊ BẢNG KPI VỚI STYLE TIÊU ĐỀ NỀN XANH CHỮ ĐỎ & BOLD NỘI DUNG
+        styled_df_kpi = df_kpi.style\
+            .map(highlight_mtd, subset=["% MTD"])\
+            .set_table_styles([
+                {'selector': 'th', 'props': [('background-color', '#034EA2'), ('color', '#FF0000'), ('font-weight', '900'), ('font-size', '14px'), ('text-align', 'center')]},
+                {'selector': 'td', 'props': [('font-weight', '900'), ('color', '#0F172A'), ('text-align', 'center')]}
+            ])
+            
+        st.dataframe(styled_df_kpi, use_container_width=True, hide_index=True)
 
         st.markdown(f"""
         <div class="comment-box">
@@ -479,7 +472,15 @@ with tab_kpi:
         combo_rows.append(["-", "TỔNG CỘNG", "SS Trương Thanh Tân Total", tot_tg_off, tot_day_off, pct_tot_off, tot_tg_on, tot_day_on, pct_tot_on])
 
         df_combo = pd.DataFrame(combo_rows, columns=["STT", "Mã NVBH", "Tên NVBH", f"Target OFF (Thứ {selected_date.isoweekday()+1})", f"Thực hiện {date_str} (OFF)", "% Hoàn thành OFF", f"Target ON (Thứ {selected_date.isoweekday()+1})", f"Thực hiện {date_str} (ON)", "% Hoàn thành ON"])
-        st.dataframe(df_combo.style.map(highlight_mtd, subset=["% Hoàn thành OFF", "% Hoàn thành ON"]), use_container_width=True, hide_index=True)
+        
+        styled_df_combo = df_combo.style\
+            .map(highlight_mtd, subset=["% Hoàn thành OFF", "% Hoàn thành ON"])\
+            .set_table_styles([
+                {'selector': 'th', 'props': [('background-color', '#034EA2'), ('color', '#FF0000'), ('font-weight', '900'), ('font-size', '14px'), ('text-align', 'center')]},
+                {'selector': 'td', 'props': [('font-weight', '900'), ('color', '#0F172A'), ('text-align', 'center')]}
+            ])
+            
+        st.dataframe(styled_df_combo, use_container_width=True, hide_index=True)
 
 # ==========================================
 # TAB 2: MCP VISIT
