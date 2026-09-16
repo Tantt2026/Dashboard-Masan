@@ -93,14 +93,14 @@ st.markdown("""
 if 'admin_logged_in' not in st.session_state:
     st.session_state['admin_logged_in'] = False
 
-# --- SIDEBAR PHÂN QUYỀN UPLOAD (CHỈ ADMIN MỚI CÓ NÚT UPLOAD) ---
+# --- SIDEBAR PHÂN QUYỀN UPLOAD (TÁCH BIỆT UPLOAD CAT & UPLOAD BRAND) ---
 st.sidebar.header("🛡️ PHÂN QUYỀN HỆ THỐNG")
 
 if not st.session_state['admin_logged_in']:
     st.sidebar.subheader("🔐 Đăng Nhập Admin")
     admin_pass = st.sidebar.text_input("Mật khẩu Admin:", type="password")
     if st.sidebar.button("Đăng nhập"):
-        if admin_pass == "admin123":  # Đổi mật khẩu Admin tại đây nếu cần
+        if admin_pass == "admin123":  # Mật khẩu Admin mặc định
             st.session_state['admin_logged_in'] = True
             st.sidebar.success("Đã đăng nhập quyền Admin thành công!")
             st.rerun()
@@ -108,7 +108,7 @@ if not st.session_state['admin_logged_in']:
             st.sidebar.error("Mật khẩu Admin không đúng!")
     
     st.sidebar.info("👀 Bạn đang xem báo cáo ở chế độ Viewer (Xem dữ liệu). Chỉ Admin mới có quyền Upload/Sửa file.")
-    file_sales, file_mcp, file_mbs, file_kpi_target = None, None, None, None
+    file_sales, file_mcp, file_mbs_cat, file_mbs_brand, file_kpi_target = None, None, None, None, None
 else:
     st.sidebar.success("🟢 ĐÃ ĐĂNG NHẬP ADMIN")
     if st.sidebar.button("🔒 Đăng Xuất Admin"):
@@ -120,7 +120,8 @@ else:
     file_kpi_target = st.sidebar.file_uploader("1. File Chỉ Tiêu (TỔNG HỢP KPI ĐĐKD.xlsx)", type=["xlsx", "csv"])
     file_sales = st.sidebar.file_uploader("2. File Chi Tiết Đơn Hàng (Sales Data)", type=["xlsx", "csv"])
     file_mcp = st.sidebar.file_uploader("3. File MCP Visit / Visit Schedule", type=["xlsx", "csv"])
-    file_mbs = st.sidebar.file_uploader("4. File Tracking MBS (Cat/Brand)", type=["xlsx", "csv"])
+    file_mbs_cat = st.sidebar.file_uploader("4. File Tracking MBS - CATEGORY", type=["xlsx", "csv"])
+    file_mbs_brand = st.sidebar.file_uploader("5. File Tracking MBS - BRAND", type=["xlsx", "csv"])
 
 # Hàm tô màu % MTD
 def highlight_mtd(val):
@@ -135,22 +136,21 @@ def highlight_mtd(val):
     except:
         return ''
 
-# --- ĐỌC VÀ NẠP DỮ LIỆU CHỈ TIÊU KPI ĐÀO TỪ FILE FILE_KPI_TARGET ---
-dict_targets = {}
-if file_kpi_target is not None:
+# Hàm format số tiền phân cách hàng nghìn rõ ràng (Ví dụ: 1,500,000 VNĐ)
+def format_currency(val):
     try:
-        try:
-            df_target_raw = pd.read_excel(file_kpi_target, sheet_name="Export")
-        except:
-            df_target_raw = pd.read_excel(file_kpi_target)
-        
-        # Mapping các chỉ tiêu từ file
-        st.sidebar.success("⚡ Đã nạp thành công File Chỉ Tiêu KPI (Sheet Export)!")
-    except Exception as e:
-        st.sidebar.error(f"Lỗi đọc file Chỉ Tiêu KPI: {e}")
+        val_float = float(val)
+        return f"{val_float:,.0f}"
+    except:
+        return val
 
-# --- HỆ THỐNG 3 TAB CHÍNH ---
-tab_kpi, tab_mcp, tab_mbs = st.tabs(["📊 BÁO CÁO KPI", "🗺️ MCP VISIT", "🎯 TRACKING MBS"])
+# --- HỆ THỐNG 4 TAB CHÍNH (TÁCH RIÊNG TRACKING MBS CAT VÀ BRAND) ---
+tab_kpi, tab_mcp, tab_mbs_cat, tab_mbs_brand = st.tabs([
+    "📊 BÁO CÁO KPI", 
+    "🗺️ MCP VISIT", 
+    "🎯 TRACKING MBS - CAT", 
+    "🏷️ TRACKING MBS - BRAND"
+])
 
 # ==========================================
 # TAB 1: BÁO CÁO KPI
@@ -372,13 +372,10 @@ with tab_kpi:
         st.markdown(f"""
         <div class="comment-box">
             <div class="comment-title">NHẬN XÉT & ĐÁNH GIÁ TỪ GIÁM SÁT BÁN HÀNG (BÁO CÁO ĐƠN HÀNG COMBO THỨ 2 - NGÀY {date_str}/2026):</div>
-            • <b>Nguồn Target Tuyến Ngày:</b> Trích xuất từ File `Visit Schedule Report` theo đúng Lịch viếng thăm Thứ 2 chẵn/lẻ của từng ĐĐKD (OFF: 215 CH, ON: 189 CH).<br>
+            • <b>Nguồn Target Tuyến Ngày:</b> Trích xuất từ File `Visit Schedule Report` theo đúng Lịch viếng thăm Thứ 2 chẵn/lẻ của từng ĐĐKD.<br>
             • <b>Phát Sinh Ngày {date_str}:</b><br>
-            - Kênh OFF Daily: Toàn team chốt được 45/215 Cửa Hàng (20.9% Target Thứ 2). Dẫn đầu: Huỳnh Tấn Lý (41.7% - 5 CH), Nguyễn Hoàng Bích Thủy (33.3% - 4 CH), Trần Minh Thành (28.6% - 4 CH).<br>
-            - Kênh ON Daily: Toàn team chốt được 9/189 Cửa Hàng (4.8% Target Thứ 2). Dẫn đầu: Ngô Nguyễn Cao Kỳ (29.4% - 5 CH), Trần Minh Thành & Huỳnh Tấn Lý.<br>
-            • <b>Kết Quả Lũy Kế MTD:</b><br>
-            - Kênh OFF MTD: Toàn team đạt 271 Cửa Hàng phát sinh đơn Combo thỏa điều kiện.<br>
-            - Kênh ON MTD: Toàn team đạt 55 Cửa Hàng phát sinh đơn Combo thỏa điều kiện.
+            - Kênh OFF Daily: Toàn team chốt được 45/215 Cửa Hàng (20.9% Target Thứ 2).<br>
+            - Kênh ON Daily: Toàn team chốt được 9/189 Cửa Hàng (4.8% Target Thứ 2).
         </div>
         """, unsafe_allow_html=True)
 
@@ -409,6 +406,9 @@ with tab_mcp:
                             sales_summary['Outlet Code Mapped'] = sales_summary['Outlet Code Mapped'].astype(str)
                             df_mcp_raw = df_mcp_raw.merge(sales_summary, left_on=code_col_mcp[0], right_on='Outlet Code Mapped', how='left')
                             df_mcp_raw['Total Doanh Số (Mapped)'] = df_mcp_raw['Total Doanh Số (Mapped)'].fillna(0)
+                            
+                            # Format Doanh Số hiển thị có dấu cách phân cách hàng nghìn
+                            df_mcp_raw['Total Doanh Số (Mapped)'] = df_mcp_raw['Total Doanh Số (Mapped)'].apply(format_currency)
                             st.info("⚡ Đã tự động map 'Total Doanh Số' từ file Sales vào từng Mã KH trong MCP Visit!")
                 except Exception as e:
                     st.warning(f"Chưa thể map data Sales: {e}")
@@ -434,67 +434,117 @@ with tab_mcp:
         st.info("👆 Vui lòng Upload file MCP Visit ở thanh Sidebar bên trái (Quyền Admin) để xem data thô và map Doanh Số!")
 
 # ==========================================
-# TAB 3: TRACKING MBS (ICON TARGET 🎯)
+# TAB 3: TRACKING MBS - CATEGORY 🎯
 # ==========================================
-with tab_mbs:
-    st.header("🎯 DỮ LIỆU THÔ TRACKING MBS (CAT & BRAND)")
+with tab_mbs_cat:
+    st.header("🎯 DỮ LIỆU THÔ TRACKING MBS - THEO NGHÀNH HÀNG (CATEGORY)")
     
-    if file_mbs is not None:
+    if file_mbs_cat is not None:
         try:
             try:
-                df_mbs_raw = pd.read_excel(file_mbs, header=2)
+                df_cat_raw = pd.read_excel(file_mbs_cat, header=2)
             except:
-                df_mbs_raw = pd.read_excel(file_mbs) if file_mbs.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mbs)
+                df_cat_raw = pd.read_excel(file_mbs_cat) if file_mbs_cat.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mbs_cat)
             
-            st.success(f"Đã tải thành công file Tracking MBS: {file_mbs.name} ({len(df_mbs_raw)} dòng)")
+            st.success(f"Đã tải thành công file Tracking MBS - CATEGORY: {file_mbs_cat.name} ({len(df_cat_raw)} dòng)")
 
-            if file_sales is not None:
-                try:
-                    df_sales_raw = pd.read_excel(file_sales) if file_sales.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_sales)
-                    st.info("⚡ Đã kích hoạt thuật toán Map Doanh Số theo Category / Brand vào Data MBS!")
-                except Exception as e:
-                    st.warning(f"Lỗi kết nối Sales Data: {e}")
+            # Format toàn bộ các cột doanh số cách hàng nghìn rõ ràng
+            rev_cols = [c for c in df_cat_raw.columns if 'doanh số' in str(c).lower() or 'thành tiền' in str(c).lower() or 'target' in str(c).lower()]
+            for rc in rev_cols:
+                df_cat_raw[rc] = df_cat_raw[rc].apply(format_currency)
 
-            st.subheader("🔍 Bộ Lọc Dữ Liệu Tracking MBS")
-            col_m1, col_m2, col_m3 = st.columns(3)
+            st.subheader("🔍 Bộ Lọc Dữ Liệu Tracking MBS (Category)")
+            col_c1, col_c2, col_c3 = st.columns(3)
             
-            with col_m1:
-                sm_cols = [c for c in df_mbs_raw.columns if 'SM Name' in str(c) or 'NVBH' in str(c)]
+            with col_c1:
+                sm_cols = [c for c in df_cat_raw.columns if 'SM Name' in str(c) or 'NVBH' in str(c)]
                 if sm_cols:
-                    sm_list = ["Tất cả"] + list(df_mbs_raw[sm_cols[0]].dropna().unique())
-                    sel_sm = st.selectbox("Lọc theo Nhân Viên (SM Name):", sm_list)
+                    sm_list = ["Tất cả"] + list(df_cat_raw[sm_cols[0]].dropna().unique())
+                    sel_sm = st.selectbox("Lọc theo Nhân Viên (Cat):", sm_list)
                 else:
                     sel_sm = "Tất cả"
 
-            with col_m2:
-                cat_brand_cols = [c for c in df_mbs_raw.columns if 'cat' in str(c).lower() or 'brand' in str(c).lower()]
-                if cat_brand_cols:
-                    cat_list = ["Tất cả"] + list(df_mbs_raw[cat_brand_cols[0]].dropna().unique())
-                    sel_cat = st.selectbox("Lọc theo Phân Loại (Cat/Brand):", cat_list)
+            with col_c2:
+                cat_cols = [c for c in df_cat_raw.columns if 'cat' in str(c).lower() or 'ngành' in str(c).lower()]
+                if cat_cols:
+                    cat_list = ["Tất cả"] + list(df_cat_raw[cat_cols[0]].dropna().unique())
+                    sel_cat = st.selectbox("Lọc theo Phân Loại (Category):", cat_list)
                 else:
                     sel_cat = "Tất cả"
 
-            with col_m3:
-                mbs_search = st.text_input("Tìm Mã KH / Tên CH (MBS):")
+            with col_c3:
+                cat_search = st.text_input("Tìm Mã KH / Tên CH (Cat):")
 
-            df_mbs_filtered = df_mbs_raw.copy()
+            df_cat_filtered = df_cat_raw.copy()
             if sm_cols and sel_sm != "Tất cả":
-                df_mbs_filtered = df_mbs_filtered[df_mbs_filtered[sm_cols[0]] == sel_sm]
-            if cat_brand_cols and sel_cat != "Tất cả":
-                df_mbs_filtered = df_mbs_filtered[df_mbs_filtered[cat_brand_cols[0]] == sel_cat]
-            if mbs_search:
-                df_mbs_filtered = df_mbs_filtered[df_mbs_filtered.astype(str).apply(lambda row: row.str.contains(mbs_search, case=False).any(), axis=1)]
+                df_cat_filtered = df_cat_filtered[df_cat_filtered[sm_cols[0]] == sel_sm]
+            if cat_cols and sel_cat != "Tất cả":
+                df_cat_filtered = df_cat_filtered[df_cat_filtered[cat_cols[0]] == sel_cat]
+            if cat_search:
+                df_cat_filtered = df_cat_filtered[df_cat_filtered.astype(str).apply(lambda row: row.str.contains(cat_search, case=False).any(), axis=1)]
 
-            st.dataframe(df_mbs_filtered, use_container_width=True)
-            
-            m1, m2 = st.columns(2)
-            m1.metric("Tổng dòng dữ liệu:", len(df_mbs_filtered))
-            revenue_col = [c for c in df_mbs_filtered.columns if 'Doanh số nền tảng' in str(c) or 'Doanh số thực đạt' in str(c)]
-            if revenue_col:
-                total_rev = pd.to_numeric(df_mbs_filtered[revenue_col[0]], errors='coerce').sum()
-                m2.metric(f"Tổng {revenue_col[0]}:", f"{total_rev:,.0f} VNĐ")
+            st.dataframe(df_cat_filtered, use_container_width=True)
+            st.metric("Tổng số dòng dữ liệu Category:", len(df_cat_filtered))
 
         except Exception as e:
-            st.error(f"Lỗi đọc file Tracking MBS: {e}")
+            st.error(f"Lỗi đọc file Tracking MBS Category: {e}")
     else:
-        st.info("👆 Vui lòng Upload file `Data_Cat.xlsx` hoặc `Data_Brand.xlsx` ở thanh Sidebar bên trái (Quyền Admin) để xem data thô MBS!")
+        st.info("👆 Vui lòng Upload file `Data_Cat.xlsx` ở thanh Sidebar bên trái (Mục 4) để xem data thô Category!")
+
+# ==========================================
+# TAB 4: TRACKING MBS - BRAND 🏷️
+# ==========================================
+with tab_mbs_brand:
+    st.header("🏷️ DỮ LIỆU THÔ TRACKING MBS - THEO NHÃN HÀNG (BRAND)")
+    
+    if file_mbs_brand is not None:
+        try:
+            try:
+                df_brand_raw = pd.read_excel(file_mbs_brand, header=2)
+            except:
+                df_brand_raw = pd.read_excel(file_mbs_brand) if file_mbs_brand.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mbs_brand)
+            
+            st.success(f"Đã tải thành công file Tracking MBS - BRAND: {file_mbs_brand.name} ({len(df_brand_raw)} dòng)")
+
+            # Format toàn bộ các cột doanh số cách hàng nghìn rõ ràng
+            rev_cols_b = [c for c in df_brand_raw.columns if 'doanh số' in str(c).lower() or 'thành tiền' in str(c).lower() or 'target' in str(c).lower()]
+            for rcb in rev_cols_b:
+                df_brand_raw[rcb] = df_brand_raw[rcb].apply(format_currency)
+
+            st.subheader("🔍 Bộ Lọc Dữ Liệu Tracking MBS (Brand)")
+            col_b1, col_b2, col_b3 = st.columns(3)
+            
+            with col_b1:
+                sm_cols_b = [c for c in df_brand_raw.columns if 'SM Name' in str(c) or 'NVBH' in str(c)]
+                if sm_cols_b:
+                    sm_list_b = ["Tất cả"] + list(df_brand_raw[sm_cols_b[0]].dropna().unique())
+                    sel_sm_b = st.selectbox("Lọc theo Nhân Viên (Brand):", sm_list_b)
+                else:
+                    sel_sm_b = "Tất cả"
+
+            with col_b2:
+                brand_cols = [c for c in df_brand_raw.columns if 'brand' in str(c).lower() or 'nhãn' in str(c).lower()]
+                if brand_cols:
+                    brand_list = ["Tất cả"] + list(df_brand_raw[brand_cols[0]].dropna().unique())
+                    sel_brand = st.selectbox("Lọc theo Phân Loại (Brand):", brand_list)
+                else:
+                    sel_brand = "Tất cả"
+
+            with col_b3:
+                brand_search = st.text_input("Tìm Mã KH / Tên CH (Brand):")
+
+            df_brand_filtered = df_brand_raw.copy()
+            if sm_cols_b and sel_sm_b != "Tất cả":
+                df_brand_filtered = df_brand_filtered[df_brand_filtered[sm_cols_b[0]] == sel_sm_b]
+            if brand_cols and sel_brand != "Tất cả":
+                df_brand_filtered = df_brand_filtered[df_brand_filtered[brand_cols[0]] == sel_brand]
+            if brand_search:
+                df_brand_filtered = df_brand_filtered[df_brand_filtered.astype(str).apply(lambda row: row.str.contains(brand_search, case=False).any(), axis=1)]
+
+            st.dataframe(df_brand_filtered, use_container_width=True)
+            st.metric("Tổng số dòng dữ liệu Brand:", len(df_brand_filtered))
+
+        except Exception as e:
+            st.error(f"Lỗi đọc file Tracking MBS Brand: {e}")
+    else:
+        st.info("👆 Vui lòng Upload file `Data_Brand.xlsx` ở thanh Sidebar bên trái (Mục 5) để xem data thô Brand!")
