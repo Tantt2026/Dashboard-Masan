@@ -15,11 +15,20 @@ if "is_admin" not in st.session_state:
 st.markdown("""
 <style>
     /* Ép tất cả văn bản trên trang web hiển thị IN ĐẬM */
-    html, body, [class*="css"], stMarkdown, p, span, label, td, th, div, button, input {
-        font-weight: 900 !important;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    html, body, p, span, label, td, th, div, button, input {
+        font-weight: 800 !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-    
+
+    /* Khôi phục Font cho Icon Streamlit (sửa lỗi đè chữ "upload" ở File Uploader) */
+    [data-testid="stIcon"], 
+    [class*="material-symbols"], 
+    [data-testid="stFileUploader"] span[class*="material"],
+    [data-testid="stFileUploader"] i {
+        font-family: "Material Symbols Rounded", "Source Sans Pro", sans-serif !important;
+        font-weight: normal !important;
+    }
+
     /* Styling Banner Header Ultra-Bold */
     .header-banner {
         background-color: #FDE047;
