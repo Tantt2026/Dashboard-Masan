@@ -23,7 +23,7 @@ st.markdown("""
         border-radius: 12px;
         padding: 15px;
         text-align: center;
-        margin-bottom: 20px;
+        margin-bottom: 15px;
     }
     .header-title {
         font-size: 26px;
@@ -33,7 +33,7 @@ st.markdown("""
         text-transform: uppercase;
     }
     .header-subtitle {
-        font-size: 20px;
+        font-size: 18px;
         font-weight: 900 !important;
         color: #0F172A;
         margin-top: 5px;
@@ -73,67 +73,49 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- BANNER HEADER ---
-st.markdown("""
-<div class="header-banner">
-    <div class="header-title">SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</div>
-    <div class="header-subtitle">TRACKING KPI ĐDKD & HỆ THỐNG QUẢN LÝ DATA THÔ</div>
-</div>
-""", unsafe_allow_html=True)
-
-# --- KHỞI TẠO SESSION ADMIN PASS & SIDEBAR TOGGLE ---
+# --- KHỞI TẠO SESSION ADMIN PASS ---
 if 'admin_logged_in' not in st.session_state:
     st.session_state['admin_logged_in'] = False
 
-# --- SIDEBAR PHÂN QUYỀN UPLOAD (BỔ SUNG NÚT THU GỌN / HIDE ADMIN PANEL) ---
-st.sidebar.header("🛡️ PHÂN QUYỀN HỆ THỐNG")
+# --- HEADER & NÚT UPLOAD/ADMIN TRÊN CÙNG BÊN GÓC PHẢI ---
+head_col1, head_col2 = st.columns([4, 1.2])
 
-if not st.session_state['admin_logged_in']:
-    with st.sidebar.expander("🔐 Đăng Nhập Admin Upload File", expanded=False):
-        admin_pass = st.text_input("Mật khẩu Admin:", type="password")
-        if st.button("Đăng nhập"):
-            if admin_pass == "admin123":
-                st.session_state['admin_logged_in'] = True
-                st.success("Đã đăng nhập quyền Admin thành công!")
+with head_col1:
+    st.markdown("""
+    <div class="header-banner">
+        <div class="header-title">SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</div>
+        <div class="header-subtitle">TRACKING KPI ĐDKD & HỆ THỐNG QUẢN LÝ DATA THÔ</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+file_sales, file_mcp, file_mbs_cat, file_mbs_brand, file_kpi_target = None, None, None, None, None
+
+with head_col2:
+    st.write("") # Tạo khoảng cách canh lề
+    if not st.session_state['admin_logged_in']:
+        with st.popover("⚙️ ĐĂNG NHẬP ADMIN / UPLOAD", use_container_width=True):
+            st.subheader("🔐 Quyền Admin")
+            admin_pass = st.text_input("Mật khẩu Admin:", type="password", key="top_admin_pass")
+            if st.button("Đăng nhập Admin", key="btn_login_top", use_container_width=True):
+                if admin_pass == "admin123":
+                    st.session_state['admin_logged_in'] = True
+                    st.success("Đã đăng nhập Admin!")
+                    st.rerun()
+                else:
+                    st.error("Sai mật khẩu!")
+            st.info("👀 Bạn đang xem báo cáo ở chế độ Viewer.")
+    else:
+        with st.popover("📁 UPLOAD FILE (ADMIN)", use_container_width=True):
+            st.success("🟢 QUYỀN ADMIN")
+            if st.button("🔒 Đăng Xuất Admin", key="btn_logout_top", use_container_width=True):
+                st.session_state['admin_logged_in'] = False
                 st.rerun()
-            else:
-                st.error("Mật khẩu Admin không đúng!")
-    
-    st.sidebar.info("👀 Chế độ Viewer (Xem dữ liệu). Mở mục Đăng Nhập ở trên nếu muốn Upload file.")
-    file_sales, file_mcp, file_mbs_cat, file_mbs_brand, file_kpi_target = None, None, None, None, None
-else:
-    st.sidebar.success("🟢 ĐÃ ĐĂNG NHẬP ADMIN")
-    if st.sidebar.button("🔒 Đăng Xuất Admin"):
-        st.session_state['admin_logged_in'] = False
-        st.rerun()
-
-    st.sidebar.markdown("---")
-    st.sidebar.header("📁 QUẢN LÝ UPLOAD DATA (ADMIN)")
-    file_kpi_target = st.sidebar.file_uploader("1. File Chỉ Tiêu (TỔNG HỢP KPI ĐĐKD.xlsx)", type=["xlsx", "csv"])
-    file_sales = st.sidebar.file_uploader("2. File Chi Tiết Đơn Hàng (Sales Data)", type=["xlsx", "csv"])
-    file_mcp = st.sidebar.file_uploader("3. File MCP Visit / Visit Schedule", type=["xlsx", "csv"])
-    file_mbs_cat = st.sidebar.file_uploader("4. File Tracking MBS - CATEGORY", type=["xlsx", "csv"])
-    file_mbs_brand = st.sidebar.file_uploader("5. File Tracking MBS - BRAND", type=["xlsx", "csv"])
-
-# Hàm tô màu % MTD
-def highlight_mtd(val):
-    try:
-        pct = float(str(val).replace('%', ''))
-        if pct >= 75.0:
-            return 'background-color: #DCFCE7; color: #15803D; font-weight: 900;'
-        elif pct >= 50.0:
-            return 'background-color: #FEF08A; color: #854D0E; font-weight: 900;'
-        else:
-            return 'background-color: #FEE2E2; color: #B91C1C; font-weight: 900;'
-    except:
-        return ''
-
-def format_currency(val):
-    try:
-        val_float = float(val)
-        return f"{val_float:,.0f}"
-    except:
-        return val
+            st.markdown("---")
+            file_kpi_target = st.file_uploader("1. File Chỉ Tiêu (KPI.xlsx)", type=["xlsx", "csv"], key="u_target")
+            file_sales = st.file_uploader("2. File Sales Chi Tiết", type=["xlsx", "csv"], key="u_sales")
+            file_mcp = st.file_uploader("3. File MCP Visit", type=["xlsx", "csv"], key="u_mcp")
+            file_mbs_cat = st.file_uploader("4. File MBS Category", type=["xlsx", "csv"], key="u_cat")
+            file_mbs_brand = st.file_uploader("5. File MBS Brand", type=["xlsx", "csv"], key="u_brand")
 
 # --- HELPER PARSING VẬN HÀNH THUẬT TOÁN ĐỘNG ---
 REPS_LIST = [
@@ -183,7 +165,7 @@ if file_kpi_target is not None:
                     t_dict = dict(zip(df_t[r_col].astype(str), pd.to_numeric(df_t[match_c[0]], errors='coerce').fillna(0)))
                     targets_from_file[kpi_key] = t_dict
     except Exception as e:
-        st.sidebar.warning(f"Lỗi đọc file Target: {e}")
+        st.warning(f"Lỗi đọc file Target: {e}")
 
 df_sales = None
 if file_sales is not None:
@@ -215,7 +197,7 @@ if file_sales is not None:
         qty_c = [c for c in df_sales.columns if 'số lượng' in c.lower() or 'quantity' in c.lower() or 'qty' in c.lower()]
         df_sales['QTY'] = pd.to_numeric(df_sales[qty_c[0]], errors='coerce').fillna(0) if qty_c else 1
     except Exception as e:
-        st.sidebar.error(f"Lỗi parse File Sales: {e}")
+        st.error(f"Lỗi parse File Sales: {e}")
 
 df_mcp = None
 if file_mcp is not None:
@@ -228,7 +210,20 @@ if file_mcp is not None:
             df_mcp['OUTLET_CODE'] = df_mcp[ch_mcp[0]].astype(str)
             df_mcp['CHANNEL_L1'] = df_mcp[kentu_mcp[0]].astype(str)
     except Exception as e:
-        st.sidebar.warning(f"Lỗi đọc File MCP Visit: {e}")
+        st.warning(f"Lỗi đọc File MCP Visit: {e}")
+
+# Hàm tô màu % MTD
+def highlight_mtd(val):
+    try:
+        pct = float(str(val).replace('%', ''))
+        if pct >= 75.0:
+            return 'background-color: #DCFCE7; color: #15803D; font-weight: 900;'
+        elif pct >= 50.0:
+            return 'background-color: #FEF08A; color: #854D0E; font-weight: 900;'
+        else:
+            return 'background-color: #FEE2E2; color: #B91C1C; font-weight: 900;'
+    except:
+        return ''
 
 # --- TAB CHÍNH ---
 tab_kpi, tab_mcp, tab_mbs_cat, tab_mbs_brand = st.tabs([
@@ -443,7 +438,7 @@ with tab_mcp:
         except Exception as e:
             st.error(f"Lỗi đọc file MCP Visit: {e}")
     else:
-        st.info("👆 Vui lòng Upload file MCP Visit ở thanh Sidebar bên trái (Quyền Admin) để xem data thô!")
+        st.info("👆 Sử dụng nút ⚙️ Quyền Admin / Upload ở góc trên bên phải để tải file Data thô!")
 
 # ==========================================
 # TAB 3 & 4: TRACKING MBS CAT & BRAND
@@ -457,7 +452,7 @@ with tab_mbs_cat:
         except Exception as e:
             st.error(f"Lỗi đọc file Tracking MBS Category: {e}")
     else:
-        st.info("👆 Vui lòng Upload file Data_Cat.xlsx ở thanh Sidebar bên trái!")
+        st.info("👆 Sử dụng nút ⚙️ Quyền Admin / Upload ở góc trên bên phải để tải file Data_Cat.xlsx!")
 
 with tab_mbs_brand:
     st.header("🏷️ DỮ LIỆU THÔ TRACKING MBS - THEO NHÃN HÀNG (BRAND)")
@@ -468,4 +463,4 @@ with tab_mbs_brand:
         except Exception as e:
             st.error(f"Lỗi đọc file Tracking MBS Brand: {e}")
     else:
-        st.info("👆 Vui lòng Upload file Data_Brand.xlsx ở thanh Sidebar bên trái!")
+        st.info("👆 Sử dụng nút ⚙️ Quyền Admin / Upload ở góc trên bên phải để tải file Data_Brand.xlsx!")
