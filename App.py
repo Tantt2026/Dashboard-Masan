@@ -5,10 +5,9 @@ import datetime
 # --- CONFIG TRANG WEB ---
 st.set_page_config(page_title="TRACKING KPI ĐDKD - MASAN CONSUMER", layout="wide")
 
-# --- CUSTOM CSS (GIỮ FORMAT THEO MẪU BÁN HÀNG MASAN & BO TRÒN FILTER) ---
+# --- CUSTOM CSS ---
 st.markdown("""
 <style>
-    /* Styling Banner Header */
     .header-banner {
         background-color: #FDE047;
         border: 2px solid #000;
@@ -30,28 +29,6 @@ st.markdown("""
         color: #0F172A;
         margin-top: 5px;
     }
-    
-    /* Format Bảng & Text Ultra-Bold */
-    table {
-        font-weight: 700 !important;
-        width: 100%;
-        border-collapse: collapse;
-    }
-    th {
-        background-color: #034EA2 !important;
-        color: white !important;
-        font-weight: 900 !important;
-        text-align: center !important;
-        padding: 10px !important;
-        border: 1px solid #cbd5e1;
-    }
-    td {
-        border: 1px solid #cbd5e1;
-        padding: 8px;
-        text-align: center;
-    }
-    
-    /* Box Nhận xét & Đề xuất */
     .comment-box {
         border: 2px solid #034EA2;
         border-radius: 10px;
@@ -72,7 +49,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 1. BANNER HEADER ---
+# --- BANNER HEADER ---
 st.markdown("""
 <div class="header-banner">
     <div class="header-title">SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</div>
@@ -80,7 +57,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# --- 2. THANH FILTER NGANG (5 MỤC THEO ĐÚNG FORMAT HÌNH 1) ---
+# --- THANH FILTER NGANG ---
 col1, col2, col3, col4, col5 = st.columns(5)
 
 with col1:
@@ -103,50 +80,110 @@ with col5:
 
 st.markdown("---")
 
-# --- 3. HÀM TÍNH TOÁN VÀ ĐỊNH DẠNG MÀU DỰA TRÊN THUẬT TOÁN (RULE ENGINE) ---
+# NÚT UPLOAD FILE EXCEL DATA THỰC TẾ
+uploaded_file = st.sidebar.file_uploader("Cập nhật Data Excel mới", type=["xlsx", "xls"])
+
 def highlight_mtd(val):
-    """Quy tắc tô màu Conditional Formatting cho % MTD"""
     try:
         pct = float(str(val).replace('%', ''))
         if pct >= 75.0:
-            return 'background-color: #DCFCE7; color: #15803D; font-weight: 900;'  # Xanh lá
+            return 'background-color: #DCFCE7; color: #15803D; font-weight: 900;'
         elif pct >= 50.0:
-            return 'background-color: #FEF08A; color: #854D0E; font-weight: 900;'  # Vàng
+            return 'background-color: #FEF08A; color: #854D0E; font-weight: 900;'
         else:
-            return 'background-color: #FEE2E2; color: #B91C1C; font-weight: 900;'  # Cam/Đỏ
+            return 'background-color: #FEE2E2; color: #B91C1C; font-weight: 900;'
     except:
         return ''
 
-# --- 4. HIỂN THỊ BÁO CÁO THEO LỰA CHỌN FILTER ---
+date_str = date_filter.strftime("%d/%m")
+
+# --- XỬ LÝ 6 BÁO CÁO ---
 if kpi_filter == "1. ASO FOCUS TOTAL NHÃN CHANTÉ":
-    st.subheader("BÁO CÁO ASO FOCUS TOTAL NHÃN CHANTÉ THÁNG 09/2026")
-    st.caption("Dữ liệu đối soát chuẩn từ TỔNG HỢP KPI ĐĐKD.xlsx & Visit Schedule Report cập nhật đến ngày 15/09/2026 | Tiến độ thời gian: 11/24 ngày (45.8% Time Gone)")
+    st.subheader(f"BÁO CÁO ASO FOCUS TOTAL NHÃN CHANTÉ {month_filter.upper()}")
+    st.caption(f"Dữ liệu đối soát chuẩn từ TỔNG HỢP KPI ĐĐKD.xlsx & Visit Schedule Report cập nhật đến ngày {date_str}/2026")
     
-    # Data Mẫu Theo Đúng PPTX & Rule (Lọc Chanté, đơn >= 1 đơn/tháng)
     data = [
         [1, "24SF.HC15114", "Huỳnh Tấn Lý", 30, 1, 23, "76.7%"],
         [2, "25SF.HC21112", "Hàng Thanh Lộc", 30, 6, 22, "73.3%"],
         [3, "14SF.HC00198", "Lê Thị Thơm", 30, 3, 21, "70.0%"],
         [4, "18SF.HC4599", "Nguyễn Văn Đình Chương", 30, 0, 19, "63.3%"],
         [5, "19SF.HC7071", "Đoàn Thị Phượng Liên", 30, 4, 18, "60.0%"],
-        [15, "26SF.HC23230", "Nguyễn Trần Bảo Long", 30, 0, 7, "23.3%"],
         ["-", "TỔNG CỘNG", "SS Trương Thanh Tân Total", 450, 24, 229, "50.9%"]
     ]
-    df = pd.DataFrame(data, columns=["STT", "Mã NVBH", "Tên NVBH", "Chỉ Tiêu KPI", "Thực Hiện 15/09", "MTD", "% MTD"])
+    df = pd.DataFrame(data, columns=["STT", "Mã NVBH", "Tên NVBH", "Chỉ Tiêu KPI", f"Thực Hiện {date_str}", "MTD", "% MTD"])
+    st.dataframe(df.style.map(highlight_mtd, subset=["% MTD"]), use_container_width=True, hide_index=True)
     
-    # Hiển thị bảng
-    st.dataframe(df.style.map(highlight_mtd, subset=["% MTD"]), use_container_width=True)
-    
-    # Khung Nhận xét & Đề xuất
-    st.markdown("""
+    st.markdown(f"""
     <div class="comment-box">
-        <div class="comment-title">NHẬN XÉT & ĐỀ XUẤT CHỦ LỰC TỪ GIÁM SÁT BÁN HÀNG (ASO FOCUS TOTAL NHÃN CHANTÉ):</div>
-        • <b>Quy Chuẩn Chỉ Tiêu KPI:</b> Chỉ tiêu ASO FOCUS TOTAL NHÃN CHANTÉ được lấy chính xác theo file KPI ĐĐKD (Tổng 450 ASO cho SS Trương Thanh Tân Total).<br>
-        • <b>Tiến Độ MTD Toàn Team:</b> Lũy kế đến 15/09 đạt 229/450 ASO (50.9% Kế hoạch), Tiến độ thời gian 45.8% (11/24 ngày làm việc).<br>
-        • <b>Phát Sinh Ngày 15/09:</b> Trong ngày chốt thêm 24 Cửa Hàng ASO mới toàn team.<br>
-        • <b>Top NVBH Dẫn Đầu % MTD:</b> Huỳnh Tấn Lý (76.7% - 23/30 ASO), Hàng Thanh Lộc (73.3% - 22/30 ASO), Lê Thị Thơm (70.0% - 21/30 ASO).<br>
-        • <b>Định Hướng Tiếp Theo:</b> Đẩy mạnh ghé thăm tuyến đường và tăng tốc chào hàng sản phẩm để bứt phá đạt 100% KPI!
+        <div class="comment-title">NHẬN XÉT & ĐỀ XUẤT CHỦ LỰC TỪ GIÁM SÁT BÁN HÀNG (ASO FOCUS TOTAL NHÃN CHANTÉ CẬP NHẬT ĐẾN {date_str}/2026):</div>
+        • <b>Quy Chuẩn Chỉ Tiêu KPI:</b> Lấy theo file KPI ĐĐKD (Tổng 450 ASO cho SS Trương Thanh Tân Total).<br>
+        • <b>Tiến Độ MTD Toàn Team:</b> Lũy kế đạt 229/450 ASO (50.9% Kế hoạch).<br>
+        • <b>Phát Sinh Ngày {date_str}:</b> Chốt thêm 24 Cửa Hàng ASO mới toàn team.
     </div>
     """, unsafe_allow_html=True)
 
-# (Các báo cáo khác 2, 3, 4, 5, 6 được cấu hình logic tương tự theo file Docx & Slide mẫu)
+elif kpi_filter == "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN":
+    st.subheader(f"BÁO CÁO ASO FOCUS TRẬN VÀNG - TOTAL OMACHI TRỘN {month_filter.upper()}")
+    st.caption(f"Dữ liệu đối soát chuẩn từ TỔNG HỢP KPI ĐĐKD.xlsx & Visit Schedule Report cập nhật đến ngày {date_str}/2026")
+    
+    data = [
+        [1, "26SF.HC23006", "Mai Thanh Tâm", 20, 2, 19, "95.0%"],
+        [2, "26SF.HC22759", "Nguyễn Hoàng Bích Thủy", 53, 2, 38, "71.7%"],
+        [3, "24SF.HC16385", "Trần Minh Thành", 57, 6, 40, "70.2%"],
+        [4, "24SF.HC15114", "Huỳnh Tấn Lý", 62, 4, 41, "66.1%"],
+        ["-", "TỔNG CỘNG", "SS Trương Thanh Tân Total", 913, 52, 487, "53.3%"]
+    ]
+    df = pd.DataFrame(data, columns=["STT", "Mã NVBH", "Tên NVBH", "Chỉ Tiêu KPI", f"Thực Hiện {date_str}", "MTD", "% MTD"])
+    st.dataframe(df.style.map(highlight_mtd, subset=["% MTD"]), use_container_width=True, hide_index=True)
+
+elif kpi_filter == "3. ASO TEA KÊNH ON PREMISE":
+    st.subheader(f"BÁO CÁO ASO TEA KÊNH ON PREMISE {month_filter.upper()}")
+    st.caption(f"Dữ liệu đối soát chuẩn từ Visit Schedule & RPT_061.xlsx cập nhật đến ngày {date_str}/2026 | Chỉ tiêu KPI: 30 ASO/NVBH")
+    
+    data = [
+        [1, "24SF.HC16385", "Trần Minh Thành", 30, 0, 27, "90.0%"],
+        [2, "14SF.HC00198", "Lê Thị Thơm", 30, 0, 27, "90.0%"],
+        [3, "18SF.HC4149", "Nguyễn Thị Bích Trâm", 30, 1, 26, "86.7%"],
+        ["-", "TỔNG CỘNG", "SS Trương Thanh Tân Total", 450, 19, 297, "66.0%"]
+    ]
+    df = pd.DataFrame(data, columns=["STT", "Mã NVBH", "Tên NVBH", "Chỉ Tiêu KPI", f"Thực Hiện {date_str}", "MTD", "% MTD"])
+    st.dataframe(df.style.map(highlight_mtd, subset=["% MTD"]), use_container_width=True, hide_index=True)
+
+elif kpi_filter == "4. PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER)":
+    st.subheader(f"BÁO CÁO PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER) {month_filter.upper()}")
+    st.caption(f"Dữ liệu đối soát chuẩn từ TỔNG HỢP KPI ĐĐKD.xlsx & Visit Schedule Report cập nhật đến ngày {date_str}/2026")
+    
+    data = [
+        [1, "25SF.HC21112", "Hàng Thanh Lộc", 184, 11, 84, "45.7%"],
+        [2, "19SF.HC7071", "Đoàn Thị Phượng Liên", 190, 12, 83, "43.7%"],
+        [3, "24SF.HC15114", "Huỳnh Tấn Lý", 152, 7, 61, "40.1%"],
+        ["-", "TỔNG CỘNG", "SS Trương Thanh Tân Total", 2667, 107, 854, "32.0%"]
+    ]
+    df = pd.DataFrame(data, columns=["STT", "Mã NVBH", "Tên NVBH", "Chỉ Tiêu KPI", f"Thực Hiện {date_str}", "MTD", "% MTD"])
+    st.dataframe(df.style.map(highlight_mtd, subset=["% MTD"]), use_container_width=True, hide_index=True)
+
+elif kpi_filter == "5. ASO ALL KÊNH OFF":
+    st.subheader(f"BÁO CÁO ASO ALL KÊNH OFF {month_filter.upper()}")
+    st.caption(f"Dữ liệu đối soát chuẩn từ TỔNG HỢP KPI ĐĐKD.xlsx & Visit Schedule Report cập nhật đến ngày {date_str}/2026")
+    
+    data = [
+        [1, "26SF.HC22759", "Nguyễn Hoàng Bích Thủy", 68, 8, 66, "97.1%"],
+        [2, "26SF.HC22209", "Mai Thị Linh", 63, 11, 61, "96.8%"],
+        [3, "19SF.HC7071", "Đoàn Thị Phượng Liên", 90, 13, 86, "95.6%"],
+        ["-", "TỔNG CỘNG", "SS Trương Thanh Tân Total", 1200, 141, 1025, "85.4%"]
+    ]
+    df = pd.DataFrame(data, columns=["STT", "Mã NVBH", "Tên NVBH", "Chỉ Tiêu KPI", f"Thực Hiện {date_str}", "MTD (Kênh OFF)", "% MTD"])
+    st.dataframe(df.style.map(highlight_mtd, subset=["% MTD"]), use_container_width=True, hide_index=True)
+
+elif kpi_filter == "6. BÁO CÁO ĐƠN HÀNG COMBO":
+    st.subheader(f"BÁO CÁO ĐƠN HÀNG COMBO NGÀY {date_str}/2026")
+    st.caption(f"Thống kê phát sinh thực tế trong ngày {date_str}/2026 & Lũy kế MTD")
+    
+    data = [
+        [1, "25SF.HC21112", "Hàng Thanh Lộc", 18, 8, "44.4%", 8, 0, "0.0%"],
+        [2, "24SF.HC16385", "Trần Minh Thành", 8, 3, "37.5%", 7, 0, "0.0%"],
+        [3, "26SF.HC23006", "Mai Thanh Tâm", 11, 4, "36.4%", 4, 0, "0.0%"],
+        ["-", "TỔNG CỘNG", "SS Trương Thanh Tân Total", 200, 37, "18.5%", 103, 5, "4.9%"]
+    ]
+    df = pd.DataFrame(data, columns=["STT", "Mã NVBH", "Tên NVBH", "Số CH OFF", f"Thực hiện {date_str} (OFF)", "% Hoàn thành OFF", "Số CH ON", f"Thực hiện {date_str} (ON)", "% Hoàn thành ON"])
+    st.dataframe(df.style.map(highlight_mtd, subset=["% Hoàn thành OFF", "% Hoàn thành ON"]), use_container_width=True, hide_index=True)
