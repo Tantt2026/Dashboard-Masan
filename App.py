@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import datetime
 import numpy as np
+import os
 
 # --- CONFIG TRANG WEB ---
 st.set_page_config(page_title="TRACKING KPI - MASAN CONSUMER", layout="wide")
@@ -87,7 +88,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- KHỞI TẠO SESSION ADMIN PASS ---
+# --- KHỞI TẠO SESSION STATE ĐỂ GIỮ FILE UPLOAD TRONG SUỐT PHIÊN BÁO CÁO ---
+for key in ['df_sales_file', 'df_mcp_file', 'df_cat_file', 'df_brand_file', 'df_target_file']:
+    if key not in st.session_state:
+        st.session_state[key] = None
+
 if 'admin_logged_in' not in st.session_state:
     st.session_state['admin_logged_in'] = False
 
@@ -101,8 +106,6 @@ with head_col1:
         <div class="header-subtitle">TRACKING KPI ĐDKD</div>
     </div>
     """, unsafe_allow_html=True)
-
-file_sales, file_mcp, file_mbs_cat, file_mbs_brand, file_kpi_target = None, None, None, None, None
 
 with head_col2:
     st.write("") 
@@ -125,11 +128,25 @@ with head_col2:
                 st.session_state['admin_logged_in'] = False
                 st.rerun()
             st.markdown("---")
-            file_kpi_target = st.file_uploader("1. File Chỉ Tiêu (KPI.xlsx)", type=["xlsx", "csv"], key="u_target")
-            file_sales = st.file_uploader("2. File Sales Chi Tiết", type=["xlsx", "csv"], key="u_sales")
-            file_mcp = st.file_uploader("3. File MCP Visit", type=["xlsx", "csv"], key="u_mcp")
-            file_mbs_cat = st.file_uploader("4. File MBS Category", type=["xlsx", "csv"], key="u_cat")
-            file_mbs_brand = st.file_uploader("5. File MBS Brand", type=["xlsx", "csv"], key="u_brand")
+            
+            u_target = st.file_uploader("1. File Chỉ Tiêu (KPI.xlsx)", type=["xlsx", "csv"], key="u_target")
+            u_sales = st.file_uploader("2. File Sales Chi Tiết (Cập nhật ngày)", type=["xlsx", "csv"], key="u_sales")
+            u_mcp = st.file_uploader("3. File MCP Visit", type=["xlsx", "csv"], key="u_mcp")
+            u_cat = st.file_uploader("4. File MBS Category", type=["xlsx", "csv"], key="u_cat")
+            u_brand = st.file_uploader("5. File MBS Brand", type=["xlsx", "csv"], key="u_brand")
+
+            if u_target: st.session_state['df_target_file'] = u_target
+            if u_sales: st.session_state['df_sales_file'] = u_sales
+            if u_mcp: st.session_state['df_mcp_file'] = u_mcp
+            if u_cat: st.session_state['df_cat_file'] = u_cat
+            if u_brand: st.session_state['df_brand_file'] = u_brand
+
+# --- LỌC FILE: ƯU TIÊN FILE UPLOAD > FILE MẶC ĐỊNH SẴN TRONG THƯ MỤC ---
+file_kpi_target = st.session_state['df_target_file'] or ("Target_KPI.xlsx" if os.path.exists("Target_KPI.xlsx") else None)
+file_sales = st.session_state['df_sales_file'] or ("Data_Sales.xlsx" if os.path.exists("Data_Sales.xlsx") else None)
+file_mcp = st.session_state['df_mcp_file'] or ("Data_MCP.xlsx" if os.path.exists("Data_MCP.xlsx") else None)
+file_mbs_cat = st.session_state['df_cat_file'] or ("Data_Cat.xlsx" if os.path.exists("Data_Cat.xlsx") else None)
+file_mbs_brand = st.session_state['df_brand_file'] or ("Data_Brand.xlsx" if os.path.exists("Data_Brand.xlsx") else None)
 
 # --- DANH SÁCH NHÂN VIÊN BÁN HÀNG ---
 REPS_LIST = [
@@ -178,7 +195,11 @@ date_str = selected_date.strftime("%d/%m")
 df_sales = None
 if file_sales is not None:
     try:
-        df_sales = pd.read_excel(file_sales) if file_sales.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_sales)
+        if isinstance(file_sales, str):
+            df_sales = pd.read_excel(file_sales) if file_sales.endswith(('.xlsx', '.xls')) else pd.read_csv(file_sales)
+        else:
+            df_sales = pd.read_excel(file_sales) if file_sales.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_sales)
+        
         df_sales.columns = [str(c).strip() for c in df_sales.columns]
         
         date_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['ngày', 'date', 'created', 'time'])]
@@ -238,7 +259,7 @@ if file_kpi_target is not None:
 df_mcp = None
 if file_mcp is not None:
     try:
-        df_mcp = pd.read_excel(file_mcp) if file_mcp.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mcp)
+        df_mcp = pd.read_excel(file_mcp) if (isinstance(file_mcp, str) and file_mcp.endswith(('.xlsx', '.xls'))) or (hasattr(file_mcp, 'name') and file_mcp.name.endswith(('.xlsx', '.xls'))) else pd.read_csv(file_mcp)
         df_mcp.columns = [str(c).strip() for c in df_mcp.columns]
         ch_mcp = [c for c in df_mcp.columns if any(k in c.lower() for k in ['mã kh', 'mã ch', 'outlet'])]
         kentu_mcp = [c for c in df_mcp.columns if any(k in c.lower() for k in ['l1', 'kênh', 'channel'])]
@@ -424,7 +445,6 @@ with tab_kpi:
 
         df_kpi = pd.DataFrame(table_rows, columns=["STT", "Mã NVBH", "Tên NVBH", "Chỉ Tiêu KPI", f"Thực Hiện {date_str}", "MTD", "% MTD"])
         
-        # HIỂN THỊ BẢNG KPI VỚI STYLE TIÊU ĐỀ NỀN XANH CHỮ ĐỎ & BOLD NỘI DUNG
         styled_df_kpi = df_kpi.style\
             .map(highlight_mtd, subset=["% MTD"])\
             .set_table_styles([
@@ -489,7 +509,10 @@ with tab_mcp:
     st.header("🗺️ MCP VISIT & MAPPING DOANH SỐ BÁN HÀNG")
     if file_mcp is not None:
         try:
-            df_mcp_raw = pd.read_excel(file_mcp) if file_mcp.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mcp)
+            if isinstance(file_mcp, str):
+                df_mcp_raw = pd.read_excel(file_mcp) if file_mcp.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mcp)
+            else:
+                df_mcp_raw = pd.read_excel(file_mcp) if file_mcp.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mcp)
             df_mcp_filtered = apply_raw_data_filters(df_mcp_raw, "mcp")
             st.success(f"Hiển thị {len(df_mcp_filtered)} / {len(df_mcp_raw)} dòng dữ liệu MCP Visit")
             st.dataframe(df_mcp_filtered, use_container_width=True)
@@ -505,7 +528,10 @@ with tab_mbs_cat:
     st.header("🎯 TRACKING MBS - THEO NGHÀNH HÀNG (CATEGORY)")
     if file_mbs_cat is not None:
         try:
-            df_cat_raw = pd.read_excel(file_mbs_cat) if file_mbs_cat.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mbs_cat)
+            if isinstance(file_mbs_cat, str):
+                df_cat_raw = pd.read_excel(file_mbs_cat) if file_mbs_cat.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mbs_cat)
+            else:
+                df_cat_raw = pd.read_excel(file_mbs_cat) if file_mbs_cat.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mbs_cat)
             df_cat_filtered = apply_raw_data_filters(df_cat_raw, "cat")
             st.success(f"Hiển thị {len(df_cat_filtered)} / {len(df_cat_raw)} dòng dữ liệu Tracking MBS Category")
             st.dataframe(df_cat_filtered, use_container_width=True)
@@ -521,7 +547,10 @@ with tab_mbs_brand:
     st.header("🏷️ TRACKING MBS - THEO NHÃN HÀNG (BRAND)")
     if file_mbs_brand is not None:
         try:
-            df_brand_raw = pd.read_excel(file_mbs_brand) if file_mbs_brand.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mbs_brand)
+            if isinstance(file_mbs_brand, str):
+                df_brand_raw = pd.read_excel(file_mbs_brand) if file_mbs_brand.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mbs_brand)
+            else:
+                df_brand_raw = pd.read_excel(file_mbs_brand) if file_mbs_brand.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mbs_brand)
             df_brand_filtered = apply_raw_data_filters(df_brand_raw, "brand")
             st.success(f"Hiển thị {len(df_brand_filtered)} / {len(df_brand_raw)} dòng dữ liệu Tracking MBS Brand")
             st.dataframe(df_brand_filtered, use_container_width=True)
