@@ -128,12 +128,12 @@ with head_col2:
                 st.session_state['df_sales_file'] = u_sales
                 st.success("Đã nạp file bán hàng thành công!")
 
-# --- TỰ ĐỘNG TÌM FILE BÁN HÀNG HOẶC DÙNG SESSION (GIỮ NGUYÊN CODE_1) ---
+# --- TỰ ĐỘNG TÌM FILE BÁN HÀNG HOẶC DÙNG SESSION (ĐÚNG 100% CODE_1) ---
 def find_available_sales_file():
     if st.session_state['df_sales_file'] is not None:
         return st.session_state['df_sales_file']
     for f in os.listdir('.'):
-        if any(kw in f.lower() for kw in ['ban_hang', 'sales', 'don_hang', 'chitietdonhang', 'data_sales', 'data']):
+        if any(kw in f.lower() for kw in ['ban_hang', 'sales', 'don_hang', 'chitietdonhang', 'data_sales']):
             return f
     return None
 
@@ -184,7 +184,7 @@ st.markdown("---")
 selected_date = date_filter
 date_str = selected_date.strftime("%d/%m")
 
-# --- ĐỌC VÀ CHUẨN HÓA FILE SALES (GIỮ NGUYÊN CODE_1, FIX CHUẨN CỘT MÃ CH) ---
+# --- ĐỌC VÀ CHUẨN HÓA FILE SALES (ĐÚNG 100% CODE_1) ---
 df_sales = None
 if file_sales is not None:
     try:
@@ -202,22 +202,15 @@ if file_sales is not None:
         def find_col(keywords):
             for kw in keywords:
                 for col in df_sales.columns:
-                    if kw.lower() == col.lower(): # Ưu tiên khớp chính xác tuyệt đối trước
-                        return col
-            for kw in keywords:
-                for col in df_sales.columns:
-                    if kw.lower() in col.lower() and 'chuyến' not in col.lower():
+                    if kw.lower() in col.lower():
                         return col
             return None
 
         date_c = find_col(['ngày', 'date', 'created', 'time', 'ngay'])
         df_sales['ORDER_DATE'] = pd.to_datetime(df_sales[date_c], errors='coerce').dt.date.fillna(selected_date) if date_c else selected_date
         
-        ch_c = find_col(['mã ch', 'mã khách hàng', 'outlet code', 'customer code', 'shipto'])
-        if not ch_c:
-            # Fallback lấy đúng cột 16 nếu file Data.xlsx chuẩn
-            ch_c = df_sales.columns[16] if len(df_sales.columns) > 16 else df_sales.columns[0]
-        df_sales['OUTLET_CODE'] = df_sales[ch_c].astype(str).str.strip()
+        ch_c = find_col(['mã ch', 'outlet', 'customer', 'cust', 'khách hàng', 'shipto', 'ship-to'])
+        df_sales['OUTLET_CODE'] = df_sales[ch_c].astype(str).str.strip() if ch_c else df_sales.iloc[:, 0].astype(str).str.strip()
             
         rep_c = find_col(['mã nvbh', 'mã nv', 'nvbh', 'sm', 'saleman', 'nhân viên'])
         df_sales['REP_CODE'] = df_sales[rep_c].astype(str).str.strip() if rep_c else ""
@@ -228,7 +221,7 @@ if file_sales is not None:
         prod_c = find_col(['sản phẩm', 'product', 'sku', 'tên sp', 'item', 'mặt hàng'])
         df_sales['PROD_NAME'] = df_sales[prod_c].astype(str).str.strip() if prod_c else ""
         
-        qty_c = find_col(['tổng chẵn', 'số lượng', 'quantity', 'qty', 'sl', 'thùng', 'kg'])
+        qty_c = find_col(['số lượng', 'quantity', 'qty', 'sl', 'thùng', 'kg'])
         df_sales['QTY'] = pd.to_numeric(df_sales[qty_c], errors='coerce').fillna(1) if qty_c else 1
     except Exception as e:
         st.error(f"⚠️ Lỗi đọc File Sales: {e}")
@@ -266,7 +259,7 @@ if file_kpi_target is not None:
     except Exception as e:
         pass
 
-# --- ĐỌC VÀ CHUẨN HÓA FILE MCP (MAP DOANH SỐ MTD TỪ FILE SALES) ---
+# --- ĐỌC VÀ CHUẨN HÓA FILE MCP (BỔ SUNG TÍNH TOÁN DOANH SỐ MTD CHO TAB MCP) ---
 df_mcp = None
 if file_mcp is not None:
     try:
@@ -278,10 +271,12 @@ if file_mcp is not None:
         if ch_mcp: df_mcp['OUTLET_CODE'] = df_mcp[ch_mcp[0]].astype(str).str.strip()
         if kentu_mcp: df_mcp['CHANNEL_L1'] = df_mcp[kentu_mcp[0]].astype(str).str.strip()
         
-        # Mapping Doanh Số MTD chuẩn xác sang file MCP
-        if df_sales is not None and 'ORDER_DATE' in df_sales.columns and 'OUTLET_CODE' in df_sales.columns:
+        # FIX DUY NHẤT CHO TAB MCP: Map Doanh Số MTD chính xác từ file Sales dựa trên Mã CH (Cột 16 của Sales)
+        if df_sales is not None and 'ORDER_DATE' in df_sales.columns:
+            # Lấy đúng cột Mã CH (cột chứa mã khách hàng trong file Data.xlsx)
+            sales_ch_col = next((c for c in df_sales.columns if 'mã ch' in c.lower()), df_sales.columns[16] if len(df_sales.columns)>16 else df_sales.columns[0])
             df_sales_mtd = df_sales[df_sales['ORDER_DATE'] <= selected_date].copy()
-            df_sales_mtd['OUTLET_CODE_STR'] = df_sales_mtd['OUTLET_CODE'].astype(str).str.strip()
+            df_sales_mtd['OUTLET_CODE_STR'] = df_sales_mtd[sales_ch_col].astype(str).str.strip()
             sales_summary = df_sales_mtd.groupby('OUTLET_CODE_STR')['QTY'].sum().to_dict()
             
             df_mcp['OUTLET_CODE_STR'] = df_mcp['OUTLET_CODE'].astype(str).str.strip()
@@ -374,7 +369,7 @@ tab_kpi, tab_mcp, tab_mbs_cat, tab_mbs_brand = st.tabs([
 ])
 
 # ==========================================
-# TAB 1: BÁO CÁO KPI (GIỮ NGUYÊN 100% CÁCH CHẠY CỦA CODE_1)
+# TAB 1: BÁO CÁO KPI (GIỮ NGUYÊN 100% CODE_1)
 # ==========================================
 with tab_kpi:
     curr_targets = targets_from_file.get(kpi_filter, DEFAULT_TARGETS.get(kpi_filter, {r[0]: 30 for r in REPS_LIST}))
@@ -544,7 +539,7 @@ with tab_kpi:
         st.dataframe(styled_df_combo, use_container_width=True, hide_index=True)
 
 # ==========================================
-# TAB 2: MCP VISIT
+# TAB 2: MCP VISIT (BỔ SUNG HIỂN THỊ DOANH SỐ MTD)
 # ==========================================
 with tab_mcp:
     st.header("🗺️ MCP VISIT & MAPPING DOANH SỐ BÁN HÀNG")
