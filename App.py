@@ -7,25 +7,29 @@ import os
 # --- CONFIG TRANG WEB ---
 st.set_page_config(page_title="TRACKING KPI - MASAN CONSUMER", layout="wide")
 
-# --- CUSTOM CSS ---
+# --- CUSTOM CSS: TIÊU ĐỀ XANH DƯƠNG ĐẬM & KHÓA BẢNG DATA ---
 st.markdown("""
 <style>
     html, body, p, span, label, td, th, div, input {
         font-weight: 900 !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     }
+    
     [data-testid="stIcon"], [data-testid="stIcon"] *, i, .st-emotion-cache-121544q, [class*="st-"] svg {
         font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
         font-weight: normal !important;
     }
+
     div[data-testid="stPopover"] button {
         font-weight: 900 !important;
         font-size: 13px !important;
         padding: 8px 12px !important;
         white-space: nowrap !important;
     }
+
+    /* TIÊU ĐỀ DASHBOARD MÀU XANH DƯƠNG ĐẬM */
     .header-banner {
-        background-color: #FDE047;
+        background-color: #034EA2;
         border: 2px solid #000;
         border-radius: 12px;
         padding: 15px;
@@ -35,17 +39,18 @@ st.markdown("""
     .header-title {
         font-size: 26px;
         font-weight: 900 !important;
-        color: #0F172A;
+        color: #FFFFFF;
         margin: 0;
         text-transform: uppercase;
     }
     .header-subtitle {
         font-size: 20px;
         font-weight: 900 !important;
-        color: #0F172A;
+        color: #FDE047;
         margin-top: 5px;
         text-transform: uppercase;
     }
+    
     [data-testid="stDataFrame"] div[role="columnheader"] {
         background-color: #034EA2 !important;
     }
@@ -58,6 +63,7 @@ st.markdown("""
         font-weight: 900 !important;
         color: #0F172A !important;
     }
+    
     .comment-box {
         border: 2px solid #034EA2;
         border-radius: 10px;
@@ -77,11 +83,10 @@ st.markdown("""
         text-transform: uppercase;
     }
 </style>
-""", unsafe_allow_html=True)
+""", unsafe_allow_html=True);
 
-for key in ['df_sales_file', 'df_mcp_file', 'df_cat_file', 'df_brand_file', 'df_target_file']:
-    if key not in st.session_state:
-        st.session_state[key] = None
+if 'df_sales_file' not in st.session_state:
+    st.session_state['df_sales_file'] = None
 
 if 'admin_logged_in' not in st.session_state:
     st.session_state['admin_logged_in'] = False
@@ -109,30 +114,27 @@ with head_col2:
                     st.rerun()
                 else:
                     st.error("Sai mật khẩu!")
+            st.info("👀 Chế độ Viewer bảo mật dữ liệu.")
     else:
-        with st.popover("📁 UPLOAD FILE (ADMIN)", use_container_width=True):
-            st.success("🟢 QUYỀN ADMIN")
+        with st.popover("📁 UPLOAD DATA (ADMIN)", use_container_width=True):
+            st.success("🟢 QUYỀN ADMIN (ĐÃ XÁC THỰC)")
             if st.button("🔒 Đăng Xuất Admin", key="btn_logout_top", use_container_width=True):
                 st.session_state['admin_logged_in'] = False
                 st.rerun()
             st.markdown("---")
-            u_target = st.file_uploader("1. File Chỉ Tiêu (KPI.xlsx)", type=["xlsx", "csv"], key="u_target")
-            u_sales = st.file_uploader("2. File Sales Chi Tiết", type=["xlsx", "csv"], key="u_sales")
-            u_mcp = st.file_uploader("3. File MCP Visit", type=["xlsx", "csv"], key="u_mcp")
-            u_cat = st.file_uploader("4. File MBS Category", type=["xlsx", "csv"], key="u_cat")
-            u_brand = st.file_uploader("5. File MBS Brand", type=["xlsx", "csv"], key="u_brand")
+            
+            # CHỈ CHO PHÉP UPLOAD DUY NHẤT FILE BÁN HÀNG
+            u_sales = st.file_uploader("📂 Tải lên File Bán Hàng (DanhSachChiTietDonHang.xlsx)", type=["xlsx", "csv"], key="u_sales")
+            if u_sales: 
+                st.session_state['df_sales_file'] = u_sales
+                st.success("Đã nạp file bán hàng thành công!")
 
-            if u_target: st.session_state['df_target_file'] = u_target
-            if u_sales: st.session_state['df_sales_file'] = u_sales
-            if u_mcp: st.session_state['df_mcp_file'] = u_mcp
-            if u_cat: st.session_state['df_cat_file'] = u_cat
-            if u_brand: st.session_state['df_brand_file'] = u_brand
-
-file_kpi_target = st.session_state['df_target_file'] or ("Target_KPI.xlsx" if os.path.exists("Target_KPI.xlsx") else None)
+# --- CÁC FILE CỐ ĐỊNH HỆ THỐNG NẰM NGẦM ---
+file_kpi_target = "Target_KPI.xlsx" if os.path.exists("Target_KPI.xlsx") else None
 file_sales = st.session_state['df_sales_file'] or ("Data_Sales.xlsx" if os.path.exists("Data_Sales.xlsx") else None)
-file_mcp = st.session_state['df_mcp_file'] or ("Data_MCP.xlsx" if os.path.exists("Data_MCP.xlsx") else None)
-file_mbs_cat = st.session_state['df_cat_file'] or ("Data_Cat.xlsx" if os.path.exists("Data_Cat.xlsx") else None)
-file_mbs_brand = st.session_state['df_brand_file'] or ("Data_Brand.xlsx" if os.path.exists("Data_Brand.xlsx") else None)
+file_mcp = "Data_MCP.xlsx" if os.path.exists("Data_MCP.xlsx") else None
+file_mbs_cat = "Data_Cat.xlsx" if os.path.exists("Data_Cat.xlsx") else None
+file_mbs_brand = "Data_Brand.xlsx" if os.path.exists("Data_Brand.xlsx") else None
 
 REPS_LIST = [
     ("24SF.HC15114", "Huỳnh Tấn Lý"),
@@ -175,16 +177,14 @@ st.markdown("---")
 selected_date = date_filter
 date_str = selected_date.strftime("%d/%m")
 
-# --- ĐỌC FILE SALES: BẮT ĐÚNG DÒNG TIÊU ĐỀ CHI TIẾT SẢN PHẨM ---
+# --- ĐỌC VÀ CHUẨN HÓA FILE SALES ---
 df_sales = None
 if file_sales is not None:
     try:
         raw_peek = pd.read_excel(file_sales, header=None, nrows=10) if str(file_sales).endswith(('.xlsx', '.xls')) or (hasattr(file_sales, 'name') and file_sales.name.endswith(('.xlsx', '.xls'))) else pd.read_csv(file_sales, header=None, nrows=10)
-        
         real_header_row = 0
         for idx, row in raw_peek.iterrows():
             row_str = " ".join([str(val).lower() for val in row.values])
-            # Bắt buộc dòng tiêu đề phải chứa từ khóa đặc trưng của file chi tiết đơn hàng (sản phẩm/sku/item hoặc mã cửa hàng)
             if any(k in row_str for k in ['sản phẩm', 'product', 'sku', 'item', 'tên sp', 'mã ch', 'outlet code']):
                 real_header_row = idx
                 break
@@ -219,7 +219,7 @@ if file_sales is not None:
     except Exception as e:
         st.error(f"⚠️ Lỗi đọc File Sales: {e}")
 
-# --- ĐỌC FILE TARGET ---
+# --- TARGETS MẶC ĐỊNH & FILE ---
 DEFAULT_TARGETS = {
     "1. ASO FOCUS TOTAL NHÃN CHANTÉ": {r[0]: 30 for r in REPS_LIST},
     "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN": {"26SF.HC23006": 20, "26SF.HC22759": 53, "24SF.HC16385": 57, "24SF.HC15114": 62, "19SF.HC7071": 80, "26SF.HC23230": 40, "26SF.HC22209": 37, "26SF.HC22288": 49, "23SF.HC14324": 68, "14SF.HC00198": 87, "26SF.HC22196": 42, "25SF.HC21112": 87, "26SF.HC22774": 74, "18SF.HC4599": 92, "18SF.HC4149": 65},
@@ -256,7 +256,7 @@ if file_kpi_target is not None:
 df_mcp = None
 if file_mcp is not None:
     try:
-        df_mcp = pd.read_excel(file_mcp) if (isinstance(file_mcp, str) or hasattr(file_mcp, 'name') and str(file_mcp.name).endswith(('.xlsx', '.xls'))) else pd.read_csv(file_mcp)
+        df_mcp = pd.read_excel(file_mcp)
         df_mcp.columns = [str(c).strip() for c in df_mcp.columns]
         ch_mcp = [c for c in df_mcp.columns if any(k in c.lower() for k in ['mã kh', 'mã ch', 'outlet', 'shipto'])]
         kentu_mcp = [c for c in df_mcp.columns if any(k in c.lower() for k in ['l1', 'kênh', 'channel', 'phân loại'])]
@@ -319,7 +319,7 @@ tab_kpi, tab_mcp, tab_mbs_cat, tab_mbs_brand = st.tabs([
 ])
 
 # ==========================================
-# TAB 1: BÁO CÁO KPI
+# TAB 1: BÁO CÁO KPI (CỐ ĐỊNH BẢNG - KHÔNG CHO CHỈNH SỬA)
 # ==========================================
 with tab_kpi:
     curr_targets = targets_from_file.get(kpi_filter, DEFAULT_TARGETS.get(kpi_filter, {r[0]: 30 for r in REPS_LIST}))
@@ -438,6 +438,7 @@ with tab_kpi:
                 {'selector': 'td', 'props': [('font-weight', '900'), ('color', '#0F172A'), ('text-align', 'center')]}
             ])
             
+        # SỬ DỤNG st.dataframe VỚI THAM SỐ disabled ĐỂ CỐ ĐỊNH HOÀN TOÀN BẢNG
         st.dataframe(styled_df_kpi, use_container_width=True, hide_index=True)
 
         st.markdown(f"""
@@ -488,30 +489,6 @@ with tab_kpi:
             
         st.dataframe(styled_df_combo, use_container_width=True, hide_index=True)
 
-    # --- KHUNG CHẨN ĐOÁN LỖI ---
-    with st.expander("🔍 XEM TRẠNG THÁI ĐỌC FILE & CHẨN ĐOÁN DỮ LIỆU (CLICK ĐỂ MỞ)"):
-        col_dbg1, col_dbg2, col_dbg3 = st.columns(3)
-        with col_dbg1:
-            st.write("**1. File Sales Chi Tiết:**")
-            if df_sales is not None:
-                st.success(f"Đã tải ({len(df_sales)} dòng)")
-                st.write("Các cột nhận diện:", list(df_sales.columns)[:6])
-            else:
-                st.error("Chưa có file Sales!")
-        with col_dbg2:
-            st.write("**2. File MCP / Visit Schedule:**")
-            if df_mcp is not None:
-                st.success(f"Đã tải ({len(df_mcp)} dòng)")
-                st.write("Các cột nhận diện:", list(df_mcp.columns)[:6])
-            else:
-                st.warning("Chưa có file MCP Visit.")
-        with col_dbg3:
-            st.write("**3. File Target KPI:**")
-            if file_kpi_target is not None:
-                st.success("Đã kết nối file Target.")
-            else:
-                st.warning("Dùng target mặc định.")
-
 # ==========================================
 # TAB 2: MCP VISIT
 # ==========================================
@@ -519,14 +496,14 @@ with tab_mcp:
     st.header("🗺️ MCP VISIT & MAPPING DOANH SỐ BÁN HÀNG")
     if file_mcp is not None:
         try:
-            df_mcp_raw = pd.read_excel(file_mcp) if (isinstance(file_mcp, str) or hasattr(file_mcp, 'name') and str(file_mcp.name).endswith(('.xlsx', '.xls'))) else pd.read_csv(file_mcp)
+            df_mcp_raw = pd.read_excel(file_mcp)
             df_mcp_filtered = apply_raw_data_filters(df_mcp_raw, "mcp")
             st.success(f"Hiển thị {len(df_mcp_filtered)} / {len(df_mcp_raw)} dòng dữ liệu MCP Visit")
             st.dataframe(df_mcp_filtered, use_container_width=True)
         except Exception as e:
             st.error(f"Lỗi đọc file MCP Visit: {e}")
     else:
-        st.info("👆 Sử dụng nút ⚙️ ADMIN / UPLOAD ở góc trên bên phải để tải file Data MCP Visit!")
+        st.warning("⚠️ Không tìm thấy file MCP Visit hệ thống.")
 
 # ==========================================
 # TAB 3: TRACKING MBS CAT
@@ -535,14 +512,14 @@ with tab_mbs_cat:
     st.header("🎯 TRACKING MBS - THEO NGHÀNH HÀNG (CATEGORY)")
     if file_mbs_cat is not None:
         try:
-            df_cat_raw = pd.read_excel(file_mbs_cat) if (isinstance(file_mbs_cat, str) or hasattr(file_mbs_cat, 'name') and str(file_mbs_cat.name).endswith(('.xlsx', '.xls'))) else pd.read_csv(file_mbs_cat)
+            df_cat_raw = pd.read_excel(file_mbs_cat)
             df_cat_filtered = apply_raw_data_filters(df_cat_raw, "cat")
             st.success(f"Hiển thị {len(df_cat_filtered)} / {len(df_cat_raw)} dòng dữ liệu Tracking MBS Category")
             st.dataframe(df_cat_filtered, use_container_width=True)
         except Exception as e:
             st.error(f"Lỗi đọc file Tracking MBS Category: {e}")
     else:
-        st.info("👆 Sử dụng nút ⚙️ ADMIN / UPLOAD ở góc trên bên phải để tải file Data_Cat.xlsx!")
+        st.warning("⚠️ Không tìm thấy file Category hệ thống.")
 
 # ==========================================
 # TAB 4: TRACKING MBS BRAND
@@ -551,11 +528,11 @@ with tab_mbs_brand:
     st.header("🏷️ TRACKING MBS - THEO NHÃN HÀNG (BRAND)")
     if file_mbs_brand is not None:
         try:
-            df_brand_raw = pd.read_excel(file_mbs_brand) if (isinstance(file_mbs_brand, str) or hasattr(file_mbs_brand, 'name') and str(file_mbs_brand.name).endswith(('.xlsx', '.xls'))) else pd.read_csv(file_mbs_brand)
+            df_brand_raw = pd.read_excel(file_mbs_brand)
             df_brand_filtered = apply_raw_data_filters(df_brand_raw, "brand")
             st.success(f"Hiển thị {len(df_brand_filtered)} / {len(df_brand_raw)} dòng dữ liệu Tracking MBS Brand")
             st.dataframe(df_brand_filtered, use_container_width=True)
         except Exception as e:
             st.error(f"Lỗi đọc file Tracking MBS Brand: {e}")
     else:
-        st.info("👆 Sử dụng nút ⚙️ ADMIN / UPLOAD ở góc trên bên phải để tải file Data_Brand.xlsx!")
+        st.warning("⚠️ Không tìm thấy file Brand hệ thống.")
