@@ -141,7 +141,7 @@ with head_col2:
             if u_cat: st.session_state['df_cat_file'] = u_cat
             if u_brand: st.session_state['df_brand_file'] = u_brand
 
-# --- LỌC FILE: ƯU TIÊN FILE UPLOAD > FILE MẶC ĐỊNH SẴN TRONG THƯ MỤC ---
+# --- LỌC FILE: ƯU TIÊN FILE UPLOAD > FILE MẶC ĐỊNH TRONG THƯ MỤC ---
 file_kpi_target = st.session_state['df_target_file'] or ("Target_KPI.xlsx" if os.path.exists("Target_KPI.xlsx") else None)
 file_sales = st.session_state['df_sales_file'] or ("Data_Sales.xlsx" if os.path.exists("Data_Sales.xlsx") else None)
 file_mcp = st.session_state['df_mcp_file'] or ("Data_MCP.xlsx" if os.path.exists("Data_MCP.xlsx") else None)
@@ -202,26 +202,35 @@ if file_sales is not None:
         
         df_sales.columns = [str(c).strip() for c in df_sales.columns]
         
-        date_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['ngày', 'date', 'created', 'time'])]
-        df_sales['ORDER_DATE'] = pd.to_datetime(df_sales[date_c[0]], errors='coerce').dt.date if date_c else selected_date
+        # Tìm cột ngày tháng linh hoạt hơn
+        date_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['ngày', 'date', 'created', 'time', 'ngay'])]
+        if date_c:
+            df_sales['ORDER_DATE'] = pd.to_datetime(df_sales[date_c[0]], errors='coerce').dt.date.fillna(selected_date)
+        else:
+            df_sales['ORDER_DATE'] = selected_date
         
-        ch_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['mã kh', 'mã ch', 'outlet', 'customer', 'cust', 'khách hàng'])]
+        # Tìm cột mã khách hàng linh hoạt
+        ch_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['mã kh', 'mã ch', 'outlet', 'customer', 'cust', 'khách hàng', 'shipto'])]
         df_sales['OUTLET_CODE'] = df_sales[ch_c[0]].astype(str) if ch_c else "OUTLET_UNKNOWN"
             
-        rep_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['mã nv', 'nvbh', 'sm', 'saleman', 'nhân viên'])]
+        # Tìm cột nhân viên linh hoạt
+        rep_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['mã nv', 'nvbh', 'sm', 'saleman', 'nhân viên', 'mã nhân viên'])]
         df_sales['REP_CODE'] = df_sales[rep_c[0]].astype(str) if rep_c else ""
 
-        ord_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['đơn hàng', 'order', 'số hd', 'so_hd', 'invoice'])]
+        # Tìm cột đơn hàng / hóa đơn
+        ord_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['đơn hàng', 'order', 'số hd', 'so_hd', 'invoice', 'so_don'])]
         df_sales['ORDER_ID'] = df_sales[ord_c[0]].astype(str) if ord_c else df_sales['OUTLET_CODE'] + "_" + df_sales['ORDER_DATE'].astype(str)
             
-        prod_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['sản phẩm', 'product', 'sku', 'tên sp', 'item'])]
+        # Tìm cột sản phẩm / SKU
+        prod_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['sản phẩm', 'product', 'sku', 'tên sp', 'item', 'mặt hàng'])]
         df_sales['PROD_NAME'] = df_sales[prod_c[0]].astype(str) if prod_c else ""
         
-        qty_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['số lượng', 'quantity', 'qty', 'sl'])]
-        df_sales['QTY'] = pd.to_numeric(df_sales[qty_c[0]], errors='coerce').fillna(0) if qty_c else 1
+        # Tìm cột số lượng
+        qty_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['số lượng', 'quantity', 'qty', 'sl', 'thùng', 'kg'])]
+        df_sales['QTY'] = pd.to_numeric(df_sales[qty_c[0]], errors='coerce').fillna(1) if qty_c else 1
 
     except Exception as e:
-        st.error(f"⚠️ Lỗi parse File Sales: {e}")
+        st.error(f"⚠️ Lỗi đọc File Sales: {e}")
 
 # --- READ FILE TARGET ---
 DEFAULT_TARGETS = {
@@ -238,7 +247,8 @@ if file_kpi_target is not None:
         xls_t = pd.ExcelFile(file_kpi_target)
         sheet = "Export" if "Export" in xls_t.sheet_names else xls_t.sheet_names[0]
         df_t = pd.read_excel(xls_t, sheet_name=sheet)
-        rep_col = [c for c in df_t.columns if 'mã nvbh' in str(c).lower() or 'mã nv' in str(c).lower() or 'sm' in str(c).lower()]
+        df_t.columns = [str(c).strip() for c in df_t.columns]
+        rep_col = [c for c in df_t.columns if any(k in c.lower() for k in ['mã nvbh', 'mã nv', 'sm', 'mã nhân viên'])]
         if rep_col:
             r_col = rep_col[0]
             for kpi_key, target_col_name in [
@@ -261,8 +271,8 @@ if file_mcp is not None:
     try:
         df_mcp = pd.read_excel(file_mcp) if (isinstance(file_mcp, str) and file_mcp.endswith(('.xlsx', '.xls'))) or (hasattr(file_mcp, 'name') and file_mcp.name.endswith(('.xlsx', '.xls'))) else pd.read_csv(file_mcp)
         df_mcp.columns = [str(c).strip() for c in df_mcp.columns]
-        ch_mcp = [c for c in df_mcp.columns if any(k in c.lower() for k in ['mã kh', 'mã ch', 'outlet'])]
-        kentu_mcp = [c for c in df_mcp.columns if any(k in c.lower() for k in ['l1', 'kênh', 'channel'])]
+        ch_mcp = [c for c in df_mcp.columns if any(k in c.lower() for k in ['mã kh', 'mã ch', 'outlet', 'shipto'])]
+        kentu_mcp = [c for c in df_mcp.columns if any(k in c.lower() for k in ['l1', 'kênh', 'channel', 'phân loại'])]
         rep_mcp = [c for c in df_mcp.columns if any(k in c.lower() for k in ['mã nv', 'nvbh', 'sm', 'nhân viên'])]
         if ch_mcp: df_mcp['OUTLET_CODE'] = df_mcp[ch_mcp[0]].astype(str)
         if kentu_mcp: df_mcp['CHANNEL_L1'] = df_mcp[kentu_mcp[0]].astype(str)
@@ -283,18 +293,17 @@ def highlight_mtd(val):
     except:
         return 'font-weight: 900;'
 
-# --- HELPER FILTER CHO 3 TAB DATA THÔ (ĐDKD, MÃ KH, TÊN KH) ---
+# --- HELPER FILTER CHO 3 TAB DATA THÔ (ĐDKD, MÃ KH, TÊN KH) VỚI GỢI Ý LINH HOẠT ---
 def apply_raw_data_filters(df, tab_prefix):
     if df is None or len(df) == 0:
         return df
     
+    df_filtered = df.copy()
     col_filter1, col_filter2, col_filter3 = st.columns([1.5, 1.5, 2.0])
     
     rep_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['mã nv', 'nvbh', 'sm', 'tên nv', 'sm name', 'nhân viên'])]
     ch_code_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['mã kh', 'mã ch', 'outlet code', 'customer code', 'shipto', 'parent code'])]
     ch_name_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['tên kh', 'tên ch', 'outlet name', 'customer name', 'shipto name', 'khách hàng'])]
-
-    filtered_df = df.copy()
 
     with col_filter1:
         selected_rep = st.selectbox(
@@ -304,19 +313,19 @@ def apply_raw_data_filters(df, tab_prefix):
             key=f"{tab_prefix}_rep"
         )
         if selected_rep != "Tất cả ĐDKD" and rep_cols:
-            filtered_df = filtered_df[filtered_df[rep_cols[0]].astype(str).str.contains(selected_rep, case=False, na=False)]
+            df_filtered = df_filtered[df_filtered[rep_cols[0]].astype(str).str.contains(selected_rep, case=False, na=False)]
 
     with col_filter2:
         search_code = st.text_input("🆔 Lọc Mã Khách Hàng", key=f"{tab_prefix}_code")
         if search_code.strip() and ch_code_cols:
-            filtered_df = filtered_df[filtered_df[ch_code_cols[0]].astype(str).str.contains(search_code.strip(), case=False, na=False)]
+            df_filtered = df_filtered[df_filtered[ch_code_cols[0]].astype(str).str.contains(search_code.strip(), case=False, na=False)]
 
     with col_filter3:
         search_name = st.text_input("🏪 Lọc Tên Khách Hàng", key=f"{tab_prefix}_name")
         if search_name.strip() and ch_name_cols:
-            filtered_df = filtered_df[filtered_df[ch_name_cols[0]].astype(str).str.contains(search_name.strip(), case=False, na=False)]
+            df_filtered = df_filtered[df_filtered[ch_name_cols[0]].astype(str).str.contains(search_name.strip(), case=False, na=False)]
 
-    return filtered_df
+    return df_filtered
 
 # --- TAB CHÍNH ---
 tab_kpi, tab_mcp, tab_mbs_cat, tab_mbs_brand = st.tabs([
@@ -352,23 +361,23 @@ with tab_kpi:
             df_mtd_f = df_mtd[cond]
             df_day_f = df_day[cond]
             for code, name in REPS_LIST:
-                res_mtd[code] = df_mtd_f[df_mtd_f['REP_CODE'] == code]['OUTLET_CODE'].nunique()
-                res_day[code] = df_day_f[df_day_f['REP_CODE'] == code]['OUTLET_CODE'].nunique()
+                res_mtd[code] = df_mtd_f[df_mtd_f['REP_CODE'].str.contains(code, case=False, na=False)]['OUTLET_CODE'].nunique()
+                res_day[code] = df_day_f[df_day_f['REP_CODE'].str.contains(code, case=False, na=False)]['OUTLET_CODE'].nunique()
 
         elif kpi_name == "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN":
             cond = df_sales['PROD_NAME'].str.contains('trộn|spaghetti|lẩu cầm tay|tron', case=False, na=False)
             df_mtd_f = df_mtd[cond]
             df_day_f = df_day[cond]
             for code, name in REPS_LIST:
-                res_mtd[code] = df_mtd_f[df_mtd_f['REP_CODE'] == code]['OUTLET_CODE'].nunique()
-                res_day[code] = df_day_f[df_day_f['REP_CODE'] == code]['OUTLET_CODE'].nunique()
+                res_mtd[code] = df_mtd_f[df_mtd_f['REP_CODE'].str.contains(code, case=False, na=False)]['OUTLET_CODE'].nunique()
+                res_day[code] = df_day_f[df_day_f['REP_CODE'].str.contains(code, case=False, na=False)]['OUTLET_CODE'].nunique()
 
         elif kpi_name == "3. ASO TEA KÊNH ON PREMISE":
             cond_tea = df_sales['PROD_NAME'].str.contains('tea365|trà búp non|tea 365', case=False, na=False)
             df_mtd_tea = df_mtd[cond_tea]
             df_day_tea = df_day[cond_tea]
 
-            if df_mcp is not None and 'CHANNEL_L1' in df_mcp.columns:
+            if df_mcp is not None and 'CHANNEL_L1' in df_mcp.columns and 'OUTLET_CODE' in df_mcp.columns:
                 on_outlets = set(df_mcp[df_mcp['CHANNEL_L1'].str.contains('on premise', case=False, na=False)]['OUTLET_CODE'])
                 df_mtd_tea = df_mtd_tea[df_mtd_tea['OUTLET_CODE'].isin(on_outlets)]
                 df_day_tea = df_day_tea[df_day_tea['OUTLET_CODE'].isin(on_outlets)]
@@ -380,15 +389,15 @@ with tab_kpi:
             ord_day_valid = ord_day_valid[ord_day_valid['QTY'] >= 12]
 
             for code, name in REPS_LIST:
-                res_mtd[code] = ord_mtd_valid[ord_mtd_valid['REP_CODE'] == code]['OUTLET_CODE'].nunique()
-                res_day[code] = ord_day_valid[ord_day_valid['REP_CODE'] == code]['OUTLET_CODE'].nunique()
+                res_mtd[code] = ord_mtd_valid[ord_mtd_valid['REP_CODE'].str.contains(code, case=False, na=False)]['OUTLET_CODE'].nunique()
+                res_day[code] = ord_day_valid[ord_day_valid['REP_CODE'].str.contains(code, case=False, na=False)]['OUTLET_CODE'].nunique()
 
         elif kpi_name == "4. PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER)":
             cond_no_beer = ~df_sales['PROD_NAME'].str.contains('bia|beer', case=False, na=False)
             df_mtd_nobeer = df_mtd[cond_no_beer]
             df_day_nobeer = df_day[cond_no_beer]
 
-            if df_mcp is not None and 'CHANNEL_L1' in df_mcp.columns:
+            if df_mcp is not None and 'CHANNEL_L1' in df_mcp.columns and 'OUTLET_CODE' in df_mcp.columns:
                 off_outlets = set(df_mcp[df_mcp['CHANNEL_L1'].str.contains('off premise', case=False, na=False)]['OUTLET_CODE'])
                 df_mtd_nobeer = df_mtd_nobeer[df_mtd_nobeer['OUTLET_CODE'].isin(off_outlets)]
                 df_day_nobeer = df_day_nobeer[df_day_nobeer['OUTLET_CODE'].isin(off_outlets)]
@@ -400,21 +409,21 @@ with tab_kpi:
             ord_day_lines = ord_day_lines[ord_day_lines['PROD_NAME'] >= 4]
 
             for code, name in REPS_LIST:
-                res_mtd[code] = ord_mtd_lines[ord_mtd_lines['REP_CODE'] == code]['OUTLET_CODE'].nunique()
-                res_day[code] = ord_day_lines[ord_day_lines['REP_CODE'] == code]['OUTLET_CODE'].nunique()
+                res_mtd[code] = ord_mtd_lines[ord_mtd_lines['REP_CODE'].str.contains(code, case=False, na=False)]['OUTLET_CODE'].nunique()
+                res_day[code] = ord_day_lines[ord_day_lines['REP_CODE'].str.contains(code, case=False, na=False)]['OUTLET_CODE'].nunique()
 
         elif kpi_name == "5. ASO ALL KÊNH OFF":
             df_mtd_off = df_mtd.copy()
             df_day_off = df_day.copy()
 
-            if df_mcp is not None and 'CHANNEL_L1' in df_mcp.columns:
+            if df_mcp is not None and 'CHANNEL_L1' in df_mcp.columns and 'OUTLET_CODE' in df_mcp.columns:
                 off_outlets = set(df_mcp[df_mcp['CHANNEL_L1'].str.contains('off premise', case=False, na=False)]['OUTLET_CODE'])
                 df_mtd_off = df_mtd_off[df_mtd_off['OUTLET_CODE'].isin(off_outlets)]
                 df_day_off = df_day_off[df_day_off['OUTLET_CODE'].isin(off_outlets)]
 
             for code, name in REPS_LIST:
-                res_mtd[code] = df_mtd_off[df_mtd_off['REP_CODE'] == code]['OUTLET_CODE'].nunique()
-                res_day[code] = df_day_off[df_day_off['REP_CODE'] == code]['OUTLET_CODE'].nunique()
+                res_mtd[code] = df_mtd_off[df_mtd_off['REP_CODE'].str.contains(code, case=False, na=False)]['OUTLET_CODE'].nunique()
+                res_day[code] = df_day_off[df_day_off['REP_CODE'].str.contains(code, case=False, na=False)]['OUTLET_CODE'].nunique()
 
         return res_day, res_mtd
 
