@@ -97,7 +97,7 @@ with head_col1:
     st.markdown("""
     <div class="header-banner">
         <div class="header-title">SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</div>
-        <div class="header-subtitle">TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN </div>
+        <div class="header-subtitle">TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN TOTAL</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -281,7 +281,6 @@ def apply_raw_data_filters(df, tab_prefix):
         return df
     df_filtered = df.copy()
     
-    # Bố trí 4 cột filter cho tab MCP, các tab khác dùng 3 cột
     if tab_prefix == "mcp":
         col_filter1, col_filter2, col_filter3, col_filter4 = st.columns([1.2, 1.2, 1.2, 1.4])
     else:
@@ -290,7 +289,6 @@ def apply_raw_data_filters(df, tab_prefix):
     rep_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['mã nv', 'nvbh', 'sm', 'tên nv', 'sm name', 'nhân viên'])]
     ch_code_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['mã kh', 'mã ch', 'outlet', 'customer', 'shipto'])]
     ch_name_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['tên kh', 'tên ch', 'name', 'khách hàng'])]
-    day_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['thứ', 'day', 't2', 't3', 't4', 't5', 't6', 't7', 'cn'])]
 
     with col_filter1:
         selected_rep = st.selectbox(
@@ -321,12 +319,14 @@ def apply_raw_data_filters(df, tab_prefix):
                 options=["Tất cả các thứ", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"],
                 key=f"{tab_prefix}_day"
             )
-            if selected_day != "Tất cả các thứ" and day_cols:
-                day_kw = selected_day.replace("Thứ ", "T").replace("Chủ Nhật", "CN").lower()
-                mask_day = False
-                for dc in day_cols:
-                    mask_day = mask_day | df_filtered[dc].astype(str).str.lower().str.contains(day_kw, na=False)
-                df_filtered = df_filtered[mask_day]
+            if selected_day != "Tất cả các thứ":
+                # Quét thông minh TẤT CẢ các cột trong bảng MCP xem cột nào chứa thông tin thứ/ngày
+                day_num = selected_day.replace("Thứ ", "T").replace("Chủ Nhật", "CN")
+                match_mask = pd.Series(False, index=df_filtered.index)
+                for col in df_filtered.columns:
+                    col_str = df_filtered[col].astype(str).str.lower()
+                    match_mask = match_mask | col_str.str.contains(selected_day.lower(), na=False) | col_str.str.contains(day_num.lower(), na=False)
+                df_filtered = df_filtered[match_mask]
 
     return df_filtered
 
@@ -502,7 +502,7 @@ with tab_kpi:
             .map(highlight_mtd, subset=["% Hoàn thành OFF", "% Hoàn thành ON"])\
             .set_table_styles([
                 {'selector': 'th', 'props': [('background-color', '#034EA2'), ('color', '#FF0000'), ('font-weight', '900'), ('font-size', '14px'), ('text-align', 'center')]},
-                {'selector': 'td', 'props': [('font-weight', '900'), ('color', '#0F172A'), ('text-align', 'center')]}
+                {'selector': 'td', 'props': [('font-weight', '900'), ('color', '#0F172A'), ('text-align', 'center')]},
             ])
             
         st.dataframe(styled_df_combo, use_container_width=True, hide_index=True)
