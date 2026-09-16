@@ -6,7 +6,7 @@ import numpy as np
 # --- CONFIG TRANG WEB ---
 st.set_page_config(page_title="TRACKING KPI - MASAN CONSUMER", layout="wide")
 
-# --- CUSTOM CSS: TÔ MÀU XANH DƯƠNG HEADER BẢNG & BOLD 100% CHỮ TRONG BẢNG ---
+# --- CUSTOM CSS: HEADER BẢNG XANH DƯƠNG CHỮ ĐỎ & BOLD 100% NỘI DUNG ---
 st.markdown("""
 <style>
     /* Bold toàn bộ chữ trên trang web */
@@ -52,10 +52,14 @@ st.markdown("""
         text-transform: uppercase;
     }
     
-    /* CSS ÉP TÔ MÀU XANH DƯƠNG CHO HEADER VÀ BOLD CHỮ TRONG BẢNG STREAMLIT */
+    /* CSS ÉP TÔ MÀU XANH DƯƠNG NỀN & CHỮ MÀU ĐỎ CHO HEADER BẢNG STREAMLIT */
     [data-testid="stDataFrame"] div[role="columnheader"] {
         background-color: #034EA2 !important;
-        color: white !important;
+        color: #FF0000 !important;
+        font-weight: 900 !important;
+    }
+    [data-testid="stDataFrame"] div[role="columnheader"] * {
+        color: #FF0000 !important;
         font-weight: 900 !important;
     }
     [data-testid="stDataFrame"] div[role="gridcell"] {
@@ -65,7 +69,7 @@ st.markdown("""
     
     th {
         background-color: #034EA2 !important;
-        color: white !important;
+        color: #FF0000 !important;
         font-weight: 900 !important;
         text-align: center !important;
         padding: 10px !important;
@@ -281,13 +285,8 @@ def apply_raw_data_filters(df, tab_prefix):
     
     col_filter1, col_filter2, col_filter3 = st.columns([1.5, 1.5, 2.0])
     
-    # 1. Tên ĐDKD Filter (Đã đồng bộ từ filter chính)
     rep_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['mã nv', 'nvbh', 'sm', 'tên nv', 'sm name', 'nhân viên'])]
-    
-    # 2. Mã KH Filter
     ch_code_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['mã kh', 'mã ch', 'outlet code', 'customer code', 'shipto', 'parent code'])]
-    
-    # 3. Tên KH Filter
     ch_name_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['tên kh', 'tên ch', 'outlet name', 'customer name', 'shipto name', 'khách hàng'])]
 
     filtered_df = df.copy()
@@ -328,7 +327,6 @@ tab_kpi, tab_mcp, tab_mbs_cat, tab_mbs_brand = st.tabs([
 with tab_kpi:
     curr_targets = targets_from_file.get(kpi_filter, DEFAULT_TARGETS.get(kpi_filter, {r[0]: 30 for r in REPS_LIST}))
 
-    # Thuật toán tính động dữ liệu báo cáo
     def calc_kpi_dynamic(kpi_name, target_date):
         res_day = {r[0]: 0 for r in REPS_LIST}
         res_mtd = {r[0]: 0 for r in REPS_LIST}
