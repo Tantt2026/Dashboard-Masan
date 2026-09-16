@@ -175,23 +175,23 @@ st.markdown("---")
 selected_date = date_filter
 date_str = selected_date.strftime("%d/%m")
 
-# --- ĐỌC FILE SALES: QUÉT THÔNG MINH ĐÚNG MỌI TÊN CỘT MASAN ---
+# --- ĐỌC FILE SALES: BẮT ĐÚNG DÒNG TIÊU ĐỀ CHI TIẾT SẢN PHẨM ---
 df_sales = None
 if file_sales is not None:
     try:
-        raw_peek = pd.read_excel(file_sales, header=None, nrows=5) if str(file_sales).endswith(('.xlsx', '.xls')) or (hasattr(file_sales, 'name') and file_sales.name.endswith(('.xlsx', '.xls'))) else pd.read_csv(file_sales, header=None, nrows=5)
+        raw_peek = pd.read_excel(file_sales, header=None, nrows=10) if str(file_sales).endswith(('.xlsx', '.xls')) or (hasattr(file_sales, 'name') and file_sales.name.endswith(('.xlsx', '.xls'))) else pd.read_csv(file_sales, header=None, nrows=10)
         
         real_header_row = 0
         for idx, row in raw_peek.iterrows():
             row_str = " ".join([str(val).lower() for val in row.values])
-            if any(k in row_str for k in ['mã', 'code', 'sản phẩm', 'product', 'outlet', 'shipto', 'nvbh']):
+            # Bắt buộc dòng tiêu đề phải chứa từ khóa đặc trưng của file chi tiết đơn hàng (sản phẩm/sku/item hoặc mã cửa hàng)
+            if any(k in row_str for k in ['sản phẩm', 'product', 'sku', 'item', 'tên sp', 'mã ch', 'outlet code']):
                 real_header_row = idx
                 break
                 
         df_sales = pd.read_excel(file_sales, header=real_header_row) if str(file_sales).endswith(('.xlsx', '.xls')) or (hasattr(file_sales, 'name') and file_sales.name.endswith(('.xlsx', '.xls'))) else pd.read_csv(file_sales, header=real_header_row)
         df_sales.columns = [str(c).strip() for c in df_sales.columns]
         
-        # Hàm tìm cột linh hoạt theo danh sách từ khóa ưu tiên
         def find_col(keywords):
             for kw in keywords:
                 for col in df_sales.columns:
@@ -202,10 +202,10 @@ if file_sales is not None:
         date_c = find_col(['ngày', 'date', 'created', 'time', 'ngay'])
         df_sales['ORDER_DATE'] = pd.to_datetime(df_sales[date_c], errors='coerce').dt.date.fillna(selected_date) if date_c else selected_date
         
-        ch_c = find_col(['ship-to', 'mã kh', 'mã ch', 'outlet', 'customer', 'cust', 'khách hàng', 'shipto'])
+        ch_c = find_col(['mã ch', 'outlet', 'customer', 'cust', 'khách hàng', 'shipto', 'ship-to'])
         df_sales['OUTLET_CODE'] = df_sales[ch_c].astype(str).str.strip() if ch_c else df_sales.iloc[:, 0].astype(str).str.strip()
             
-        rep_c = find_col(['mã nvbh', 'mã nv', 'nvbh', 'sm', 'saleman', 'nhân viên', 'tên nv'])
+        rep_c = find_col(['mã nvbh', 'mã nv', 'nvbh', 'sm', 'saleman', 'nhân viên'])
         df_sales['REP_CODE'] = df_sales[rep_c].astype(str).str.strip() if rep_c else ""
 
         ord_c = find_col(['đơn hàng', 'order', 'số hd', 'so_hd', 'invoice', 'so_don'])
