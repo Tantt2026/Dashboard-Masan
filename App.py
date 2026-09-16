@@ -182,7 +182,7 @@ st.markdown("---")
 selected_date = date_filter
 date_str = selected_date.strftime("%d/%m")
 
-# --- ĐỌC FILE SALES CHI TIẾT ---
+# --- ĐỌC VÀ CHUẨN HÓA FILE SALES CHI TIẾT ---
 df_sales = None
 if file_sales is not None:
     try:
@@ -193,23 +193,23 @@ if file_sales is not None:
         df_sales['ORDER_DATE'] = pd.to_datetime(df_sales[date_c[0]], errors='coerce').dt.date.fillna(selected_date) if date_c else selected_date
         
         ch_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['mã kh', 'mã ch', 'outlet', 'customer', 'cust', 'khách hàng', 'shipto'])]
-        df_sales['OUTLET_CODE'] = df_sales[ch_c[0]].astype(str) if ch_c else "OUTLET_UNKNOWN"
+        df_sales['OUTLET_CODE'] = df_sales[ch_c[0]].astype(str).str.strip() if ch_c else "OUTLET_UNKNOWN"
             
         rep_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['mã nv', 'nvbh', 'sm', 'saleman', 'nhân viên', 'mã nhân viên', 'sm name', 'tên nv'])]
-        df_sales['REP_CODE'] = df_sales[rep_c[0]].astype(str) if rep_c else ""
+        df_sales['REP_CODE'] = df_sales[rep_c[0]].astype(str).str.strip() if rep_c else ""
 
         ord_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['đơn hàng', 'order', 'số hd', 'so_hd', 'invoice', 'so_don'])]
-        df_sales['ORDER_ID'] = df_sales[ord_c[0]].astype(str) if ord_c else df_sales['OUTLET_CODE'] + "_" + df_sales['ORDER_DATE'].astype(str)
+        df_sales['ORDER_ID'] = df_sales[ord_c[0]].astype(str).str.strip() if ord_c else df_sales['OUTLET_CODE'] + "_" + df_sales['ORDER_DATE'].astype(str)
             
         prod_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['sản phẩm', 'product', 'sku', 'tên sp', 'item', 'mặt hàng'])]
-        df_sales['PROD_NAME'] = df_sales[prod_c[0]].astype(str) if prod_c else ""
+        df_sales['PROD_NAME'] = df_sales[prod_c[0]].astype(str).str.strip() if prod_c else ""
         
         qty_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['số lượng', 'quantity', 'qty', 'sl', 'thùng', 'kg'])]
         df_sales['QTY'] = pd.to_numeric(df_sales[qty_c[0]], errors='coerce').fillna(1) if qty_c else 1
     except Exception as e:
         st.error(f"⚠️ Lỗi đọc File Sales: {e}")
 
-# --- ĐỌC FILE TARGET (TỔNG HỢP KPI ĐĐKD.xlsx -> Sheet Export) ---
+# --- ĐỌC VÀ CHUẨN HÓA FILE TARGET ---
 DEFAULT_TARGETS = {
     "1. ASO FOCUS TOTAL NHÃN CHANTÉ": {r[0]: 30 for r in REPS_LIST},
     "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN": {"26SF.HC23006": 20, "26SF.HC22759": 53, "24SF.HC16385": 57, "24SF.HC15114": 62, "19SF.HC7071": 80, "26SF.HC23230": 40, "26SF.HC22209": 37, "26SF.HC22288": 49, "23SF.HC14324": 68, "14SF.HC00198": 87, "26SF.HC22196": 42, "25SF.HC21112": 87, "26SF.HC22774": 74, "18SF.HC4599": 92, "18SF.HC4149": 65},
@@ -237,12 +237,12 @@ if file_kpi_target is not None:
             ]:
                 match_c = [c for c in df_t.columns if target_col_name.lower() in str(c).lower()]
                 if match_c:
-                    t_dict = dict(zip(df_t[r_col].astype(str), pd.to_numeric(df_t[match_c[0]], errors='coerce').fillna(0)))
+                    t_dict = dict(zip(df_t[r_col].astype(str).str.strip(), pd.to_numeric(df_t[match_c[0]], errors='coerce').fillna(0)))
                     targets_from_file[kpi_key] = t_dict
     except Exception as e:
         pass
 
-# --- ĐỌC FILE MCP / VISIT SCHEDULE REPORT ---
+# --- ĐỌC VÀ CHUẨN HÓA FILE MCP / VISIT ---
 df_mcp = None
 if file_mcp is not None:
     try:
@@ -250,8 +250,8 @@ if file_mcp is not None:
         df_mcp.columns = [str(c).strip() for c in df_mcp.columns]
         ch_mcp = [c for c in df_mcp.columns if any(k in c.lower() for k in ['mã kh', 'mã ch', 'outlet', 'shipto'])]
         kentu_mcp = [c for c in df_mcp.columns if any(k in c.lower() for k in ['l1', 'kênh', 'channel', 'phân loại'])]
-        if ch_mcp: df_mcp['OUTLET_CODE'] = df_mcp[ch_mcp[0]].astype(str)
-        if kentu_mcp: df_mcp['CHANNEL_L1'] = df_mcp[kentu_mcp[0]].astype(str)
+        if ch_mcp: df_mcp['OUTLET_CODE'] = df_mcp[ch_mcp[0]].astype(str).str.strip()
+        if kentu_mcp: df_mcp['CHANNEL_L1'] = df_mcp[kentu_mcp[0]].astype(str).str.strip()
     except Exception as e:
         pass
 
@@ -267,11 +267,9 @@ def highlight_mtd(val):
     except:
         return 'font-weight: 900;'
 
-# --- BỘ LỌC CHUẨN CHO 3 TAB THÔ ---
 def apply_raw_data_filters(df, tab_prefix):
     if df is None or len(df) == 0:
         return df
-    
     df_filtered = df.copy()
     col_filter1, col_filter2, col_filter3 = st.columns([1.5, 1.5, 2.0])
     
@@ -303,7 +301,6 @@ def apply_raw_data_filters(df, tab_prefix):
 
     return df_filtered
 
-# --- TAB CHÍNH ---
 tab_kpi, tab_mcp, tab_mbs_cat, tab_mbs_brand = st.tabs([
     "📊 BÁO CÁO KPI", 
     "🗺️ MCP VISIT", 
@@ -312,7 +309,7 @@ tab_kpi, tab_mcp, tab_mbs_cat, tab_mbs_brand = st.tabs([
 ])
 
 # ==========================================
-# TAB 1: BÁO CÁO KPI (ĐÚNG RULE 6 BÁO CÁO)
+# TAB 1: BÁO CÁO KPI
 # ==========================================
 with tab_kpi:
     curr_targets = targets_from_file.get(kpi_filter, DEFAULT_TARGETS.get(kpi_filter, {r[0]: 30 for r in REPS_LIST}))
@@ -339,19 +336,16 @@ with tab_kpi:
             df_m_rep = df_mtd[rep_mask_mtd]
             df_d_rep = df_day[rep_mask_day]
 
-            # 1. BÁO CÁO ASO FOCUS TOTAL NHÃN CHANTÉ (Toàn bộ CH, Chanté/Chante, Khử trùng lặp unique outlet)
             if kpi_name == "1. ASO FOCUS TOTAL NHÃN CHANTÉ":
                 res_mtd[code] = df_m_rep[df_m_rep['PROD_NAME'].str.contains('chanté|chante', case=False, na=False)]['OUTLET_CODE'].nunique()
                 res_day[code] = df_d_rep[df_d_rep['PROD_NAME'].str.contains('chanté|chante', case=False, na=False)]['OUTLET_CODE'].nunique()
 
-            # 2. BÁO CÁO ASO FOCUS TRẬN VÀNG - OMACHI TRỘN (Toàn bộ CH, Omachi trộn, spaghetti, lẩu cầm tay, tron)
             elif kpi_name == "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN":
                 cond_tron = df_m_rep['PROD_NAME'].str.contains('trộn|spaghetti|lẩu cầm tay|tron', case=False, na=False)
                 res_mtd[code] = df_m_rep[cond_tron]['OUTLET_CODE'].nunique()
                 cond_tron_d = df_d_rep['PROD_NAME'].str.contains('trộn|spaghetti|lẩu cầm tay|tron', case=False, na=False)
                 res_day[code] = df_d_rep[cond_tron_d]['OUTLET_CODE'].nunique()
 
-            # 3. ASO TEA KÊNH ON PREMISE (Kênh ON, Trà TEA365/Trà Búp Non, đơn >= 12 chai trên cùng Order ID)
             elif kpi_name == "3. ASO TEA KÊNH ON PREMISE":
                 df_m_tea = df_m_rep[df_m_rep['PROD_NAME'].str.contains('tea365|trà búp non|tea 365', case=False, na=False)]
                 df_d_tea = df_d_rep[df_d_rep['PROD_NAME'].str.contains('tea365|trà búp non|tea 365', case=False, na=False)]
@@ -369,7 +363,6 @@ with tab_kpi:
                 ord_d = ord_d[ord_d['QTY'] >= 12]
                 res_day[code] = ord_d['OUTLET_CODE'].nunique()
 
-            # 4. PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER) (Kênh OFF, loại trừ Bia/Beer, đơn >= 4 SKU lines)
             elif kpi_name == "4. PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER)":
                 df_m_nb = df_m_rep[~df_m_rep['PROD_NAME'].str.contains('bia|beer', case=False, na=False)]
                 df_d_nb = df_d_rep[~df_d_rep['PROD_NAME'].str.contains('bia|beer', case=False, na=False)]
@@ -387,7 +380,6 @@ with tab_kpi:
                 ord_d_l = ord_d_l[ord_d_l['PROD_NAME'] >= 4]
                 res_day[code] = ord_d_l['OUTLET_CODE'].nunique()
 
-            # 5. ASO ALL KÊNH OFF (Kênh OFF, tổng hợp điểm lẻ bao phủ sản phẩm chuẩn, khử trùng lặp MTD)
             elif kpi_name == "5. ASO ALL KÊNH OFF":
                 df_m_off = df_m_rep.copy()
                 df_d_off = df_d_rep.copy()
@@ -448,7 +440,6 @@ with tab_kpi:
         """, unsafe_allow_html=True)
 
     else:
-        # 6. BÁO CÁO ĐƠN HÀNG COMBO (Split 2 Kênh OFF & ON theo tuyến lịch viếng thăm)
         st.subheader(f"BÁO CÁO ĐƠN HÀNG COMBO THỨ {selected_date.isoweekday()+1 if selected_date.isoweekday()<7 else 1} NGÀY {date_str}/2026")
         st.caption(f"⚡ Phân tách 2 Kênh OFF & ON theo tuyến viếng thăm ngày {date_str}/2026")
 
@@ -486,6 +477,30 @@ with tab_kpi:
             ])
             
         st.dataframe(styled_df_combo, use_container_width=True, hide_index=True)
+
+    # --- KHUNG KIỂM TRA TRẠNG THÁI DỮ LIỆU (DEBUGGER) ---
+    with st.expander("🔍 XEM TRẠNG THÁI ĐỌC FILE & CHẨN ĐOÁN DỮ LIỆU (CLICK ĐỂ MỞ)"):
+        col_dbg1, col_dbg2, col_dbg3 = st.columns(3)
+        with col_dbg1:
+            st.write("**1. File Sales Chi Tiết:**")
+            if df_sales is not None:
+                st.success(f"Đã tải ({len(df_sales)} dòng)")
+                st.write("Các cột nhận diện:", list(df_sales.columns)[:6])
+            else:
+                st.error("Chưa có file Sales! Vui lòng upload qua nút Admin góc phải.")
+        with col_dbg2:
+            st.write("**2. File MCP / Visit Schedule:**")
+            if df_mcp is not None:
+                st.success(f"Đã tải ({len(df_mcp)} dòng)")
+                st.write("Các cột nhận diện:", list(df_mcp.columns)[:6])
+            else:
+                st.warning("Chưa có file MCP Visit (Kênh On/Off sẽ không được lọc phân kênh).")
+        with col_dbg3:
+            st.write("**3. File Target KPI:**")
+            if file_kpi_target is not None:
+                st.success("Đã kết nối file Target.")
+            else:
+                st.warning("Dùng target mặc định trong code.")
 
 # ==========================================
 # TAB 2: MCP VISIT
