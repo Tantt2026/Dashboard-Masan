@@ -7,26 +7,23 @@ import os
 # --- CONFIG TRANG WEB ---
 st.set_page_config(page_title="TRACKING KPI - MASAN CONSUMER", layout="wide")
 
-# --- CUSTOM CSS: TÔ MÀU XANH DƯƠNG HEADER BẢNG CHỮ ĐỎ & BOLD 100% NỘI DUNG ---
+# --- CUSTOM CSS ---
 st.markdown("""
 <style>
     html, body, p, span, label, td, th, div, input {
         font-weight: 900 !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     }
-    
     [data-testid="stIcon"], [data-testid="stIcon"] *, i, .st-emotion-cache-121544q, [class*="st-"] svg {
         font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
         font-weight: normal !important;
     }
-
     div[data-testid="stPopover"] button {
         font-weight: 900 !important;
         font-size: 13px !important;
         padding: 8px 12px !important;
         white-space: nowrap !important;
     }
-
     .header-banner {
         background-color: #FDE047;
         border: 2px solid #000;
@@ -49,7 +46,6 @@ st.markdown("""
         margin-top: 5px;
         text-transform: uppercase;
     }
-    
     [data-testid="stDataFrame"] div[role="columnheader"] {
         background-color: #034EA2 !important;
     }
@@ -62,7 +58,6 @@ st.markdown("""
         font-weight: 900 !important;
         color: #0F172A !important;
     }
-    
     .comment-box {
         border: 2px solid #034EA2;
         border-radius: 10px;
@@ -114,7 +109,6 @@ with head_col2:
                     st.rerun()
                 else:
                     st.error("Sai mật khẩu!")
-            st.info("👀 Bạn đang xem báo cáo ở chế độ Viewer.")
     else:
         with st.popover("📁 UPLOAD FILE (ADMIN)", use_container_width=True):
             st.success("🟢 QUYỀN ADMIN")
@@ -122,10 +116,9 @@ with head_col2:
                 st.session_state['admin_logged_in'] = False
                 st.rerun()
             st.markdown("---")
-            
-            u_target = st.file_uploader("1. File Chỉ Tiêu (TỔNG HỢP KPI ĐĐKD.xlsx)", type=["xlsx", "csv"], key="u_target")
-            u_sales = st.file_uploader("2. File Sales Chi Tiết (DanhSachChiTietDonHang.xlsx)", type=["xlsx", "csv"], key="u_sales")
-            u_mcp = st.file_uploader("3. File MCP Visit (Visit Schedule Report)", type=["xlsx", "csv"], key="u_mcp")
+            u_target = st.file_uploader("1. File Chỉ Tiêu (KPI.xlsx)", type=["xlsx", "csv"], key="u_target")
+            u_sales = st.file_uploader("2. File Sales Chi Tiết", type=["xlsx", "csv"], key="u_sales")
+            u_mcp = st.file_uploader("3. File MCP Visit", type=["xlsx", "csv"], key="u_mcp")
             u_cat = st.file_uploader("4. File MBS Category", type=["xlsx", "csv"], key="u_cat")
             u_brand = st.file_uploader("5. File MBS Brand", type=["xlsx", "csv"], key="u_brand")
 
@@ -182,11 +175,20 @@ st.markdown("---")
 selected_date = date_filter
 date_str = selected_date.strftime("%d/%m")
 
-# --- ĐỌC VÀ CHUẨN HÓA FILE SALES CHI TIẾT ---
+# --- ĐỌC FILE SALES VỚI CƠ CHẾ TỰ DỘNG TÌM DÒNG TIÊU ĐỀ CHUẨN ---
 df_sales = None
 if file_sales is not None:
     try:
-        df_sales = pd.read_excel(file_sales) if (isinstance(file_sales, str) or hasattr(file_sales, 'name') and str(file_sales.name).endswith(('.xlsx', '.xls'))) else pd.read_csv(file_sales)
+        # Thử đọc qua các header khác nhau nếu file có dòng tiêu đề rỗng ở đầu
+        for h_idx in [0, 1, 2]:
+            temp_df = pd.read_excel(file_sales, header=h_idx) if str(file_sales).endswith(('.xlsx', '.xls')) or (hasattr(file_sales, 'name') and file_sales.name.endswith(('.xlsx', '.xls'))) else pd.read_csv(file_sales, header=h_idx)
+            cols_str = " ".join([str(c).lower() for c in temp_df.columns])
+            if 'mã' in cols_str or 'code' in cols_str or 'sản phẩm' in cols_str or 'product' in cols_str or 'outlet' in cols_str:
+                df_sales = temp_df
+                break
+        if df_sales is None:
+            df_sales = pd.read_excel(file_sales)
+            
         df_sales.columns = [str(c).strip() for c in df_sales.columns]
         
         date_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['ngày', 'date', 'created', 'time', 'ngay'])]
@@ -209,7 +211,7 @@ if file_sales is not None:
     except Exception as e:
         st.error(f"⚠️ Lỗi đọc File Sales: {e}")
 
-# --- ĐỌC VÀ CHUẨN HÓA FILE TARGET ---
+# --- ĐỌC FILE TARGET ---
 DEFAULT_TARGETS = {
     "1. ASO FOCUS TOTAL NHÃN CHANTÉ": {r[0]: 30 for r in REPS_LIST},
     "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN": {"26SF.HC23006": 20, "26SF.HC22759": 53, "24SF.HC16385": 57, "24SF.HC15114": 62, "19SF.HC7071": 80, "26SF.HC23230": 40, "26SF.HC22209": 37, "26SF.HC22288": 49, "23SF.HC14324": 68, "14SF.HC00198": 87, "26SF.HC22196": 42, "25SF.HC21112": 87, "26SF.HC22774": 74, "18SF.HC4599": 92, "18SF.HC4149": 65},
@@ -242,7 +244,7 @@ if file_kpi_target is not None:
     except Exception as e:
         pass
 
-# --- ĐỌC VÀ CHUẨN HÓA FILE MCP / VISIT ---
+# --- ĐỌC FILE MCP ---
 df_mcp = None
 if file_mcp is not None:
     try:
@@ -478,7 +480,7 @@ with tab_kpi:
             
         st.dataframe(styled_df_combo, use_container_width=True, hide_index=True)
 
-    # --- KHUNG KIỂM TRA TRẠNG THÁI DỮ LIỆU (DEBUGGER) ---
+    # --- KHUNG CHẨN ĐOÁN LỖI ---
     with st.expander("🔍 XEM TRẠNG THÁI ĐỌC FILE & CHẨN ĐOÁN DỮ LIỆU (CLICK ĐỂ MỞ)"):
         col_dbg1, col_dbg2, col_dbg3 = st.columns(3)
         with col_dbg1:
@@ -487,20 +489,20 @@ with tab_kpi:
                 st.success(f"Đã tải ({len(df_sales)} dòng)")
                 st.write("Các cột nhận diện:", list(df_sales.columns)[:6])
             else:
-                st.error("Chưa có file Sales! Vui lòng upload qua nút Admin góc phải.")
+                st.error("Chưa có file Sales!")
         with col_dbg2:
             st.write("**2. File MCP / Visit Schedule:**")
             if df_mcp is not None:
                 st.success(f"Đã tải ({len(df_mcp)} dòng)")
                 st.write("Các cột nhận diện:", list(df_mcp.columns)[:6])
             else:
-                st.warning("Chưa có file MCP Visit (Kênh On/Off sẽ không được lọc phân kênh).")
+                st.warning("Chưa có file MCP Visit.")
         with col_dbg3:
             st.write("**3. File Target KPI:**")
             if file_kpi_target is not None:
                 st.success("Đã kết nối file Target.")
             else:
-                st.warning("Dùng target mặc định trong code.")
+                st.warning("Dùng target mặc định.")
 
 # ==========================================
 # TAB 2: MCP VISIT
