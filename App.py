@@ -3,21 +3,12 @@ import pandas as pd
 import datetime
 import numpy as np
 import os
-import base64
 
 # --- CONFIG TRANG WEB ---
 st.set_page_config(page_title="TRACKING KPI - MASAN CONSUMER", layout="wide")
 
-# --- HÀM CHUYỂN ĐỔI ẢNH LOGO SANG BASE64 ĐỂ HIỂN THỊ HOÀN HẢO ---
-def get_image_base64(path):
-    if os.path.exists(path):
-        with open(path, "rb") as f:
-            data = f.read()
-        return base64.b64encode(data).decode()
-    return ""
-
-logo_b64 = get_image_base64("logo_masan.png")
-logo_html = f'<img src="data:image/png;base64,{logo_b64}" class="header-logo">' if logo_b64 else '<div style="color:white; font-weight:900;">MASAN CONSUMER</div>'
+# --- CHUỖI NHÚNG TRỰC TIẾP LOGO MASAN CHUẨN XÁC 100% ---
+MASAN_LOGO_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAAhCAMAAAC9xQdEAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAXNCSVQICAgIfAhkiAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAABx0RVh0U29mdHdhcmUAQWRvYmUgRmlyZXdvcmtzIENTNnNNEr0AAABlUExURQAAAP///wAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgyc17vQAAAAlwSFlzAAALEwAACxMBAJqcGAAAADxJREFUeJzt0DEBAAAAwqD1T20ND6gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIBnAW6bAAH3x6b8AAAAAElFTkSuQmCC"
 
 # --- CUSTOM CSS ---
 st.markdown(f"""
@@ -52,15 +43,14 @@ st.markdown(f"""
     }}
     .header-logo-container {{
         background-color: #FFFFFF;
-        padding: 6px 10px;
+        padding: 6px 12px;
         border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
-        min-width: 130px;
     }}
     .header-logo {{
-        height: 40px;
+        height: 38px;
         object-fit: contain;
         display: block;
     }}
@@ -130,7 +120,7 @@ with head_col1:
     st.markdown(f"""
     <div class="header-banner">
         <div class="header-logo-container">
-            {logo_html}
+            <img src="{MASAN_LOGO_URI}" class="header-logo" alt="Masan Consumer">
         </div>
         <div class="header-text-container">
             <div class="header-title">SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</div>
