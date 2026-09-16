@@ -123,17 +123,17 @@ with head_col2:
                 st.rerun()
             st.markdown("---")
             
-            u_sales = st.file_uploader("📂 Tải lên File Bán Hàng (DanhSachChiTietDonHang.xlsx)", type=["xlsx", "csv"], key="u_sales")
+            u_sales = st.file_uploader("📂 Tải lên File Bán Hàng (Data.xlsx)", type=["xlsx", "csv"], key="u_sales")
             if u_sales: 
                 st.session_state['df_sales_file'] = u_sales
                 st.success("Đã nạp file bán hàng thành công!")
 
-# --- TỰ ĐỘNG TÌM FILE BÁN HÀNG HOẶC DÙNG SESSION ---
+# --- TÌM FILE BÁN HÀNG ---
 def find_available_sales_file():
     if st.session_state['df_sales_file'] is not None:
         return st.session_state['df_sales_file']
     for f in os.listdir('.'):
-        if any(kw in f.lower() for kw in ['ban_hang', 'sales', 'don_hang', 'chitietdonhang', 'data_sales']):
+        if any(kw in f.lower() for kw in ['ban_hang', 'sales', 'don_hang', 'chitietdonhang', 'data']):
             return f
     return None
 
@@ -184,45 +184,33 @@ st.markdown("---")
 selected_date = date_filter
 date_str = selected_date.strftime("%d/%m")
 
-# --- ĐỌC VÀ CHUẨN HÓA FILE SALES ---
+# --- ĐỌC VÀ CHUẨN HÓA FILE SALES (CỐ ĐỊNH HEADER DÒNG 3 CHO FILE DATA.XLSX) ---
 df_sales = None
 if file_sales is not None:
     try:
-        raw_peek = pd.read_excel(file_sales, header=None, nrows=10) if str(file_sales).endswith(('.xlsx', '.xls')) or (hasattr(file_sales, 'name') and file_sales.name.endswith(('.xlsx', '.xls'))) else pd.read_csv(file_sales, header=None, nrows=10)
-        real_header_row = 0
-        for idx, row in raw_peek.iterrows():
-            row_str = " ".join([str(val).lower() for val in row.values])
-            if any(k in row_str for k in ['sản phẩm', 'product', 'sku', 'item', 'tên sp', 'mã ch', 'outlet code']):
-                real_header_row = idx
-                break
-                
-        df_sales = pd.read_excel(file_sales, header=real_header_row) if str(file_sales).endswith(('.xlsx', '.xls')) or (hasattr(file_sales, 'name') and file_sales.name.endswith(('.xlsx', '.xls'))) else pd.read_csv(file_sales, header=real_header_row)
+        is_excel = str(file_sales).endswith(('.xlsx', '.xls')) or (hasattr(file_sales, 'name') and file_sales.name.endswith(('.xlsx', '.xls')))
+        # Đọc trực tiếp header=3 theo đúng cấu trúc file Data.xlsx của Masan
+        df_sales = pd.read_excel(file_sales, header=3) if is_excel else pd.read_csv(file_sales, header=3)
         df_sales.columns = [str(c).strip() for c in df_sales.columns]
         
-        def find_col(keywords):
-            for kw in keywords:
-                for col in df_sales.columns:
-                    if kw.lower() in col.lower():
-                        return col
-            return None
-
-        date_c = find_col(['ngày', 'date', 'created', 'time', 'ngay'])
-        df_sales['ORDER_DATE'] = pd.to_datetime(df_sales[date_c], errors='coerce').dt.date.fillna(selected_date) if date_c else selected_date
+        # Chuẩn hóa các cột quan trọng
+        date_col = next((c for c in df_sales.columns if 'ngày tạo đơn hàng' in c.lower() or 'ngay' in c.lower()), df_sales.columns[13] if len(df_sales.columns)>13 else None)
+        df_sales['ORDER_DATE'] = pd.to_datetime(df_sales[date_col], errors='coerce').dt.date.fillna(selected_date) if date_col else selected_date
         
-        ch_c = find_col(['mã ch', 'outlet', 'customer', 'cust', 'khách hàng', 'shipto', 'ship-to'])
-        df_sales['OUTLET_CODE'] = df_sales[ch_c].astype(str).str.strip() if ch_c else df_sales.iloc[:, 0].astype(str).str.strip()
+        ch_col = next((c for c in df_sales.columns if 'mã ch' in c.lower() or 'outlet' in c.lower()), 'Mã CH' if 'Mã CH' in df_sales.columns else df_sales.columns[16])
+        df_sales['OUTLET_CODE'] = df_sales[ch_col].astype(str).str.strip()
             
-        rep_c = find_col(['mã nvbh', 'mã nv', 'nvbh', 'sm', 'saleman', 'nhân viên'])
-        df_sales['REP_CODE'] = df_sales[rep_c].astype(str).str.strip() if rep_c else ""
+        rep_col = next((c for c in df_sales.columns if 'mã nvbh' in c.lower() or 'nvbh' in c.lower()), 'Mã NVBH' if 'Mã NVBH' in df_sales.columns else df_sales.columns[2])
+        df_sales['REP_CODE'] = df_sales[rep_col].astype(str).str.strip()
 
-        ord_c = find_col(['đơn hàng', 'order', 'số hd', 'so_hd', 'invoice', 'so_don'])
-        df_sales['ORDER_ID'] = df_sales[ord_c].astype(str).str.strip() if ord_c else df_sales['OUTLET_CODE'] + "_" + df_sales['ORDER_DATE'].astype(str)
+        ord_col = next((c for c in df_sales.columns if 'mã đơn hàng' in c.lower() or 'order' in c.lower()), 'Mã đơn hàng' if 'Mã đơn hàng' in df_sales.columns else df_sales.columns[6])
+        df_sales['ORDER_ID'] = df_sales[ord_col].astype(str).str.strip()
             
-        prod_c = find_col(['sản phẩm', 'product', 'sku', 'tên sp', 'item', 'mặt hàng'])
-        df_sales['PROD_NAME'] = df_sales[prod_c].astype(str).str.strip() if prod_c else ""
+        prod_col = next((c for c in df_sales.columns if 'tên sản phẩm' in c.lower() or 'product' in c.lower() or 'sku' in c.lower()), 'Tên sản phẩm' if 'Tên sản phẩm' in df_sales.columns else df_sales.columns[24])
+        df_sales['PROD_NAME'] = df_sales[prod_col].astype(str).str.strip()
         
-        qty_c = find_col(['số lượng', 'quantity', 'qty', 'sl', 'thùng', 'kg'])
-        df_sales['QTY'] = pd.to_numeric(df_sales[qty_c], errors='coerce').fillna(1) if qty_c else 1
+        qty_col = next((c for c in df_sales.columns if 'tổng chẵn' in c.lower() or 'qty' in c.lower() or 'số lượng' in c.lower()), 'Tổng chẵn' if 'Tổng chẵn' in df_sales.columns else df_sales.columns[29])
+        df_sales['QTY'] = pd.to_numeric(df_sales[qty_col], errors='coerce').fillna(1)
     except Exception as e:
         st.error(f"⚠️ Lỗi đọc File Sales: {e}")
 
@@ -259,7 +247,7 @@ if file_kpi_target is not None:
     except Exception as e:
         pass
 
-# --- ĐỌC VÀ CHUẨN HÓA FILE MCP (MAP DOANH SỐ MTD TỪ FILE SALES CHUNG) ---
+# --- ĐỌC VÀ CHUẨN HÓA FILE MCP (MAP DOANH SỐ MTD) ---
 df_mcp = None
 if file_mcp is not None:
     try:
@@ -271,11 +259,15 @@ if file_mcp is not None:
         if ch_mcp: df_mcp['OUTLET_CODE'] = df_mcp[ch_mcp[0]].astype(str).str.strip()
         if kentu_mcp: df_mcp['CHANNEL_L1'] = df_mcp[kentu_mcp[0]].astype(str).str.strip()
         
-        # Lấy trực tiếp df_sales đang chạy KPI để map vào Doanh Số MTD
+        # Map chính xác Doanh số MTD từ df_sales
         if df_sales is not None and 'ORDER_DATE' in df_sales.columns and 'OUTLET_CODE' in df_sales.columns:
-            df_sales_mtd = df_sales[df_sales['ORDER_DATE'] <= selected_date]
-            sales_summary = df_sales_mtd.groupby('OUTLET_CODE')['QTY'].sum().to_dict()
-            df_mcp['Doanh Số MTD'] = df_mcp['OUTLET_CODE'].map(sales_summary).fillna(0)
+            df_sales_mtd = df_sales[df_sales['ORDER_DATE'] <= selected_date].copy()
+            df_sales_mtd['OUTLET_CODE_STR'] = df_sales_mtd['OUTLET_CODE'].astype(str).str.strip()
+            sales_summary = df_sales_mtd.groupby('OUTLET_CODE_STR')['QTY'].sum().to_dict()
+            
+            df_mcp['OUTLET_CODE_STR'] = df_mcp['OUTLET_CODE'].astype(str).str.strip()
+            df_mcp['Doanh Số MTD'] = df_mcp['OUTLET_CODE_STR'].map(sales_summary).fillna(0)
+            df_mcp = df_mcp.drop(columns=['OUTLET_CODE_STR'])
         else:
             df_mcp['Doanh Số MTD'] = 0
     except Exception as e:
@@ -363,7 +355,7 @@ tab_kpi, tab_mcp, tab_mbs_cat, tab_mbs_brand = st.tabs([
 ])
 
 # ==========================================
-# TAB 1: BÁO CÁO KPI (CỐ ĐỊNH BẢNG)
+# TAB 1: BÁO CÁO KPI
 # ==========================================
 with tab_kpi:
     curr_targets = targets_from_file.get(kpi_filter, DEFAULT_TARGETS.get(kpi_filter, {r[0]: 30 for r in REPS_LIST}))
@@ -541,7 +533,7 @@ with tab_mcp:
         try:
             df_mcp_raw = df_mcp.copy()
             df_mcp_filtered = apply_raw_data_filters(df_mcp_raw, "mcp")
-            st.success(f"Hiển thị {len(df_mcp_filtered)} / {len(df_mcp_raw)} dòng dữ liệu MCP Visit (Cột cuối: Doanh Số MTD)")
+            st.success(f"Hiển thị {len(df_mcp_filtered)} / {len(df_mcp_raw)} dòng dữ liệu MCP Visit (Cột cuối: Doanh Số MTD đã map từ file Sales)")
             st.dataframe(df_mcp_filtered, use_container_width=True)
         except Exception as e:
             st.error(f"Lỗi đọc file MCP Visit: {e}")
