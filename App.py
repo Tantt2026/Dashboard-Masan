@@ -6,29 +6,27 @@ import numpy as np
 # --- CONFIG TRANG WEB ---
 st.set_page_config(page_title="TRACKING KPI - MASAN CONSUMER", layout="wide")
 
-# --- CUSTOM CSS: BOLD 100% & KHẮC PHỤC CHỒNG CHỮ TRÊN BUTTON/POPOVER ---
+# --- CUSTOM CSS: TÔ MÀU XANH DƯƠNG HEADER BẢNG & BOLD 100% CHỮ TRONG BẢNG ---
 st.markdown("""
 <style>
-    /* Bolding toàn bộ text nhưng chừa font icon của Streamlit */
+    /* Bold toàn bộ chữ trên trang web */
     html, body, p, span, label, td, th, div, input {
         font-weight: 900 !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     }
     
-    /* Bảo vệ icon Streamlit không bị vỡ font gây chồng chữ (expand_more, gear, folder...) */
+    /* Font icon Streamlit */
     [data-testid="stIcon"], [data-testid="stIcon"] *, i, .st-emotion-cache-121544q, [class*="st-"] svg {
         font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
         font-weight: normal !important;
     }
 
-    /* Style Popover Button cho gọn gàng không bị dính chữ */
+    /* Style Nút Admin góc phải */
     div[data-testid="stPopover"] button {
         font-weight: 900 !important;
         font-size: 13px !important;
         padding: 8px 12px !important;
         white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
     }
 
     .header-banner {
@@ -53,6 +51,18 @@ st.markdown("""
         margin-top: 5px;
         text-transform: uppercase;
     }
+    
+    /* CSS ÉP TÔ MÀU XANH DƯƠNG CHO HEADER VÀ BOLD CHỮ TRONG BẢNG STREAMLIT */
+    [data-testid="stDataFrame"] div[role="columnheader"] {
+        background-color: #034EA2 !important;
+        color: white !important;
+        font-weight: 900 !important;
+    }
+    [data-testid="stDataFrame"] div[role="gridcell"] {
+        font-weight: 900 !important;
+        color: #0F172A !important;
+    }
+    
     th {
         background-color: #034EA2 !important;
         color: white !important;
@@ -67,6 +77,7 @@ st.markdown("""
         text-align: center;
         font-weight: 900 !important;
     }
+    
     .comment-box {
         border: 2px solid #034EA2;
         border-radius: 10px;
@@ -106,7 +117,7 @@ with head_col1:
 file_sales, file_mcp, file_mbs_cat, file_mbs_brand, file_kpi_target = None, None, None, None, None
 
 with head_col2:
-    st.write("") # Canh lề
+    st.write("") 
     if not st.session_state['admin_logged_in']:
         with st.popover("⚙️ ADMIN / UPLOAD", use_container_width=True):
             st.subheader("🔐 Quyền Admin")
@@ -175,46 +186,28 @@ st.markdown("---")
 selected_date = date_filter
 date_str = selected_date.strftime("%d/%m")
 
-# --- READ & PARSE FILE SALES CHI TIẾT (AN TOÀN BẢO VỆ LỖI MISSING COLUMNS) ---
+# --- READ & PARSE FILE SALES CHI TIẾT ---
 df_sales = None
 if file_sales is not None:
     try:
         df_sales = pd.read_excel(file_sales) if file_sales.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_sales)
         df_sales.columns = [str(c).strip() for c in df_sales.columns]
         
-        # Mapping ngày
         date_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['ngày', 'date', 'created', 'time'])]
-        if date_c:
-            df_sales['ORDER_DATE'] = pd.to_datetime(df_sales[date_c[0]], errors='coerce').dt.date
-        else:
-            df_sales['ORDER_DATE'] = selected_date
+        df_sales['ORDER_DATE'] = pd.to_datetime(df_sales[date_c[0]], errors='coerce').dt.date if date_c else selected_date
         
-        # Mapping Cửa hàng (Outlet) - FIX LỖI KEYERROR 'OUTLET_CODE'
         ch_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['mã kh', 'mã ch', 'outlet', 'customer', 'cust', 'khách hàng'])]
-        if ch_c:
-            df_sales['OUTLET_CODE'] = df_sales[ch_c[0]].astype(str)
-        else:
-            df_sales['OUTLET_CODE'] = "OUTLET_UNKNOWN"
+        df_sales['OUTLET_CODE'] = df_sales[ch_c[0]].astype(str) if ch_c else "OUTLET_UNKNOWN"
             
-        # Mapping NVBH
         rep_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['mã nv', 'nvbh', 'sm', 'saleman', 'nhân viên'])]
-        if rep_c:
-            df_sales['REP_CODE'] = df_sales[rep_c[0]].astype(str)
-        else:
-            df_sales['REP_CODE'] = ""
+        df_sales['REP_CODE'] = df_sales[rep_c[0]].astype(str) if rep_c else ""
 
-        # Mapping Đơn hàng
         ord_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['đơn hàng', 'order', 'số hd', 'so_hd', 'invoice'])]
-        if ord_c:
-            df_sales['ORDER_ID'] = df_sales[ord_c[0]].astype(str)
-        else:
-            df_sales['ORDER_ID'] = df_sales['OUTLET_CODE'] + "_" + df_sales['ORDER_DATE'].astype(str)
+        df_sales['ORDER_ID'] = df_sales[ord_c[0]].astype(str) if ord_c else df_sales['OUTLET_CODE'] + "_" + df_sales['ORDER_DATE'].astype(str)
             
-        # Mapping Sản phẩm
         prod_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['sản phẩm', 'product', 'sku', 'tên sp', 'item'])]
         df_sales['PROD_NAME'] = df_sales[prod_c[0]].astype(str) if prod_c else ""
         
-        # Mapping Số lượng
         qty_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['số lượng', 'quantity', 'qty', 'sl'])]
         df_sales['QTY'] = pd.to_numeric(df_sales[qty_c[0]], errors='coerce').fillna(0) if qty_c else 1
 
@@ -268,7 +261,7 @@ if file_mcp is not None:
     except Exception as e:
         st.warning(f"Lỗi đọc File MCP Visit: {e}")
 
-# Hàm tô màu % MTD
+# Hàm tô màu % MTD & Bold Chữ Bảng
 def highlight_mtd(val):
     try:
         pct = float(str(val).replace('%', ''))
@@ -279,7 +272,47 @@ def highlight_mtd(val):
         else:
             return 'background-color: #FEE2E2; color: #B91C1C; font-weight: 900;'
     except:
-        return ''
+        return 'font-weight: 900;'
+
+# --- HELPER FILTER CHO 3 TAB DATA THÔ (ĐDKD, MÃ KH, TÊN KH) ---
+def apply_raw_data_filters(df, tab_prefix):
+    if df is None or len(df) == 0:
+        return df
+    
+    col_filter1, col_filter2, col_filter3 = st.columns([1.5, 1.5, 2.0])
+    
+    # 1. Tên ĐDKD Filter (Đã đồng bộ từ filter chính)
+    rep_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['mã nv', 'nvbh', 'sm', 'tên nv', 'sm name', 'nhân viên'])]
+    
+    # 2. Mã KH Filter
+    ch_code_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['mã kh', 'mã ch', 'outlet code', 'customer code', 'shipto', 'parent code'])]
+    
+    # 3. Tên KH Filter
+    ch_name_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['tên kh', 'tên ch', 'outlet name', 'customer name', 'shipto name', 'khách hàng'])]
+
+    filtered_df = df.copy()
+
+    with col_filter1:
+        selected_rep = st.selectbox(
+            "👤 Lọc Nhân Viên (ĐDKD)",
+            options=["Tất cả ĐDKD"] + [r[1] for r in REPS_LIST],
+            index=0 if ddkd_filter == "Tất cả ĐDKD" else ([r[1] for r in REPS_LIST].index(ddkd_filter) + 1 if ddkd_filter in [r[1] for r in REPS_LIST] else 0),
+            key=f"{tab_prefix}_rep"
+        )
+        if selected_rep != "Tất cả ĐDKD" and rep_cols:
+            filtered_df = filtered_df[filtered_df[rep_cols[0]].astype(str).str.contains(selected_rep, case=False, na=False)]
+
+    with col_filter2:
+        search_code = st.text_input("🆔 Lọc Mã Khách Hàng", key=f"{tab_prefix}_code")
+        if search_code.strip() and ch_code_cols:
+            filtered_df = filtered_df[filtered_df[ch_code_cols[0]].astype(str).str.contains(search_code.strip(), case=False, na=False)]
+
+    with col_filter3:
+        search_name = st.text_input("🏪 Lọc Tên Khách Hàng", key=f"{tab_prefix}_name")
+        if search_name.strip() and ch_name_cols:
+            filtered_df = filtered_df[filtered_df[ch_name_cols[0]].astype(str).str.contains(search_name.strip(), case=False, na=False)]
+
+    return filtered_df
 
 # --- TAB CHÍNH ---
 tab_kpi, tab_mcp, tab_mbs_cat, tab_mbs_brand = st.tabs([
@@ -458,51 +491,41 @@ with tab_mcp:
     if file_mcp is not None:
         try:
             df_mcp_raw = pd.read_excel(file_mcp) if file_mcp.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mcp)
-            
-            # Áp dụng Filter ĐDKD nếu có
-            rep_c_mcp = [c for c in df_mcp_raw.columns if any(k in str(c).lower() for k in ['mã nv', 'nvbh', 'sm', 'tên nv', 'nhân viên'])]
-            if rep_c_mcp and ddkd_filter != "Tất cả ĐDKD":
-                df_mcp_raw = df_mcp_raw[df_mcp_raw[rep_c_mcp[0]].astype(str).str.contains(ddkd_filter, case=False, na=False)]
-
-            st.success(f"Đã tải thành công file MCP Visit: {file_mcp.name} ({len(df_mcp_raw)} dòng)")
-            st.dataframe(df_mcp_raw, use_container_width=True)
+            df_mcp_filtered = apply_raw_data_filters(df_mcp_raw, "mcp")
+            st.success(f"Hiển thị {len(df_mcp_filtered)} / {len(df_mcp_raw)} dòng dữ liệu MCP Visit")
+            st.dataframe(df_mcp_filtered, use_container_width=True)
         except Exception as e:
             st.error(f"Lỗi đọc file MCP Visit: {e}")
     else:
-        st.info("👆 Sử dụng nút ⚙️ ADMIN / UPLOAD ở góc trên bên phải để tải file Data!")
+        st.info("👆 Sử dụng nút ⚙️ ADMIN / UPLOAD ở góc trên bên phải để tải file Data MCP Visit!")
 
 # ==========================================
-# TAB 3 & 4: TRACKING MBS CAT & BRAND
+# TAB 3: TRACKING MBS CAT
 # ==========================================
 with tab_mbs_cat:
     st.header("🎯 TRACKING MBS - THEO NGHÀNH HÀNG (CATEGORY)")
     if file_mbs_cat is not None:
         try:
             df_cat_raw = pd.read_excel(file_mbs_cat) if file_mbs_cat.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mbs_cat)
-            
-            # Áp dụng Filter ĐDKD nếu có
-            rep_c_cat = [c for c in df_cat_raw.columns if any(k in str(c).lower() for k in ['mã nv', 'nvbh', 'sm', 'tên nv', 'sm name', 'nhân viên'])]
-            if rep_c_cat and ddkd_filter != "Tất cả ĐDKD":
-                df_cat_raw = df_cat_raw[df_cat_raw[rep_c_cat[0]].astype(str).str.contains(ddkd_filter, case=False, na=False)]
-
-            st.dataframe(df_cat_raw, use_container_width=True)
+            df_cat_filtered = apply_raw_data_filters(df_cat_raw, "cat")
+            st.success(f"Hiển thị {len(df_cat_filtered)} / {len(df_cat_raw)} dòng dữ liệu Tracking MBS Category")
+            st.dataframe(df_cat_filtered, use_container_width=True)
         except Exception as e:
             st.error(f"Lỗi đọc file Tracking MBS Category: {e}")
     else:
         st.info("👆 Sử dụng nút ⚙️ ADMIN / UPLOAD ở góc trên bên phải để tải file Data_Cat.xlsx!")
 
+# ==========================================
+# TAB 4: TRACKING MBS BRAND
+# ==========================================
 with tab_mbs_brand:
     st.header("🏷️ TRACKING MBS - THEO NHÃN HÀNG (BRAND)")
     if file_mbs_brand is not None:
         try:
             df_brand_raw = pd.read_excel(file_mbs_brand) if file_mbs_brand.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mbs_brand)
-            
-            # Áp dụng Filter ĐDKD nếu có
-            rep_c_brand = [c for c in df_brand_raw.columns if any(k in str(c).lower() for k in ['mã nv', 'nvbh', 'sm', 'tên nv', 'sm name', 'nhân viên'])]
-            if rep_c_brand and ddkd_filter != "Tất cả ĐDKD":
-                df_brand_raw = df_brand_raw[df_brand_raw[rep_c_brand[0]].astype(str).str.contains(ddkd_filter, case=False, na=False)]
-
-            st.dataframe(df_brand_raw, use_container_width=True)
+            df_brand_filtered = apply_raw_data_filters(df_brand_raw, "brand")
+            st.success(f"Hiển thị {len(df_brand_filtered)} / {len(df_brand_raw)} dòng dữ liệu Tracking MBS Brand")
+            st.dataframe(df_brand_filtered, use_container_width=True)
         except Exception as e:
             st.error(f"Lỗi đọc file Tracking MBS Brand: {e}")
     else:
