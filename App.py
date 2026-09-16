@@ -128,7 +128,7 @@ with head_col2:
                 st.session_state['df_sales_file'] = u_sales
                 st.success("Đã nạp file bán hàng thành công!")
 
-# --- TỰ ĐỘNG TÌM FILE BÁN HÀNG NẾU CÓ TRONG THƯ MỤC ---
+# --- TỰ ĐỘNG TÌM FILE BÁN HÀNG HOẶC DÙNG SESSION ---
 def find_available_sales_file():
     if st.session_state['df_sales_file'] is not None:
         return st.session_state['df_sales_file']
@@ -259,7 +259,7 @@ if file_kpi_target is not None:
     except Exception as e:
         pass
 
-# --- ĐỌC VÀ CHUẨN HÓA FILE MCP (MAP DOANH SỐ MTD TỪ FILE BÁN HÀNG) ---
+# --- ĐỌC VÀ CHUẨN HÓA FILE MCP (MAP DOANH SỐ MTD TỪ FILE SALES CHUNG) ---
 df_mcp = None
 if file_mcp is not None:
     try:
@@ -271,13 +271,13 @@ if file_mcp is not None:
         if ch_mcp: df_mcp['OUTLET_CODE'] = df_mcp[ch_mcp[0]].astype(str).str.strip()
         if kentu_mcp: df_mcp['CHANNEL_L1'] = df_mcp[kentu_mcp[0]].astype(str).str.strip()
         
-        # LOGIC TÍNH VÀ MAPPING DOANH SỐ MTD VÀO CỘT CUỐI CÙNG
+        # Lấy trực tiếp df_sales đang chạy KPI để map vào Doanh Số MTD
         if df_sales is not None and 'ORDER_DATE' in df_sales.columns and 'OUTLET_CODE' in df_sales.columns:
             df_sales_mtd = df_sales[df_sales['ORDER_DATE'] <= selected_date]
             sales_summary = df_sales_mtd.groupby('OUTLET_CODE')['QTY'].sum().to_dict()
-            df_mcp['Doanh số MTD'] = df_mcp['OUTLET_CODE'].map(sales_summary).fillna(0)
+            df_mcp['Doanh Số MTD'] = df_mcp['OUTLET_CODE'].map(sales_summary).fillna(0)
         else:
-            df_mcp['Doanh số MTD'] = 0
+            df_mcp['Doanh Số MTD'] = 0
     except Exception as e:
         pass
 
@@ -537,9 +537,6 @@ with tab_kpi:
 # ==========================================
 with tab_mcp:
     st.header("🗺️ MCP VISIT & MAPPING DOANH SỐ BÁN HÀNG")
-    if file_sales is None:
-        st.info("💡 Mẹo: Hãy bấm vào nút **⚙️ ADMIN / UPLOAD** ở góc trên bên phải và tải lên file bán hàng (`DanhSachChiTietDonHang.xlsx`) để cột **Doanh Số MTD** tự động tính toán chính xác cho từng khách hàng!")
-    
     if file_mcp is not None:
         try:
             df_mcp_raw = df_mcp.copy()
