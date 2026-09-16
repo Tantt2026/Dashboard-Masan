@@ -320,12 +320,21 @@ def apply_raw_data_filters(df, tab_prefix):
                 key=f"{tab_prefix}_day"
             )
             if selected_day != "Tất cả các thứ":
-                # Quét thông minh TẤT CẢ các cột trong bảng MCP xem cột nào chứa thông tin thứ/ngày
-                day_num = selected_day.replace("Thứ ", "T").replace("Chủ Nhật", "CN")
+                # Ánh xạ mã gộp chuẩn xác theo yêu cầu (Thứ 2 & 5 = 25, Thứ 3 & 6 = 36, Thứ 4 & 7 = 47)
+                day_mapping = {
+                    "Thứ 2": [2, 25, "2", "25"],
+                    "Thứ 3": [3, 36, "3", "36"],
+                    "Thứ 4": [4, 47, "4", "47"],
+                    "Thứ 5": [5, 25, "5", "25"],
+                    "Thứ 6": [6, 36, "6", "36"],
+                    "Thứ 7": [7, 47, "7", "47"],
+                    "Chủ Nhật": []
+                }
+                target_vals = day_mapping.get(selected_day, [])
                 match_mask = pd.Series(False, index=df_filtered.index)
                 for col in df_filtered.columns:
-                    col_str = df_filtered[col].astype(str).str.lower()
-                    match_mask = match_mask | col_str.str.contains(selected_day.lower(), na=False) | col_str.str.contains(day_num.lower(), na=False)
+                    col_check = df_filtered[col].isin(target_vals) | df_filtered[col].astype(str).str.strip().isin([str(v) for v in target_vals])
+                    match_mask = match_mask | col_check
                 df_filtered = df_filtered[match_mask]
 
     return df_filtered
@@ -502,7 +511,7 @@ with tab_kpi:
             .map(highlight_mtd, subset=["% Hoàn thành OFF", "% Hoàn thành ON"])\
             .set_table_styles([
                 {'selector': 'th', 'props': [('background-color', '#034EA2'), ('color', '#FF0000'), ('font-weight', '900'), ('font-size', '14px'), ('text-align', 'center')]},
-                {'selector': 'td', 'props': [('font-weight', '900'), ('color', '#0F172A'), ('text-align', 'center')]},
+                {'selector': 'td', 'props': [('font-weight', '900'), ('color', '#0F172A'), ('text-align', 'center')]}
             ])
             
         st.dataframe(styled_df_combo, use_container_width=True, hide_index=True)
