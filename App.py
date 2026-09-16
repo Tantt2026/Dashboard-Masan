@@ -97,7 +97,7 @@ with head_col1:
     st.markdown("""
     <div class="header-banner">
         <div class="header-title">SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</div>
-        <div class="header-subtitle">TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN TOTAL</div>
+        <div class="header-subtitle">TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN </div>
     </div>
     """, unsafe_allow_html=True)
 
