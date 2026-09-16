@@ -81,25 +81,25 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# --- KHỞI TẠO SESSION ADMIN PASS ---
+# --- KHỞI TẠO SESSION ADMIN PASS & SIDEBAR TOGGLE ---
 if 'admin_logged_in' not in st.session_state:
     st.session_state['admin_logged_in'] = False
 
-# --- SIDEBAR PHÂN QUYỀN UPLOAD ---
+# --- SIDEBAR PHÂN QUYỀN UPLOAD (BỔ SUNG NÚT THU GỌN / HIDE ADMIN PANEL) ---
 st.sidebar.header("🛡️ PHÂN QUYỀN HỆ THỐNG")
 
 if not st.session_state['admin_logged_in']:
-    st.sidebar.subheader("🔐 Đăng Nhập Admin")
-    admin_pass = st.sidebar.text_input("Mật khẩu Admin:", type="password")
-    if st.sidebar.button("Đăng nhập"):
-        if admin_pass == "admin123":
-            st.session_state['admin_logged_in'] = True
-            st.sidebar.success("Đã đăng nhập quyền Admin thành công!")
-            st.rerun()
-        else:
-            st.sidebar.error("Mật khẩu Admin không đúng!")
+    with st.sidebar.expander("🔐 Đăng Nhập Admin Upload File", expanded=False):
+        admin_pass = st.text_input("Mật khẩu Admin:", type="password")
+        if st.button("Đăng nhập"):
+            if admin_pass == "admin123":
+                st.session_state['admin_logged_in'] = True
+                st.success("Đã đăng nhập quyền Admin thành công!")
+                st.rerun()
+            else:
+                st.error("Mật khẩu Admin không đúng!")
     
-    st.sidebar.info("👀 Bạn đang xem báo cáo ở chế độ Viewer (Xem dữ liệu). Chỉ Admin mới có quyền Upload/Sửa file.")
+    st.sidebar.info("👀 Chế độ Viewer (Xem dữ liệu). Mở mục Đăng Nhập ở trên nếu muốn Upload file.")
     file_sales, file_mcp, file_mbs_cat, file_mbs_brand, file_kpi_target = None, None, None, None, None
 else:
     st.sidebar.success("🟢 ĐÃ ĐĂNG NHẬP ADMIN")
@@ -162,7 +162,6 @@ DEFAULT_TARGETS = {
     "5. ASO ALL KÊNH OFF": {"26SF.HC22759": 68, "26SF.HC22209": 63, "19SF.HC7071": 90, "14SF.HC00198": 80, "25SF.HC21112": 91, "24SF.HC16385": 95, "26SF.HC23006": 59, "18SF.HC4149": 96, "26SF.HC22288": 71, "23SF.HC14324": 78, "24SF.HC15114": 79, "26SF.HC23230": 56, "18SF.HC4599": 101, "26SF.HC22196": 71, "26SF.HC22774": 102}
 }
 
-# Load file target động nếu admin upload
 targets_from_file = {}
 if file_kpi_target is not None:
     try:
@@ -186,7 +185,6 @@ if file_kpi_target is not None:
     except Exception as e:
         st.sidebar.warning(f"Lỗi đọc file Target: {e}")
 
-# Parse File Sales nếu có
 df_sales = None
 if file_sales is not None:
     try:
@@ -219,7 +217,6 @@ if file_sales is not None:
     except Exception as e:
         st.sidebar.error(f"Lỗi parse File Sales: {e}")
 
-# Parse File MCP Visit / Visit Schedule nếu có
 df_mcp = None
 if file_mcp is not None:
     try:
@@ -270,15 +267,12 @@ with tab_kpi:
 
     curr_targets = targets_from_file.get(kpi_filter, DEFAULT_TARGETS.get(kpi_filter, {r[0]: 30 for r in REPS_LIST}))
 
-    # ----------------------------------------------------
-    # THUẬT TOÁN TÍNH ĐỘNG DỮ LIỆU BÁO CÁO TỪ FILE SALES
-    # ----------------------------------------------------
+    # Thuật toán tính động dữ liệu báo cáo
     def calc_kpi_dynamic(kpi_name, target_date):
         res_day = {r[0]: 0 for r in REPS_LIST}
         res_mtd = {r[0]: 0 for r in REPS_LIST}
         
         if df_sales is None or 'ORDER_DATE' not in df_sales.columns:
-            # Nếu chưa upload file sales: Biến đổi số liệu động linh hoạt theo ngày chọn
             seed_offset = target_date.day
             for idx, (code, name) in enumerate(REPS_LIST):
                 base_tg = curr_targets.get(code, 30)
