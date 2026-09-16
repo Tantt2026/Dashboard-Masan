@@ -175,41 +175,47 @@ st.markdown("---")
 selected_date = date_filter
 date_str = selected_date.strftime("%d/%m")
 
-# --- ĐỌC FILE SALES: TỰ ĐỘNG QUÉT VÀ TÌM ĐÚNG DÒNG TIÊU ĐỀ ---
+# --- ĐỌC FILE SALES: QUÉT THÔNG MINH ĐÚNG MỌI TÊN CỘT MASAN ---
 df_sales = None
 if file_sales is not None:
     try:
-        # Đọc thô 5 dòng đầu để dò tìm dòng tiêu đề thật sự chứa từ khóa cột dữ liệu
         raw_peek = pd.read_excel(file_sales, header=None, nrows=5) if str(file_sales).endswith(('.xlsx', '.xls')) or (hasattr(file_sales, 'name') and file_sales.name.endswith(('.xlsx', '.xls'))) else pd.read_csv(file_sales, header=None, nrows=5)
         
         real_header_row = 0
         for idx, row in raw_peek.iterrows():
             row_str = " ".join([str(val).lower() for val in row.values])
-            if any(k in row_str for k in ['mã kh', 'mã ch', 'outlet', 'sản phẩm', 'product', 'mã nv', 'nvbh', 'shipto']):
+            if any(k in row_str for k in ['mã', 'code', 'sản phẩm', 'product', 'outlet', 'shipto', 'nvbh']):
                 real_header_row = idx
                 break
                 
-        # Đọc lại file chính xác với dòng tiêu đề đã tìm thấy
         df_sales = pd.read_excel(file_sales, header=real_header_row) if str(file_sales).endswith(('.xlsx', '.xls')) or (hasattr(file_sales, 'name') and file_sales.name.endswith(('.xlsx', '.xls'))) else pd.read_csv(file_sales, header=real_header_row)
         df_sales.columns = [str(c).strip() for c in df_sales.columns]
         
-        date_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['ngày', 'date', 'created', 'time', 'ngay'])]
-        df_sales['ORDER_DATE'] = pd.to_datetime(df_sales[date_c[0]], errors='coerce').dt.date.fillna(selected_date) if date_c else selected_date
-        
-        ch_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['mã kh', 'mã ch', 'outlet', 'customer', 'cust', 'khách hàng', 'shipto'])]
-        df_sales['OUTLET_CODE'] = df_sales[ch_c[0]].astype(str).str.strip() if ch_c else "OUTLET_UNKNOWN"
-            
-        rep_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['mã nv', 'nvbh', 'sm', 'saleman', 'nhân viên', 'mã nhân viên', 'sm name', 'tên nv'])]
-        df_sales['REP_CODE'] = df_sales[rep_c[0]].astype(str).str.strip() if rep_c else ""
+        # Hàm tìm cột linh hoạt theo danh sách từ khóa ưu tiên
+        def find_col(keywords):
+            for kw in keywords:
+                for col in df_sales.columns:
+                    if kw.lower() in col.lower():
+                        return col
+            return None
 
-        ord_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['đơn hàng', 'order', 'số hd', 'so_hd', 'invoice', 'so_don'])]
-        df_sales['ORDER_ID'] = df_sales[ord_c[0]].astype(str).str.strip() if ord_c else df_sales['OUTLET_CODE'] + "_" + df_sales['ORDER_DATE'].astype(str)
-            
-        prod_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['sản phẩm', 'product', 'sku', 'tên sp', 'item', 'mặt hàng'])]
-        df_sales['PROD_NAME'] = df_sales[prod_c[0]].astype(str).str.strip() if prod_c else ""
+        date_c = find_col(['ngày', 'date', 'created', 'time', 'ngay'])
+        df_sales['ORDER_DATE'] = pd.to_datetime(df_sales[date_c], errors='coerce').dt.date.fillna(selected_date) if date_c else selected_date
         
-        qty_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['số lượng', 'quantity', 'qty', 'sl', 'thùng', 'kg'])]
-        df_sales['QTY'] = pd.to_numeric(df_sales[qty_c[0]], errors='coerce').fillna(1) if qty_c else 1
+        ch_c = find_col(['ship-to', 'mã kh', 'mã ch', 'outlet', 'customer', 'cust', 'khách hàng', 'shipto'])
+        df_sales['OUTLET_CODE'] = df_sales[ch_c].astype(str).str.strip() if ch_c else df_sales.iloc[:, 0].astype(str).str.strip()
+            
+        rep_c = find_col(['mã nvbh', 'mã nv', 'nvbh', 'sm', 'saleman', 'nhân viên', 'tên nv'])
+        df_sales['REP_CODE'] = df_sales[rep_c].astype(str).str.strip() if rep_c else ""
+
+        ord_c = find_col(['đơn hàng', 'order', 'số hd', 'so_hd', 'invoice', 'so_don'])
+        df_sales['ORDER_ID'] = df_sales[ord_c].astype(str).str.strip() if ord_c else df_sales['OUTLET_CODE'] + "_" + df_sales['ORDER_DATE'].astype(str)
+            
+        prod_c = find_col(['sản phẩm', 'product', 'sku', 'tên sp', 'item', 'mặt hàng'])
+        df_sales['PROD_NAME'] = df_sales[prod_c].astype(str).str.strip() if prod_c else ""
+        
+        qty_c = find_col(['số lượng', 'quantity', 'qty', 'sl', 'thùng', 'kg'])
+        df_sales['QTY'] = pd.to_numeric(df_sales[qty_c], errors='coerce').fillna(1) if qty_c else 1
     except Exception as e:
         st.error(f"⚠️ Lỗi đọc File Sales: {e}")
 
