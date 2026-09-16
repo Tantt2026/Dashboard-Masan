@@ -97,7 +97,7 @@ with head_col1:
     st.markdown("""
     <div class="header-banner">
         <div class="header-title">SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</div>
-        <div class="header-subtitle">TRACKING KPI ĐDKD</div>
+        <div class="header-subtitle">TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN TOTAL</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -123,9 +123,9 @@ with head_col2:
                 st.rerun()
             st.markdown("---")
             
-            u_target = st.file_uploader("1. File Chỉ Tiêu (KPI.xlsx)", type=["xlsx", "csv"], key="u_target")
-            u_sales = st.file_uploader("2. File Sales Chi Tiết (Cập nhật ngày)", type=["xlsx", "csv"], key="u_sales")
-            u_mcp = st.file_uploader("3. File MCP Visit", type=["xlsx", "csv"], key="u_mcp")
+            u_target = st.file_uploader("1. File Chỉ Tiêu (TỔNG HỢP KPI ĐĐKD.xlsx)", type=["xlsx", "csv"], key="u_target")
+            u_sales = st.file_uploader("2. File Sales Chi Tiết (DanhSachChiTietDonHang.xlsx)", type=["xlsx", "csv"], key="u_sales")
+            u_mcp = st.file_uploader("3. File MCP Visit (Visit Schedule Report)", type=["xlsx", "csv"], key="u_mcp")
             u_cat = st.file_uploader("4. File MBS Category", type=["xlsx", "csv"], key="u_cat")
             u_brand = st.file_uploader("5. File MBS Brand", type=["xlsx", "csv"], key="u_brand")
 
@@ -209,7 +209,7 @@ if file_sales is not None:
     except Exception as e:
         st.error(f"⚠️ Lỗi đọc File Sales: {e}")
 
-# --- ĐỌC FILE TARGET ---
+# --- ĐỌC FILE TARGET (TỔNG HỢP KPI ĐĐKD.xlsx -> Sheet Export) ---
 DEFAULT_TARGETS = {
     "1. ASO FOCUS TOTAL NHÃN CHANTÉ": {r[0]: 30 for r in REPS_LIST},
     "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN": {"26SF.HC23006": 20, "26SF.HC22759": 53, "24SF.HC16385": 57, "24SF.HC15114": 62, "19SF.HC7071": 80, "26SF.HC23230": 40, "26SF.HC22209": 37, "26SF.HC22288": 49, "23SF.HC14324": 68, "14SF.HC00198": 87, "26SF.HC22196": 42, "25SF.HC21112": 87, "26SF.HC22774": 74, "18SF.HC4599": 92, "18SF.HC4149": 65},
@@ -242,7 +242,7 @@ if file_kpi_target is not None:
     except Exception as e:
         pass
 
-# --- ĐỌC FILE MCP ---
+# --- ĐỌC FILE MCP / VISIT SCHEDULE REPORT ---
 df_mcp = None
 if file_mcp is not None:
     try:
@@ -312,7 +312,7 @@ tab_kpi, tab_mcp, tab_mbs_cat, tab_mbs_brand = st.tabs([
 ])
 
 # ==========================================
-# TAB 1: BÁO CÁO KPI
+# TAB 1: BÁO CÁO KPI (ĐÚNG RULE 6 BÁO CÁO)
 # ==========================================
 with tab_kpi:
     curr_targets = targets_from_file.get(kpi_filter, DEFAULT_TARGETS.get(kpi_filter, {r[0]: 30 for r in REPS_LIST}))
@@ -339,14 +339,19 @@ with tab_kpi:
             df_m_rep = df_mtd[rep_mask_mtd]
             df_d_rep = df_day[rep_mask_day]
 
+            # 1. BÁO CÁO ASO FOCUS TOTAL NHÃN CHANTÉ (Toàn bộ CH, Chanté/Chante, Khử trùng lặp unique outlet)
             if kpi_name == "1. ASO FOCUS TOTAL NHÃN CHANTÉ":
                 res_mtd[code] = df_m_rep[df_m_rep['PROD_NAME'].str.contains('chanté|chante', case=False, na=False)]['OUTLET_CODE'].nunique()
                 res_day[code] = df_d_rep[df_d_rep['PROD_NAME'].str.contains('chanté|chante', case=False, na=False)]['OUTLET_CODE'].nunique()
 
+            # 2. BÁO CÁO ASO FOCUS TRẬN VÀNG - OMACHI TRỘN (Toàn bộ CH, Omachi trộn, spaghetti, lẩu cầm tay, tron)
             elif kpi_name == "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN":
-                res_mtd[code] = df_m_rep[df_m_rep['PROD_NAME'].str.contains('trộn|spaghetti|lẩu cầm tay|tron', case=False, na=False)]['OUTLET_CODE'].nunique()
-                res_day[code] = df_d_rep[df_d_rep['PROD_NAME'].str.contains('trộn|spaghetti|lẩu cầm tay|tron', case=False, na=False)]['OUTLET_CODE'].nunique()
+                cond_tron = df_m_rep['PROD_NAME'].str.contains('trộn|spaghetti|lẩu cầm tay|tron', case=False, na=False)
+                res_mtd[code] = df_m_rep[cond_tron]['OUTLET_CODE'].nunique()
+                cond_tron_d = df_d_rep['PROD_NAME'].str.contains('trộn|spaghetti|lẩu cầm tay|tron', case=False, na=False)
+                res_day[code] = df_d_rep[cond_tron_d]['OUTLET_CODE'].nunique()
 
+            # 3. ASO TEA KÊNH ON PREMISE (Kênh ON, Trà TEA365/Trà Búp Non, đơn >= 12 chai trên cùng Order ID)
             elif kpi_name == "3. ASO TEA KÊNH ON PREMISE":
                 df_m_tea = df_m_rep[df_m_rep['PROD_NAME'].str.contains('tea365|trà búp non|tea 365', case=False, na=False)]
                 df_d_tea = df_d_rep[df_d_rep['PROD_NAME'].str.contains('tea365|trà búp non|tea 365', case=False, na=False)]
@@ -364,6 +369,7 @@ with tab_kpi:
                 ord_d = ord_d[ord_d['QTY'] >= 12]
                 res_day[code] = ord_d['OUTLET_CODE'].nunique()
 
+            # 4. PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER) (Kênh OFF, loại trừ Bia/Beer, đơn >= 4 SKU lines)
             elif kpi_name == "4. PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER)":
                 df_m_nb = df_m_rep[~df_m_rep['PROD_NAME'].str.contains('bia|beer', case=False, na=False)]
                 df_d_nb = df_d_rep[~df_d_rep['PROD_NAME'].str.contains('bia|beer', case=False, na=False)]
@@ -381,6 +387,7 @@ with tab_kpi:
                 ord_d_l = ord_d_l[ord_d_l['PROD_NAME'] >= 4]
                 res_day[code] = ord_d_l['OUTLET_CODE'].nunique()
 
+            # 5. ASO ALL KÊNH OFF (Kênh OFF, tổng hợp điểm lẻ bao phủ sản phẩm chuẩn, khử trùng lặp MTD)
             elif kpi_name == "5. ASO ALL KÊNH OFF":
                 df_m_off = df_m_rep.copy()
                 df_d_off = df_d_rep.copy()
@@ -441,6 +448,7 @@ with tab_kpi:
         """, unsafe_allow_html=True)
 
     else:
+        # 6. BÁO CÁO ĐƠN HÀNG COMBO (Split 2 Kênh OFF & ON theo tuyến lịch viếng thăm)
         st.subheader(f"BÁO CÁO ĐƠN HÀNG COMBO THỨ {selected_date.isoweekday()+1 if selected_date.isoweekday()<7 else 1} NGÀY {date_str}/2026")
         st.caption(f"⚡ Phân tách 2 Kênh OFF & ON theo tuyến viếng thăm ngày {date_str}/2026")
 
