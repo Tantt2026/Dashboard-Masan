@@ -3,11 +3,17 @@ import pandas as pd
 import datetime
 import numpy as np
 import os
+import base64
 
 # --- CONFIG TRANG WEB ---
 st.set_page_config(page_title="TRACKING KPI - MASAN CONSUMER", layout="wide")
 
-# --- CUSTOM CSS: TIÊU ĐỀ XANH DƯƠNG ĐẬM & KHÓA BẢNG DATA ---
+# --- MÃ HÓA LOGO MASAN CONSUMER ĐỂ NHÚNG TRỰC TIẾP ---
+MASAN_LOGO_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAASwAAAAhCAMAAAC9xQdEAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAXNCSVQICAgIfAhkiAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAABx0RVh0U29mdHdhcmUAQWRvYmUgRmlyZXdvcmtzIENTNnNNEr0AAABlUExURQAAAP///wAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgyc17vQAAAAlwSFlzAAALEwAACxMBAJqcGAAAADxJREFUeJzt0DEBAAAAwqD1T20ND6gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIBnAW6bAAH3x6b8AAAAAElFTkSuQmCC"
+# Sử dụng logo svg trực tiếp qua thẻ html image data uri
+LOGO_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAAhCAMAAAC9xQdEAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAXNCSVQICAgIfAhkiAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAABx0RVh0U29mdHdhcmUAQWRvYmUgRmlyZXdvcmtzIENTNnNNEr0AAABlUExURQAAAP///wAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgyc17vQAAAAlwSFlzAAALEwAACxMBAJqcGAAAADxJREFUeJzt0DEBAAAAwqD1T20ND6gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIBnAW6bAAH3x6b8AAAAAElFTkSuQmCC"
+
+# --- CUSTOM CSS ---
 st.markdown("""
 <style>
     html, body, p, span, label, td, th, div, input {
@@ -27,27 +33,40 @@ st.markdown("""
         white-space: nowrap !important;
     }
 
-    /* TIÊU ĐỀ DASHBOARD MÀU XANH DƯƠNG ĐẬM */
+    /* BANNER TIÊU ĐỀ XANH DƯƠNG ĐẬM */
     .header-banner {
         background-color: #034EA2;
         border: 2px solid #000;
         border-radius: 12px;
-        padding: 15px;
-        text-align: center;
+        padding: 12px 15px;
         margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .header-logo {
+        height: 45px;
+        background-color: #FFFFFF;
+        padding: 4px 8px;
+        border-radius: 6px;
+        object-fit: contain;
+    }
+    .header-text-container {
+        text-align: center;
+        flex-grow: 1;
     }
     .header-title {
-        font-size: 26px;
+        font-size: 24px;
         font-weight: 900 !important;
         color: #FFFFFF;
         margin: 0;
         text-transform: uppercase;
     }
     .header-subtitle {
-        font-size: 20px;
+        font-size: 18px;
         font-weight: 900 !important;
         color: #FDE047;
-        margin-top: 5px;
+        margin-top: 3px;
         text-transform: uppercase;
     }
     
@@ -83,7 +102,7 @@ st.markdown("""
         text-transform: uppercase;
     }
 </style>
-""", unsafe_allow_html=True);
+""", unsafe_allow_html=True)
 
 if 'df_sales_file' not in st.session_state:
     st.session_state['df_sales_file'] = None
@@ -94,10 +113,13 @@ if 'admin_logged_in' not in st.session_state:
 head_col1, head_col2 = st.columns([3.8, 1.2])
 
 with head_col1:
-    st.markdown("""
+    st.markdown(f"""
     <div class="header-banner">
-        <div class="header-title">SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</div>
-        <div class="header-subtitle">TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN TOTAL</div>
+        <img src="https://upload.wikimedia.org/wikipedia/commons/9/9e/Masan_Group_logo.svg" class="header-logo" alt="Masan Consumer">
+        <div class="header-text-container">
+            <div class="header-title">SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</div>
+            <div class="header-subtitle">TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN TOTAL</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -123,7 +145,6 @@ with head_col2:
                 st.rerun()
             st.markdown("---")
             
-            # CHỈ CHO PHÉP UPLOAD DUY NHẤT FILE BÁN HÀNG
             u_sales = st.file_uploader("📂 Tải lên File Bán Hàng (DanhSachChiTietDonHang.xlsx)", type=["xlsx", "csv"], key="u_sales")
             if u_sales: 
                 st.session_state['df_sales_file'] = u_sales
@@ -319,7 +340,7 @@ tab_kpi, tab_mcp, tab_mbs_cat, tab_mbs_brand = st.tabs([
 ])
 
 # ==========================================
-# TAB 1: BÁO CÁO KPI (CỐ ĐỊNH BẢNG - KHÔNG CHO CHỈNH SỬA)
+# TAB 1: BÁO CÁO KPI (CỐ ĐỊNH BẢNG)
 # ==========================================
 with tab_kpi:
     curr_targets = targets_from_file.get(kpi_filter, DEFAULT_TARGETS.get(kpi_filter, {r[0]: 30 for r in REPS_LIST}))
@@ -438,7 +459,6 @@ with tab_kpi:
                 {'selector': 'td', 'props': [('font-weight', '900'), ('color', '#0F172A'), ('text-align', 'center')]}
             ])
             
-        # SỬ DỤNG st.dataframe VỚI THAM SỐ disabled ĐỂ CỐ ĐỊNH HOÀN TOÀN BẢNG
         st.dataframe(styled_df_kpi, use_container_width=True, hide_index=True)
 
         st.markdown(f"""
