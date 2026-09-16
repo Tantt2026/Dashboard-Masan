@@ -4,7 +4,7 @@ import datetime
 import numpy as np
 
 # --- CONFIG TRANG WEB ---
-st.set_page_config(page_title="TRACKING KPI & DATA THÔ - MASAN CONSUMER", layout="wide")
+st.set_page_config(page_title="TRACKING KPI - MASAN CONSUMER", layout="wide")
 
 # --- CUSTOM CSS: BOLD 100% & BẢO VỆ FONT ICON STREAMLIT ---
 st.markdown("""
@@ -33,10 +33,11 @@ st.markdown("""
         text-transform: uppercase;
     }
     .header-subtitle {
-        font-size: 18px;
+        font-size: 20px;
         font-weight: 900 !important;
         color: #0F172A;
         margin-top: 5px;
+        text-transform: uppercase;
     }
     th {
         background-color: #034EA2 !important;
@@ -77,21 +78,21 @@ st.markdown("""
 if 'admin_logged_in' not in st.session_state:
     st.session_state['admin_logged_in'] = False
 
-# --- HEADER & NÚT UPLOAD/ADMIN TRÊN CÙNG BÊN GÓC PHẢI ---
+# --- HEADER BANNER & NÚT UPLOAD/ADMIN GÓC TRÊN BÊN PHẢI ---
 head_col1, head_col2 = st.columns([4, 1.2])
 
 with head_col1:
     st.markdown("""
     <div class="header-banner">
         <div class="header-title">SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</div>
-        <div class="header-subtitle">TRACKING KPI ĐDKD & HỆ THỐNG QUẢN LÝ DATA THÔ</div>
+        <div class="header-subtitle">TRACKING KPI ĐDKD</div>
     </div>
     """, unsafe_allow_html=True)
 
 file_sales, file_mcp, file_mbs_cat, file_mbs_brand, file_kpi_target = None, None, None, None, None
 
 with head_col2:
-    st.write("") # Tạo khoảng cách canh lề
+    st.write("") # Canh lề
     if not st.session_state['admin_logged_in']:
         with st.popover("⚙️ ĐĂNG NHẬP ADMIN / UPLOAD", use_container_width=True):
             st.subheader("🔐 Quyền Admin")
@@ -429,7 +430,7 @@ with tab_kpi:
 # TAB 2: MCP VISIT
 # ==========================================
 with tab_mcp:
-    st.header("🗺️ DỮ LIỆU THÔ MCP VISIT & MAPPING DOANH SỐ BÁN HÀNG")
+    st.header("🗺️ MCP VISIT & MAPPING DOANH SỐ BÁN HÀNG")
     if file_mcp is not None:
         try:
             df_mcp_raw = pd.read_excel(file_mcp) if file_mcp.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mcp)
@@ -438,13 +439,13 @@ with tab_mcp:
         except Exception as e:
             st.error(f"Lỗi đọc file MCP Visit: {e}")
     else:
-        st.info("👆 Sử dụng nút ⚙️ Quyền Admin / Upload ở góc trên bên phải để tải file Data thô!")
+        st.info("👆 Sử dụng nút ⚙️ Quyền Admin / Upload ở góc trên bên phải để tải file Data!")
 
 # ==========================================
 # TAB 3 & 4: TRACKING MBS CAT & BRAND
 # ==========================================
 with tab_mbs_cat:
-    st.header("🎯 DỮ LIỆU THÔ TRACKING MBS - THEO NGHÀNH HÀNG (CATEGORY)")
+    st.header("🎯 TRACKING MBS - THEO NGHÀNH HÀNG (CATEGORY)")
     if file_mbs_cat is not None:
         try:
             df_cat_raw = pd.read_excel(file_mbs_cat) if file_mbs_cat.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mbs_cat)
@@ -455,7 +456,7 @@ with tab_mbs_cat:
         st.info("👆 Sử dụng nút ⚙️ Quyền Admin / Upload ở góc trên bên phải để tải file Data_Cat.xlsx!")
 
 with tab_mbs_brand:
-    st.header("🏷️ DỮ LIỆU THÔ TRACKING MBS - THEO NHÃN HÀNG (BRAND)")
+    st.header("🏷️ TRACKING MBS - THEO NHÃN HÀNG (BRAND)")
     if file_mbs_brand is not None:
         try:
             df_brand_raw = pd.read_excel(file_mbs_brand) if file_mbs_brand.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mbs_brand)
