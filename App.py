@@ -7,87 +7,64 @@ import os
 # --- CONFIG TRANG WEB ---
 st.set_page_config(page_title="TRACKING KPI - MASAN CONSUMER", layout="wide")
 
-# --- CHUỖI NHÚNG TRỰC TIẾP LOGO MASAN CHUẨN XÁC 100% ---
-MASAN_LOGO_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAAhCAMAAAC9xQdEAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAXNCSVQICAgIfAhkiAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAABx0RVh0U29mdHdhcmUAQWRvYmUgRmlyZXdvcmtzIENTNnNNEr0AAABlUExURQAAAP///wAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgyc17vQAAAAlwSFlzAAALEwAACxMBAJqcGAAAADxJREFUeJzt0DEBAAAAwqD1T20ND6gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIBnAW6bAAH3x6b8AAAAAElFTkSuQmCC"
-
 # --- CUSTOM CSS ---
-st.markdown(f"""
+st.markdown("""
 <style>
-    html, body, p, span, label, td, th, div, input {{
+    html, body, p, span, label, td, th, div, input {
         font-weight: 900 !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-    }}
+    }
     
-    [data-testid="stIcon"], [data-testid="stIcon"] *, i, .st-emotion-cache-121544q, [class*="st-"] svg {{
+    [data-testid="stIcon"], [data-testid="stIcon"] *, i, .st-emotion-cache-121544q, [class*="st-"] svg {
         font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
         font-weight: normal !important;
-    }}
+    }
 
-    div[data-testid="stPopover"] button {{
+    div[data-testid="stPopover"] button {
         font-weight: 900 !important;
         font-size: 13px !important;
         padding: 8px 12px !important;
         white-space: nowrap !important;
-    }}
+    }
 
     /* BANNER TIÊU ĐỀ XANH DƯƠNG ĐẬM */
-    .header-banner {{
+    .header-banner {
         background-color: #034EA2;
         border: 2px solid #000;
         border-radius: 12px;
-        padding: 12px 15px;
-        margin-bottom: 15px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }}
-    .header-logo-container {{
-        background-color: #FFFFFF;
-        padding: 6px 12px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }}
-    .header-logo {{
-        height: 38px;
-        object-fit: contain;
-        display: block;
-    }}
-    .header-text-container {{
+        padding: 15px;
         text-align: center;
-        flex-grow: 1;
-        padding: 0 15px;
-    }}
-    .header-title {{
-        font-size: 24px;
+        margin-bottom: 15px;
+    }
+    .header-title {
+        font-size: 26px;
         font-weight: 900 !important;
         color: #FFFFFF;
         margin: 0;
         text-transform: uppercase;
-    }}
-    .header-subtitle {{
-        font-size: 18px;
+    }
+    .header-subtitle {
+        font-size: 20px;
         font-weight: 900 !important;
         color: #FDE047;
-        margin-top: 3px;
+        margin-top: 5px;
         text-transform: uppercase;
-    }}
+    }
     
-    [data-testid="stDataFrame"] div[role="columnheader"] {{
+    [data-testid="stDataFrame"] div[role="columnheader"] {
         background-color: #034EA2 !important;
-    }}
-    [data-testid="stDataFrame"] div[role="columnheader"] * {{
+    }
+    [data-testid="stDataFrame"] div[role="columnheader"] * {
         color: #FF0000 !important;
         font-weight: 900 !important;
         font-size: 14px !important;
-    }}
-    [data-testid="stDataFrame"] div[role="gridcell"] {{
+    }
+    [data-testid="stDataFrame"] div[role="gridcell"] {
         font-weight: 900 !important;
         color: #0F172A !important;
-    }}
+    }
     
-    .comment-box {{
+    .comment-box {
         border: 2px solid #034EA2;
         border-radius: 10px;
         padding: 15px;
@@ -97,14 +74,14 @@ st.markdown(f"""
         font-weight: 900 !important;
         line-height: 1.6;
         color: #0F172A;
-    }}
-    .comment-title {{
+    }
+    .comment-title {
         color: #0F172A;
         font-weight: 900 !important;
         font-size: 14px;
         margin-bottom: 8px;
         text-transform: uppercase;
-    }}
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -117,15 +94,10 @@ if 'admin_logged_in' not in st.session_state:
 head_col1, head_col2 = st.columns([3.8, 1.2])
 
 with head_col1:
-    st.markdown(f"""
+    st.markdown("""
     <div class="header-banner">
-        <div class="header-logo-container">
-            <img src="{MASAN_LOGO_URI}" class="header-logo" alt="Masan Consumer">
-        </div>
-        <div class="header-text-container">
-            <div class="header-title">SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</div>
-            <div class="header-subtitle">TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN </div>
-        </div>
+        <div class="header-title">SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</div>
+        <div class="header-subtitle">TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN TOTAL</div>
     </div>
     """, unsafe_allow_html=True)
 
