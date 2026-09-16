@@ -175,20 +175,22 @@ st.markdown("---")
 selected_date = date_filter
 date_str = selected_date.strftime("%d/%m")
 
-# --- ĐỌC FILE SALES VỚI CƠ CHẾ TỰ DỘNG TÌM DÒNG TIÊU ĐỀ CHUẨN ---
+# --- ĐỌC FILE SALES: TỰ ĐỘNG QUÉT VÀ TÌM ĐÚNG DÒNG TIÊU ĐỀ ---
 df_sales = None
 if file_sales is not None:
     try:
-        # Thử đọc qua các header khác nhau nếu file có dòng tiêu đề rỗng ở đầu
-        for h_idx in [0, 1, 2]:
-            temp_df = pd.read_excel(file_sales, header=h_idx) if str(file_sales).endswith(('.xlsx', '.xls')) or (hasattr(file_sales, 'name') and file_sales.name.endswith(('.xlsx', '.xls'))) else pd.read_csv(file_sales, header=h_idx)
-            cols_str = " ".join([str(c).lower() for c in temp_df.columns])
-            if 'mã' in cols_str or 'code' in cols_str or 'sản phẩm' in cols_str or 'product' in cols_str or 'outlet' in cols_str:
-                df_sales = temp_df
+        # Đọc thô 5 dòng đầu để dò tìm dòng tiêu đề thật sự chứa từ khóa cột dữ liệu
+        raw_peek = pd.read_excel(file_sales, header=None, nrows=5) if str(file_sales).endswith(('.xlsx', '.xls')) or (hasattr(file_sales, 'name') and file_sales.name.endswith(('.xlsx', '.xls'))) else pd.read_csv(file_sales, header=None, nrows=5)
+        
+        real_header_row = 0
+        for idx, row in raw_peek.iterrows():
+            row_str = " ".join([str(val).lower() for val in row.values])
+            if any(k in row_str for k in ['mã kh', 'mã ch', 'outlet', 'sản phẩm', 'product', 'mã nv', 'nvbh', 'shipto']):
+                real_header_row = idx
                 break
-        if df_sales is None:
-            df_sales = pd.read_excel(file_sales)
-            
+                
+        # Đọc lại file chính xác với dòng tiêu đề đã tìm thấy
+        df_sales = pd.read_excel(file_sales, header=real_header_row) if str(file_sales).endswith(('.xlsx', '.xls')) or (hasattr(file_sales, 'name') and file_sales.name.endswith(('.xlsx', '.xls'))) else pd.read_csv(file_sales, header=real_header_row)
         df_sales.columns = [str(c).strip() for c in df_sales.columns]
         
         date_c = [c for c in df_sales.columns if any(k in c.lower() for k in ['ngày', 'date', 'created', 'time', 'ngay'])]
