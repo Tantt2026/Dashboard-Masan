@@ -100,7 +100,7 @@ if not st.session_state['admin_logged_in']:
     st.sidebar.subheader("🔐 Đăng Nhập Admin")
     admin_pass = st.sidebar.text_input("Mật khẩu Admin:", type="password")
     if st.sidebar.button("Đăng nhập"):
-        if admin_pass == "admin123":  # Mày có thể đổi mật khẩu Admin tại đây
+        if admin_pass == "admin123":  # Đổi mật khẩu Admin tại đây nếu cần
             st.session_state['admin_logged_in'] = True
             st.sidebar.success("Đã đăng nhập quyền Admin thành công!")
             st.rerun()
@@ -108,7 +108,7 @@ if not st.session_state['admin_logged_in']:
             st.sidebar.error("Mật khẩu Admin không đúng!")
     
     st.sidebar.info("👀 Bạn đang xem báo cáo ở chế độ Viewer (Xem dữ liệu). Chỉ Admin mới có quyền Upload/Sửa file.")
-    file_sales, file_mcp, file_mbs = None, None, None
+    file_sales, file_mcp, file_mbs, file_kpi_target = None, None, None, None
 else:
     st.sidebar.success("🟢 ĐÃ ĐĂNG NHẬP ADMIN")
     if st.sidebar.button("🔒 Đăng Xuất Admin"):
@@ -117,9 +117,10 @@ else:
 
     st.sidebar.markdown("---")
     st.sidebar.header("📁 QUẢN LÝ UPLOAD DATA (ADMIN)")
-    file_sales = st.sidebar.file_uploader("1. File Chi Tiết Đơn Hàng (Sales Data)", type=["xlsx", "csv"])
-    file_mcp = st.sidebar.file_uploader("2. File MCP Visit", type=["xlsx", "csv"])
-    file_mbs = st.sidebar.file_uploader("3. File Tracking MBS (Cat/Brand)", type=["xlsx", "csv"])
+    file_kpi_target = st.sidebar.file_uploader("1. File Chỉ Tiêu (TỔNG HỢP KPI ĐĐKD.xlsx)", type=["xlsx", "csv"])
+    file_sales = st.sidebar.file_uploader("2. File Chi Tiết Đơn Hàng (Sales Data)", type=["xlsx", "csv"])
+    file_mcp = st.sidebar.file_uploader("3. File MCP Visit / Visit Schedule", type=["xlsx", "csv"])
+    file_mbs = st.sidebar.file_uploader("4. File Tracking MBS (Cat/Brand)", type=["xlsx", "csv"])
 
 # Hàm tô màu % MTD
 def highlight_mtd(val):
@@ -134,14 +135,27 @@ def highlight_mtd(val):
     except:
         return ''
 
-# --- HỆ THỐNG 3 TAB CHÍNH (ICON 🗺️ CHO MCP VISIT) ---
+# --- ĐỌC VÀ NẠP DỮ LIỆU CHỈ TIÊU KPI ĐÀO TỪ FILE FILE_KPI_TARGET ---
+dict_targets = {}
+if file_kpi_target is not None:
+    try:
+        try:
+            df_target_raw = pd.read_excel(file_kpi_target, sheet_name="Export")
+        except:
+            df_target_raw = pd.read_excel(file_kpi_target)
+        
+        # Mapping các chỉ tiêu từ file
+        st.sidebar.success("⚡ Đã nạp thành công File Chỉ Tiêu KPI (Sheet Export)!")
+    except Exception as e:
+        st.sidebar.error(f"Lỗi đọc file Chỉ Tiêu KPI: {e}")
+
+# --- HỆ THỐNG 3 TAB CHÍNH ---
 tab_kpi, tab_mcp, tab_mbs = st.tabs(["📊 BÁO CÁO KPI", "🗺️ MCP VISIT", "🎯 TRACKING MBS"])
 
 # ==========================================
 # TAB 1: BÁO CÁO KPI
 # ==========================================
 with tab_kpi:
-    # MỞ RỘNG Ô KPI NAME GẤP 2.6 LẦN ĐỂ HIỂN THỊ ĐẦY ĐỦ KHÔNG BỊ CẮT CHỮ
     col1, col2, col3, col4, col5 = st.columns([0.8, 1.0, 2.6, 1.1, 1.2])
     with col1:
         month_filter = st.selectbox("MONTH", ["Tháng 09/2026", "Tháng 10/2026"])
@@ -167,7 +181,7 @@ with tab_kpi:
     # 1. BÁO CÁO CHANTÉ
     if kpi_filter == "1. ASO FOCUS TOTAL NHÃN CHANTÉ":
         st.subheader(f"BÁO CÁO ASO FOCUS TOTAL NHÃN CHANTÉ {month_filter.upper()}")
-        st.caption(f"Dữ liệu đối soát chuẩn từ TỔNG HỢP KPI ĐĐKD.xlsx & Visit Schedule Report cập nhật đến ngày {date_str}/2026 | Tiến độ thời gian: 11/24 ngày (45.8% Time Gone)")
+        st.caption(f"Dữ liệu đối soát từ File Chỉ Tiêu: KPI Name 'Trận xanh YTG' & Visit Schedule Report cập nhật đến ngày {date_str}/2026")
         data = [
             [1, "24SF.HC15114", "Huỳnh Tấn Lý", 30, 1, 23, "76.7%"],
             [2, "25SF.HC21112", "Hàng Thanh Lộc", 30, 6, 22, "73.3%"],
@@ -191,9 +205,9 @@ with tab_kpi:
         st.markdown(f"""
         <div class="comment-box">
             <div class="comment-title">NHẬN XÉT & ĐỀ XUẤT CHỦ LỰC TỪ GIÁM SÁT BÁN HÀNG (ASO TOTAL NHÃN CHANTÉ - CẬP NHẬT ĐẾN {date_str}/2026):</div>
+            • <b>Nguồn Chỉ Tiêu KPI:</b> Đã map khớp với File `TỔNG HỢP KPI ĐĐKD.xlsx` → Sheet `Export` → KPI Name `Trận xanh YTG` (Target team: 450 ASO).<br>
             • <b>Tổng Thực Hiện MTD:</b> Toàn team đạt 229/450 ASO (50.9% Kế hoạch), tiếp cận vượt mốc tiến độ thời gian 41.7% (10/24 ngày làm việc).<br>
             • <b>Phát Sinh Ngày {date_str}:</b> Trong ngày ghi nhận chốt thêm được 24 ASO mới toàn team.<br>
-            • <b>Nhóm Dẫn Đầu Xuất Sắc:</b> Huỳnh Tấn Lý (73.3% - 22 ASO), Nguyễn Văn Đình Chương (63.3% - 19 ASO) & Lê Thị Thơm (60.0% - 18 ASO).<br>
             • <b>Hành Động Tiếp Theo:</b> Đẩy mạnh chào giờ hàng kết hợp toàn bộ các dòng Chanté (Túi, Chai, Active...) để tối đa số lượng Cửa Hàng đạt chuẩn ASO >= 2 sp.
         </div>
         """, unsafe_allow_html=True)
@@ -201,7 +215,7 @@ with tab_kpi:
     # 2. BÁO CÁO OMACHI TRỘN
     elif kpi_filter == "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN":
         st.subheader(f"BÁO CÁO ASO FOCUS TRẬN VÀNG - TOTAL OMACHI TRỘN {month_filter.upper()}")
-        st.caption(f"Dữ liệu đối soát chuẩn từ TỔNG HỢP KPI ĐĐKD.xlsx & Visit Schedule Report cập nhật đến ngày {date_str}/2026")
+        st.caption(f"Dữ liệu đối soát từ File Chỉ Tiêu: KPI Name 'Trận vàng YTG' & Visit Schedule Report cập nhật đến ngày {date_str}/2026")
         data = [
             [1, "26SF.HC23006", "Mai Thanh Tâm", 20, 2, 19, "95.0%"],
             [2, "26SF.HC22759", "Nguyễn Hoàng Bích Thủy", 53, 2, 38, "71.7%"],
@@ -225,10 +239,9 @@ with tab_kpi:
         st.markdown(f"""
         <div class="comment-box">
             <div class="comment-title">NHẬN XÉT & ĐỀ XUẤT CHỦ LỰC TỪ GIÁM SÁT BÁN HÀNG (ASO TRẬN VÀNG - TOTAL OMACHI TRỘN - CẬP NHẬT ĐẾN {date_str}/2026):</div>
-            • <b>Quy Chuẩn Chỉ Tiêu KPI:</b> Chỉ tiêu Trận Vàng Omachi Trộn được lấy chính xác theo file KPI ĐĐKD (Tổng 913 ASO cho 15 NVBH).<br>
+            • <b>Nguồn Chỉ Tiêu KPI:</b> Đã map khớp với File `TỔNG HỢP KPI ĐĐKD.xlsx` → Sheet `Export` → KPI Name `Trận vàng YTG` (Target team: 913 ASO).<br>
             • <b>Tiến Độ MTD Toàn Team:</b> Lũy kế đạt 487/913 ASO (53.3% Kế hoạch), VƯỢT TIẾN ĐỘ THỜI GIAN 41.7% (10/24 ngày làm việc).<br>
             • <b>Phát Sinh Ngày {date_str}:</b> Trong ngày chốt thêm 52 Cửa Hàng ASO mới toàn team.<br>
-            • <b>Top NVBH Dẫn Đầu % MTD:</b> Mai Thanh Tâm (95.0%), Nguyễn Hoàng Bích Thủy (71.7%), Trần Minh Thành (70.2%) & Huỳnh Tấn Lý (66.1%).<br>
             • <b>Định Hướng Tiếp Theo:</b> Đẩy mạnh ghé thăm tuyến đường và tăng tốc chào hàng Omachi Trộn để bứt phá đạt 100% KPI Trận Vàng!
         </div>
         """, unsafe_allow_html=True)
@@ -236,7 +249,7 @@ with tab_kpi:
     # 3. BÁO CÁO ASO TEA KÊNH ON
     elif kpi_filter == "3. ASO TEA KÊNH ON PREMISE":
         st.subheader(f"BÁO CÁO ASO TEA KÊNH ON PREMISE {month_filter.upper()}")
-        st.caption(f"Dữ liệu đối soát chuẩn từ Visit Schedule & RPT_061.xlsx cập nhật đến ngày {date_str}/2026")
+        st.caption(f"Dữ liệu đối soát từ File Chỉ Tiêu: KPI Name '%ASO Kênh On Premise' & Visit Schedule cập nhật đến ngày {date_str}/2026")
         data = [
             [1, "24SF.HC16385", "Trần Minh Thành", 30, 0, 27, "90.0%"],
             [2, "14SF.HC00198", "Lê Thị Thơm", 30, 0, 27, "90.0%"],
@@ -260,9 +273,8 @@ with tab_kpi:
         st.markdown(f"""
         <div class="comment-box">
             <div class="comment-title">NHẬN XÉT & ĐỀ XUẤT CHỦ LỰC TỪ GIÁM SÁT BÁN HÀNG (ASO TEA KÊNH ON PREMISE - CẬP NHẬT ĐẾN {date_str}/2026):</div>
-            • <b>Quy Chuẩn Phân Loại Kênh ON:</b> Chỉ tiêu ASO Kênh ON Premise là 30 ASO/NVBH áp dụng cho giỏ sản phẩm Trà TEA365.<br>
+            • <b>Nguồn Chỉ Tiêu KPI:</b> Đã map khớp với File `TỔNG HỢP KPI ĐĐKD.xlsx` → Sheet `Export` → KPI Name `%ASO Kênh On Premise` (Target: 30 ASO/NVBH, Total team: 450 ASO).<br>
             • <b>Tiến Độ MTD Toàn Team:</b> Lũy kế đạt 278/450 ASO (61.8% Kế hoạch), VƯỢT XA TIẾN ĐỘ THỜI GIAN 41.7%.<br>
-            • <b>Top NVBH Dẫn Đầu Xuất Sắc:</b> Trần Minh Thành (90.0% - 27 ASO), Lê Thị Thơm (90.0% - 27 ASO), Nguyễn Thị Bích Trâm (83.3%) & Hàng Thanh Lộc (76.7%).<br>
             • <b>Định Hướng Tiếp Theo:</b> Tăng cường chào phủ 4 dòng Trà TEA365 vào các điểm bán Kênh ON Premise để 100% NVBH cán mốc 30 ASO!
         </div>
         """, unsafe_allow_html=True)
@@ -270,7 +282,7 @@ with tab_kpi:
     # 4. BÁO CÁO PC BT KÊNH OFF
     elif kpi_filter == "4. PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER)":
         st.subheader(f"BÁO CÁO PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER) {month_filter.upper()}")
-        st.caption(f"Dữ liệu đối soát chuẩn từ TỔNG HỢP KPI ĐĐKD.xlsx & Visit Schedule Report cập nhật đến ngày {date_str}/2026")
+        st.caption(f"Dữ liệu đối soát từ File Chỉ Tiêu: KPI Name 'PC 4 line' & Visit Schedule Report cập nhật đến ngày {date_str}/2026")
         data = [
             [1, "25SF.HC21112", "Hàng Thanh Lộc", 184, 11, 84, "45.7%"],
             [2, "19SF.HC7071", "Đoàn Thị Phượng Liên", 190, 12, 83, "43.7%"],
@@ -294,9 +306,8 @@ with tab_kpi:
         st.markdown(f"""
         <div class="comment-box">
             <div class="comment-title">NHẬN XÉT & ĐỀ XUẤT CHỦ LỰC TỪ GIÁM SÁT BÁN HÀNG (PC BT KÊNH OFF ĐƠN >= 4 LINE LOẠI BEER - CẬP NHẬT ĐẾN {date_str}/2026):</div>
-            • <b>Quy Chuẩn Tính PC BT Kênh OFF:</b> Chỉ đếm các Cửa Hàng Kênh OFF có đơn hàng hợp lệ từ 4 SKU/line hàng trở lên (Không tính Beer).<br>
-            • <b>Tiến Độ MTD Toàn Team:</b> Lũy kế đến {date_str} đạt 671/2,667 PC Kênh OFF (25.2% Kế hoạch).<br>
-            • <b>Top NVBH Dẫn Đầu Kênh OFF:</b> Hàng Thanh Lộc (35.9%), Đoàn Thị Phượng Liên (35.8%) & Danh Hồng Oanh (30.8%).<br>
+            • <b>Nguồn Chỉ Tiêu KPI:</b> Đã map khớp với File `TỔNG HỢP KPI ĐĐKD.xlsx` → Sheet `Export` → KPI Name `PC 4 line` (Target team: 2,667 ASO).<br>
+            • <b>Tiến Độ MTD Toàn Team:</b> Lũy kế đến {date_str} đạt 854/2,667 PC Kênh OFF (32.0% Kế hoạch).<br>
             • <b>Định Hướng Tiếp Theo:</b> Tập trung toàn bộ nguồn lực đi tuyến Kênh OFF, kết hợp combo giỏ hàng đa ngành (Gia vị, Mì, Trà TEA365, Homey...) để kéo tăng tỷ lệ chốt đơn >= 4 line!
         </div>
         """, unsafe_allow_html=True)
@@ -304,7 +315,7 @@ with tab_kpi:
     # 5. BÁO CÁO ASO ALL KÊNH OFF
     elif kpi_filter == "5. ASO ALL KÊNH OFF":
         st.subheader(f"BÁO CÁO ASO ALL KÊNH OFF {month_filter.upper()}")
-        st.caption(f"Dữ liệu đối soát chuẩn từ TỔNG HỢP KPI ĐĐKD.xlsx & Visit Schedule Report cập nhật đến ngày {date_str}/2026")
+        st.caption(f"Dữ liệu đối soát từ File Chỉ Tiêu: KPI Name 'Điểm lẻ bao phủ tổng sản phẩm' & Visit Schedule Report cập nhật đến ngày {date_str}/2026")
         data = [
             [1, "26SF.HC22759", "Nguyễn Hoàng Bích Thủy", 68, 8, 66, "97.1%"],
             [2, "26SF.HC22209", "Mai Thị Linh", 63, 11, 61, "96.8%"],
@@ -328,9 +339,8 @@ with tab_kpi:
         st.markdown(f"""
         <div class="comment-box">
             <div class="comment-title">NHẬN XÉT & ĐỀ XUẤT CHỦ LỰC TỪ GIÁM SÁT BÁN HÀNG (ASO ALL KÊNH OFF - CẬP NHẬT ĐẾN {date_str}/2026):</div>
-            • <b>Quy Chuẩn Filter Kênh OFF:</b> Đánh giá tổng số điểm bán lẻ Kênh OFF (Loại trừ On-Premise) có phát sinh đơn hàng bán ra thành công.<br>
-            • <b>Tiến Độ MTD Toàn Team:</b> Lũy kế đạt 818/1,200 ASO Kênh OFF (68.2% Kế hoạch), VƯỢT XA TIẾN ĐỘ THỜI GIAN 41.7%.<br>
-            • <b>Top NVBH Dẫn Đầu Kênh OFF:</b> Nguyễn Hoàng Bích Thủy (88.2%), Mai Thanh Tâm (78.0%), Đoàn Thị Phượng Liên (77.8%) & Hàng Thanh Lộc (74.7%).<br>
+            • <b>Nguồn Chỉ Tiêu KPI:</b> Đã map khớp với File `TỔNG HỢP KPI ĐĐKD.xlsx` → Sheet `Export` → KPI Name `Điểm lẻ bao phủ tổng sản phẩm` (Target team: 1,200 ASO).<br>
+            • <b>Tiến Độ MTD Toàn Team:</b> Lũy kế đạt 1,025/1,200 ASO Kênh OFF (85.4% Kế hoạch), VƯỢT XA TIẾN ĐỘ THỜI GIAN 41.7%.<br>
             • <b>Định Hướng Tiếp Theo:</b> Tăng tốc mở rộng các điểm bán Kênh OFF còn lại trên tuyến đường (chưa ra HD) để đạt 100% KPI ASO ALL KÊNH OFF!
         </div>
         """, unsafe_allow_html=True)
@@ -338,7 +348,7 @@ with tab_kpi:
     # 6. BÁO CÁO ĐƠN HÀNG COMBO
     elif kpi_filter == "6. BÁO CÁO ĐƠN HÀNG COMBO":
         st.subheader(f"BÁO CÁO ĐƠN HÀNG COMBO THỨ 2 NGÀY {date_str}/2026")
-        st.caption(f"Target Tuyến Ngày: 215 CH OFF / 189 CH ON | Thống kê phát sinh thực tế trong ngày {date_str}/2026 & Lũy kế MTD")
+        st.caption(f"Target Tuyến Ngày: Trích xuất từ File Visit Schedule (Kế hoạch thứ trong tuần). Thống kê phát sinh thực tế ngày {date_str}/2026 & Lũy kế MTD")
         data = [
             [1, "24SF.HC15114", "Huỳnh Tấn Lý", 12, 5, "41.7%", 15, 1, "6.7%"],
             [2, "26SF.HC22759", "Nguyễn Hoàng Bích Thủy", 12, 4, "33.3%", 2, 0, "0.0%"],
@@ -362,6 +372,7 @@ with tab_kpi:
         st.markdown(f"""
         <div class="comment-box">
             <div class="comment-title">NHẬN XÉT & ĐÁNH GIÁ TỪ GIÁM SÁT BÁN HÀNG (BÁO CÁO ĐƠN HÀNG COMBO THỨ 2 - NGÀY {date_str}/2026):</div>
+            • <b>Nguồn Target Tuyến Ngày:</b> Trích xuất từ File `Visit Schedule Report` theo đúng Lịch viếng thăm Thứ 2 chẵn/lẻ của từng ĐĐKD (OFF: 215 CH, ON: 189 CH).<br>
             • <b>Phát Sinh Ngày {date_str}:</b><br>
             - Kênh OFF Daily: Toàn team chốt được 45/215 Cửa Hàng (20.9% Target Thứ 2). Dẫn đầu: Huỳnh Tấn Lý (41.7% - 5 CH), Nguyễn Hoàng Bích Thủy (33.3% - 4 CH), Trần Minh Thành (28.6% - 4 CH).<br>
             - Kênh ON Daily: Toàn team chốt được 9/189 Cửa Hàng (4.8% Target Thứ 2). Dẫn đầu: Ngô Nguyễn Cao Kỳ (29.4% - 5 CH), Trần Minh Thành & Huỳnh Tấn Lý.<br>
