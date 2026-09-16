@@ -251,16 +251,26 @@ if file_kpi_target is not None:
     except Exception as e:
         pass
 
-# --- ĐỌC FILE MCP ---
+# --- ĐỌC VÀ CHUẨN HÓA FILE MCP (KÈM TÍNH DOANH SỐ MTD MỚI) ---
 df_mcp = None
 if file_mcp is not None:
     try:
         df_mcp = pd.read_excel(file_mcp)
         df_mcp.columns = [str(c).strip() for c in df_mcp.columns]
+        
         ch_mcp = [c for c in df_mcp.columns if any(k in c.lower() for k in ['mã kh', 'mã ch', 'outlet', 'shipto'])]
         kentu_mcp = [c for c in df_mcp.columns if any(k in c.lower() for k in ['l1', 'kênh', 'channel', 'phân loại'])]
         if ch_mcp: df_mcp['OUTLET_CODE'] = df_mcp[ch_mcp[0]].astype(str).str.strip()
         if kentu_mcp: df_mcp['CHANNEL_L1'] = df_mcp[kentu_mcp[0]].astype(str).str.strip()
+        
+        # LOGIC TÍNH VÀ MAPPING DOANH SỐ MTD VÀO CỘT CUỐI CÙNG CỦA MCP
+        if df_sales is not None and 'ORDER_DATE' in df_sales.columns and 'OUTLET_CODE' in df_sales.columns:
+            df_sales_mtd = df_sales[df_sales['ORDER_DATE'] <= selected_date]
+            sales_summary = df_sales_mtd.groupby('OUTLET_CODE')['QTY'].sum().to_dict()
+            df_mcp['Doanh số MTD'] = df_mcp['OUTLET_CODE'].map(sales_summary).fillna(0)
+        else:
+            # Mặc định nếu chưa load file sales thì để 0
+            df_mcp['Doanh số MTD'] = 0
     except Exception as e:
         pass
 
@@ -320,7 +330,6 @@ def apply_raw_data_filters(df, tab_prefix):
                 key=f"{tab_prefix}_day"
             )
             if selected_day != "Tất cả các thứ":
-                # Ánh xạ mã gộp chuẩn xác theo yêu cầu (Thứ 2 & 5 = 25, Thứ 3 & 6 = 36, Thứ 4 & 7 = 47)
                 day_mapping = {
                     "Thứ 2": [2, 25, "2", "25"],
                     "Thứ 3": [3, 36, "3", "36"],
@@ -523,9 +532,9 @@ with tab_mcp:
     st.header("🗺️ MCP VISIT & MAPPING DOANH SỐ BÁN HÀNG")
     if file_mcp is not None:
         try:
-            df_mcp_raw = pd.read_excel(file_mcp)
+            df_mcp_raw = df_mcp.copy()
             df_mcp_filtered = apply_raw_data_filters(df_mcp_raw, "mcp")
-            st.success(f"Hiển thị {len(df_mcp_filtered)} / {len(df_mcp_raw)} dòng dữ liệu MCP Visit")
+            st.success(f"Hiển thị {len(df_mcp_filtered)} / {len(df_mcp_raw)} dòng dữ liệu MCP Visit (Đã cập nhật Doanh số MTD cột cuối)")
             st.dataframe(df_mcp_filtered, use_container_width=True)
         except Exception as e:
             st.error(f"Lỗi đọc file MCP Visit: {e}")
