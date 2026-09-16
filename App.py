@@ -3,32 +3,44 @@ import pandas as pd
 import datetime
 import numpy as np
 import os
+import base64
 
 # --- CONFIG TRANG WEB ---
 st.set_page_config(page_title="TRACKING KPI - MASAN CONSUMER", layout="wide")
 
+# --- HÀM CHUYỂN ĐỔI ẢNH LOGO SANG BASE64 ĐỂ HIỂN THỊ HOÀN HẢO ---
+def get_image_base64(path):
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            data = f.read()
+        return base64.b64encode(data).decode()
+    return ""
+
+logo_b64 = get_image_base64("logo_masan.png")
+logo_html = f'<img src="data:image/png;base64,{logo_b64}" class="header-logo">' if logo_b64 else '<div style="color:white; font-weight:900;">MASAN CONSUMER</div>'
+
 # --- CUSTOM CSS ---
-st.markdown("""
+st.markdown(f"""
 <style>
-    html, body, p, span, label, td, th, div, input {
+    html, body, p, span, label, td, th, div, input {{
         font-weight: 900 !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-    }
+    }}
     
-    [data-testid="stIcon"], [data-testid="stIcon"] *, i, .st-emotion-cache-121544q, [class*="st-"] svg {
+    [data-testid="stIcon"], [data-testid="stIcon"] *, i, .st-emotion-cache-121544q, [class*="st-"] svg {{
         font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
         font-weight: normal !important;
-    }
+    }}
 
-    div[data-testid="stPopover"] button {
+    div[data-testid="stPopover"] button {{
         font-weight: 900 !important;
         font-size: 13px !important;
         padding: 8px 12px !important;
         white-space: nowrap !important;
-    }
+    }}
 
     /* BANNER TIÊU ĐỀ XANH DƯƠNG ĐẬM */
-    .header-banner {
+    .header-banner {{
         background-color: #034EA2;
         border: 2px solid #000;
         border-radius: 12px;
@@ -37,48 +49,55 @@ st.markdown("""
         display: flex;
         align-items: center;
         justify-content: space-between;
-    }
-    .header-logo-container {
+    }}
+    .header-logo-container {{
         background-color: #FFFFFF;
         padding: 6px 10px;
-        border-radius: 6px;
+        border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
-    }
-    .header-text-container {
+        min-width: 130px;
+    }}
+    .header-logo {{
+        height: 40px;
+        object-fit: contain;
+        display: block;
+    }}
+    .header-text-container {{
         text-align: center;
         flex-grow: 1;
-    }
-    .header-title {
+        padding: 0 15px;
+    }}
+    .header-title {{
         font-size: 24px;
         font-weight: 900 !important;
         color: #FFFFFF;
         margin: 0;
         text-transform: uppercase;
-    }
-    .header-subtitle {
+    }}
+    .header-subtitle {{
         font-size: 18px;
         font-weight: 900 !important;
         color: #FDE047;
         margin-top: 3px;
         text-transform: uppercase;
-    }
+    }}
     
-    [data-testid="stDataFrame"] div[role="columnheader"] {
+    [data-testid="stDataFrame"] div[role="columnheader"] {{
         background-color: #034EA2 !important;
-    }
-    [data-testid="stDataFrame"] div[role="columnheader"] * {
+    }}
+    [data-testid="stDataFrame"] div[role="columnheader"] * {{
         color: #FF0000 !important;
         font-weight: 900 !important;
         font-size: 14px !important;
-    }
-    [data-testid="stDataFrame"] div[role="gridcell"] {
+    }}
+    [data-testid="stDataFrame"] div[role="gridcell"] {{
         font-weight: 900 !important;
         color: #0F172A !important;
-    }
+    }}
     
-    .comment-box {
+    .comment-box {{
         border: 2px solid #034EA2;
         border-radius: 10px;
         padding: 15px;
@@ -88,14 +107,14 @@ st.markdown("""
         font-weight: 900 !important;
         line-height: 1.6;
         color: #0F172A;
-    }
-    .comment-title {
+    }}
+    .comment-title {{
         color: #0F172A;
         font-weight: 900 !important;
         font-size: 14px;
         margin-bottom: 8px;
         text-transform: uppercase;
-    }
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -108,32 +127,14 @@ if 'admin_logged_in' not in st.session_state:
 head_col1, head_col2 = st.columns([3.8, 1.2])
 
 with head_col1:
-    st.markdown("""
+    st.markdown(f"""
     <div class="header-banner">
         <div class="header-logo-container">
-            <svg width="110" height="36" viewBox="0 0 280 95" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12.5 68.5V36.2H24.3V68.5H12.5ZM6.1 23.4H30.7V31.5H6.1V23.4Z" fill="#00539F"/>
-                <path d="M41.2 68.5V36.2H52.2V41.4H52.4C54.4 37.8 57.9 35.8 61.9 35.8C68.9 35.8 72.9 40.5 72.9 47.9V68.5H61.1V49.5C61.1 45.9 59.2 44.2 56.4 44.2C53.7 44.2 52.4 46 52.4 49.5V68.5H41.2Z" fill="#00539F"/>
-                <path d="M84.2 68.5V36.2H95.2V41.1H95.4C97.5 37.7 100.8 35.8 104.8 35.8C111.8 35.8 115.8 40.5 115.8 47.9V68.5H104V49.5C104 45.9 102.1 44.2 99.3 44.2C96.6 44.2 95.3 46 95.3 49.5V68.5H84.2Z" fill="#00539F"/>
-                <path d="M127.3 68.5V36.2H138.4V41.1H138.6C140.7 37.7 144 35.8 148 35.8C155 35.8 159 40.5 159 47.9V68.5H147.2V49.5C147.2 45.9 145.3 44.2 142.5 44.2C139.8 44.2 138.5 46 138.5 49.5V68.5H127.3Z" fill="#00539F"/>
-                <path d="M194.2 35.3C203.4 35.3 208.5 41 207.2 50.1H180.2C180.8 56.3 186.2 59.8 192.5 59.8C197.6 59.8 201.1 57.6 203.2 54.3L211.8 59.3C208.1 65.5 201.2 68.8 193 68.8C180.2 68.8 170.1 60.1 170.1 46.9C170.1 34.2 180.3 35.3 194.2 35.3ZM193.7 43.1C188.7 43.1 184.8 45.2 181.7 50.1H204.6C204.2 45.5 200.2 43.1 193.7 43.1Z" fill="#00539F"/>
-                <path d="M54.5 82.2C54.5 86.8 51.5 89.2 46.8 89.2C44.1 89.2 41.8 88.5 39.8 87.2L41.3 80.5C43 81.6 44.7 82.1 46.2 82.1C47.7 82.1 48.7 81.3 48.7 79.9C48.7 78.4 47.5 77.8 44.9 77.1C40.9 76 38.6 74.1 38.6 70.3C38.6 66.2 42 63.8 47.1 63.8C49.8 63.8 52 64.5 53.7 65.6L52.3 72.1C50.7 71.1 49 70.6 47.6 70.6C46.3 70.6 45.4 71.3 45.4 72.6C45.4 73.9 46.6 74.5 49 75.1C52.7 76.1 54.5 78.2 54.5 82.2Z" fill="#00539F"/>
-                <path d="M63.3 64.6H70.3V88.8H63.3V64.6Z" fill="#00539F"/>
-                <path d="M78.6 64.6H85.5V88.8H78.6V64.6Z" fill="#00539F"/>
-                <path d="M93.8 64.6H100.8V88.8H93.8V64.6Z" fill="#00539F"/>
-                <path d="M109.1 64.6H116V88.8H109.1V64.6Z" fill="#00539F"/>
-                <path d="M136.2 64C143.9 64 148.8 68.6 148.8 76.7C148.8 84.8 143.9 89.4 136.2 89.4H124.9V64H136.2ZM131.9 83.3H135.8C140.2 83.3 142.2 80.7 142.2 76.7C142.2 72.7 140.2 70.1 135.8 70.1H131.9V83.3Z" fill="#00539F"/>
-                <path d="M155.6 64.6H162.5V83.1H175.7V88.8H155.6V64.6Z" fill="#00539F"/>
-                <path d="M183.1 64C190.8 64 195.7 68.6 195.7 76.7C195.7 84.8 190.8 89.4 183.1 89.4H171.8V64H183.1ZM178.8 83.3H182.7C187.1 83.3 189.1 80.7 189.1 76.7C189.1 72.7 187.1 70.1 182.7 70.1H178.8V83.3Z" fill="#00539F"/>
-                <path d="M202.5 64.6H209.4V88.8H202.5V64.6Z" fill="#00539F"/>
-                <path d="M225.2 64.6L217.2 88.8H224.5L226.1 83.1H233.9L235.5 88.8H242.8L234.8 64.6H225.2ZM228 69.4L231.7 80.8H224.2L228 69.4Z" fill="#00539F"/>
-                <path d="M394.4 34.3C363.3 49.3 325 56.5 281.2 56.6C265 56.7 249.2 55.4 233.8 52.8C259.9 31.9 295.5 13.9 339 6.2C355.2 3.4 371.7 1.5 388.5 0.5C397.6 0 406.8 -0.3 416 0.1C394.9 14.8 395 34.3 394.4 34.3Z" fill="#00539F"/>
-                <path d="M394.4 34.3C365.1 48.7 328.7 54.8 288.7 54.3C275.4 54.2 262.3 53.1 249.5 51.1C273.7 32.7 305.5 17 344 10.3C358.3 7.8 372.8 6 387.6 4.9C394.5 4.4 401.4 4.2 408.4 4.5C394.8 14.3 395 34.3 394.4 34.3Z" fill="#F47A20"/>
-            </svg>
+            {logo_html}
         </div>
         <div class="header-text-container">
             <div class="header-title">SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</div>
-            <div class="header-subtitle">TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN TOTAL</div>
+            <div class="header-subtitle">TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
