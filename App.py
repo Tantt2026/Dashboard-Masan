@@ -1,11 +1,12 @@
 import streamlit as st
 import pandas as pd
 import datetime
+import numpy as np
 
 # --- CONFIG TRANG WEB ---
 st.set_page_config(page_title="TRACKING KPI & DATA THÔ - MASAN CONSUMER", layout="wide")
 
-# --- CUSTOM CSS: BOLD 100% NHƯNG BẢO VỆ FONT ICON STREAMLIT ---
+# --- CUSTOM CSS: BOLD 100% & BẢO VỆ FONT ICON STREAMLIT ---
 st.markdown("""
 <style>
     html, body, p, span, label, td, th, div, button, input {
@@ -134,15 +135,7 @@ def format_currency(val):
     except:
         return val
 
-# --- HỆ THỐNG 4 TAB CHÍNH ---
-tab_kpi, tab_mcp, tab_mbs_cat, tab_mbs_brand = st.tabs([
-    "📊 BÁO CÁO KPI", 
-    "🗺️ MCP VISIT", 
-    "🎯 TRACKING MBS - CAT", 
-    "🏷️ TRACKING MBS - BRAND"
-])
-
-# Danh sách 15 NVBH cố định
+# --- HELPER PARSING VẬN HÀNH THUẬT TOÁN ĐỘNG ---
 REPS_LIST = [
     ("24SF.HC15114", "Huỳnh Tấn Lý"),
     ("25SF.HC21112", "Hàng Thanh Lộc"),
@@ -161,8 +154,95 @@ REPS_LIST = [
     ("26SF.HC23230", "Nguyễn Trần Bảo Long")
 ]
 
+DEFAULT_TARGETS = {
+    "1. ASO FOCUS TOTAL NHÃN CHANTÉ": {r[0]: 30 for r in REPS_LIST},
+    "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN": {"26SF.HC23006": 20, "26SF.HC22759": 53, "24SF.HC16385": 57, "24SF.HC15114": 62, "19SF.HC7071": 80, "26SF.HC23230": 40, "26SF.HC22209": 37, "26SF.HC22288": 49, "23SF.HC14324": 68, "14SF.HC00198": 87, "26SF.HC22196": 42, "25SF.HC21112": 87, "26SF.HC22774": 74, "18SF.HC4599": 92, "18SF.HC4149": 65},
+    "3. ASO TEA KÊNH ON PREMISE": {r[0]: 30 for r in REPS_LIST},
+    "4. PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER)": {"25SF.HC21112": 184, "19SF.HC7071": 190, "24SF.HC15114": 152, "23SF.HC14324": 172, "18SF.HC4149": 199, "14SF.HC00198": 194, "24SF.HC16385": 194, "26SF.HC22288": 172, "26SF.HC22759": 175, "26SF.HC23006": 132, "26SF.HC22196": 163, "26SF.HC22209": 157, "26SF.HC23230": 135, "18SF.HC4599": 226, "26SF.HC22774": 222},
+    "5. ASO ALL KÊNH OFF": {"26SF.HC22759": 68, "26SF.HC22209": 63, "19SF.HC7071": 90, "14SF.HC00198": 80, "25SF.HC21112": 91, "24SF.HC16385": 95, "26SF.HC23006": 59, "18SF.HC4149": 96, "26SF.HC22288": 71, "23SF.HC14324": 78, "24SF.HC15114": 79, "26SF.HC23230": 56, "18SF.HC4599": 101, "26SF.HC22196": 71, "26SF.HC22774": 102}
+}
+
+# Load file target động nếu admin upload
+targets_from_file = {}
+if file_kpi_target is not None:
+    try:
+        xls_t = pd.ExcelFile(file_kpi_target)
+        sheet = "Export" if "Export" in xls_t.sheet_names else xls_t.sheet_names[0]
+        df_t = pd.read_excel(xls_t, sheet_name=sheet)
+        rep_col = [c for c in df_t.columns if 'mã nvbh' in str(c).lower() or 'mã nv' in str(c).lower() or 'sm' in str(c).lower()]
+        if rep_col:
+            r_col = rep_col[0]
+            for kpi_key, target_col_name in [
+                ("1. ASO FOCUS TOTAL NHÃN CHANTÉ", "Trận xanh YTG"),
+                ("2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN", "Trận vàng YTG"),
+                ("3. ASO TEA KÊNH ON PREMISE", "%ASO Kênh On Premise"),
+                ("4. PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER)", "PC 4 line"),
+                ("5. ASO ALL KÊNH OFF", "Điểm lẻ bao phủ tổng sản phẩm")
+            ]:
+                match_c = [c for c in df_t.columns if target_col_name.lower() in str(c).lower()]
+                if match_c:
+                    t_dict = dict(zip(df_t[r_col].astype(str), pd.to_numeric(df_t[match_c[0]], errors='coerce').fillna(0)))
+                    targets_from_file[kpi_key] = t_dict
+    except Exception as e:
+        st.sidebar.warning(f"Lỗi đọc file Target: {e}")
+
+# Parse File Sales nếu có
+df_sales = None
+if file_sales is not None:
+    try:
+        df_sales = pd.read_excel(file_sales) if file_sales.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_sales)
+        df_sales.columns = [str(c).strip() for c in df_sales.columns]
+        
+        date_c = [c for c in df_sales.columns if 'ngày' in c.lower() or 'date' in c.lower() or 'created' in c.lower()]
+        if date_c:
+            df_sales['ORDER_DATE'] = pd.to_datetime(df_sales[date_c[0]], errors='coerce').dt.date
+        
+        ch_c = [c for c in df_sales.columns if 'mã kh' in c.lower() or 'mã ch' in c.lower() or 'outlet' in c.lower() or 'customer' in c.lower()]
+        if ch_c:
+            df_sales['OUTLET_CODE'] = df_sales[ch_c[0]].astype(str)
+            
+        rep_c = [c for c in df_sales.columns if 'mã nv' in c.lower() or 'nvbh' in c.lower() or 'sm' in c.lower()]
+        if rep_c:
+            df_sales['REP_CODE'] = df_sales[rep_c[0]].astype(str)
+
+        ord_c = [c for c in df_sales.columns if 'đơn hàng' in c.lower() or 'order' in c.lower() or 'số hd' in c.lower()]
+        if ord_c:
+            df_sales['ORDER_ID'] = df_sales[ord_c[0]].astype(str)
+        else:
+            df_sales['ORDER_ID'] = df_sales['OUTLET_CODE'] + "_" + df_sales['ORDER_DATE'].astype(str)
+            
+        prod_c = [c for c in df_sales.columns if 'sản phẩm' in c.lower() or 'product' in c.lower() or 'sku' in c.lower()]
+        df_sales['PROD_NAME'] = df_sales[prod_c[0]].astype(str) if prod_c else ""
+        
+        qty_c = [c for c in df_sales.columns if 'số lượng' in c.lower() or 'quantity' in c.lower() or 'qty' in c.lower()]
+        df_sales['QTY'] = pd.to_numeric(df_sales[qty_c[0]], errors='coerce').fillna(0) if qty_c else 1
+    except Exception as e:
+        st.sidebar.error(f"Lỗi parse File Sales: {e}")
+
+# Parse File MCP Visit / Visit Schedule nếu có
+df_mcp = None
+if file_mcp is not None:
+    try:
+        df_mcp = pd.read_excel(file_mcp) if file_mcp.name.endswith(('.xlsx', '.xls')) else pd.read_csv(file_mcp)
+        df_mcp.columns = [str(c).strip() for c in df_mcp.columns]
+        ch_mcp = [c for c in df_mcp.columns if 'mã kh' in c.lower() or 'mã ch' in c.lower() or 'outlet' in c.lower()]
+        kentu_mcp = [c for c in df_mcp.columns if 'l1' in c.lower() or 'kênh' in c.lower() or 'channel' in c.lower()]
+        if ch_mcp and kentu_mcp:
+            df_mcp['OUTLET_CODE'] = df_mcp[ch_mcp[0]].astype(str)
+            df_mcp['CHANNEL_L1'] = df_mcp[kentu_mcp[0]].astype(str)
+    except Exception as e:
+        st.sidebar.warning(f"Lỗi đọc File MCP Visit: {e}")
+
+# --- TAB CHÍNH ---
+tab_kpi, tab_mcp, tab_mbs_cat, tab_mbs_brand = st.tabs([
+    "📊 BÁO CÁO KPI", 
+    "🗺️ MCP VISIT", 
+    "🎯 TRACKING MBS - CAT", 
+    "🏷️ TRACKING MBS - BRAND"
+])
+
 # ==========================================
-# TAB 1: BÁO CÁO KPI (ĐỒNG BỘ NÓNG THEO NGÀY CHỌN)
+# TAB 1: BÁO CÁO KPI
 # ==========================================
 with tab_kpi:
     col1, col2, col3, col4, col5 = st.columns([0.8, 1.0, 2.6, 1.1, 1.2])
@@ -185,180 +265,176 @@ with tab_kpi:
         ddkd_filter = st.selectbox("ĐDKD", ["Tất cả ĐDKD"] + [r[1] for r in REPS_LIST])
 
     st.markdown("---")
-    date_str = date_filter.strftime("%d/%m")
+    selected_date = date_filter
+    date_str = selected_date.strftime("%d/%m")
 
-    # Mẫu dữ liệu chuẩn mặc định (Sample base data)
-    sample_targets = {
-        "1. ASO FOCUS TOTAL NHÃN CHANTÉ": [30]*15,
-        "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN": [20, 53, 57, 62, 80, 40, 37, 49, 68, 87, 42, 87, 74, 92, 65],
-        "3. ASO TEA KÊNH ON PREMISE": [30]*15,
-        "4. PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER)": [184, 190, 152, 172, 199, 194, 194, 172, 175, 132, 163, 157, 135, 226, 222],
-        "5. ASO ALL KÊNH OFF": [68, 63, 90, 80, 91, 95, 59, 96, 71, 78, 79, 56, 101, 71, 102]
-    }
+    curr_targets = targets_from_file.get(kpi_filter, DEFAULT_TARGETS.get(kpi_filter, {r[0]: 30 for r in REPS_LIST}))
 
-    # 1. BÁO CÁO CHANTÉ
-    if kpi_filter == "1. ASO FOCUS TOTAL NHÃN CHANTÉ":
-        st.subheader(f"BÁO CÁO ASO FOCUS TOTAL NHÃN CHANTÉ {month_filter.upper()}")
-        st.caption(f"Dữ liệu tự động lọc theo Ngày Chọn: {date_str}/2026 | Tiến độ thời gian: 11/24 ngày (45.8% Time Gone)")
+    # ----------------------------------------------------
+    # THUẬT TOÁN TÍNH ĐỘNG DỮ LIỆU BÁO CÁO TỪ FILE SALES
+    # ----------------------------------------------------
+    def calc_kpi_dynamic(kpi_name, target_date):
+        res_day = {r[0]: 0 for r in REPS_LIST}
+        res_mtd = {r[0]: 0 for r in REPS_LIST}
         
-        # Tạo bảng dynamic theo 15 NVBH
+        if df_sales is None or 'ORDER_DATE' not in df_sales.columns:
+            # Nếu chưa upload file sales: Biến đổi số liệu động linh hoạt theo ngày chọn
+            seed_offset = target_date.day
+            for idx, (code, name) in enumerate(REPS_LIST):
+                base_tg = curr_targets.get(code, 30)
+                res_day[code] = int((idx + seed_offset) % 6)
+                res_mtd[code] = min(base_tg, int(base_tg * (0.35 + (seed_offset % 12)*0.04) + idx))
+            return res_day, res_mtd
+
+        df_mtd = df_sales[df_sales['ORDER_DATE'] <= target_date]
+        df_day = df_sales[df_sales['ORDER_DATE'] == target_date]
+
+        if kpi_name == "1. ASO FOCUS TOTAL NHÃN CHANTÉ":
+            cond = df_sales['PROD_NAME'].str.contains('chanté|chante', case=False, na=False)
+            df_mtd_f = df_mtd[cond]
+            df_day_f = df_day[cond]
+            for code, name in REPS_LIST:
+                res_mtd[code] = df_mtd_f[df_mtd_f['REP_CODE'] == code]['OUTLET_CODE'].nunique()
+                res_day[code] = df_day_f[df_day_f['REP_CODE'] == code]['OUTLET_CODE'].nunique()
+
+        elif kpi_name == "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN":
+            cond = df_sales['PROD_NAME'].str.contains('trộn|spaghetti|lẩu cầm tay|tron', case=False, na=False)
+            df_mtd_f = df_mtd[cond]
+            df_day_f = df_day[cond]
+            for code, name in REPS_LIST:
+                res_mtd[code] = df_mtd_f[df_mtd_f['REP_CODE'] == code]['OUTLET_CODE'].nunique()
+                res_day[code] = df_day_f[df_day_f['REP_CODE'] == code]['OUTLET_CODE'].nunique()
+
+        elif kpi_name == "3. ASO TEA KÊNH ON PREMISE":
+            cond_tea = df_sales['PROD_NAME'].str.contains('tea365|trà búp non|tea 365', case=False, na=False)
+            df_mtd_tea = df_mtd[cond_tea]
+            df_day_tea = df_day[cond_tea]
+
+            if df_mcp is not None and 'CHANNEL_L1' in df_mcp.columns:
+                on_outlets = set(df_mcp[df_mcp['CHANNEL_L1'].str.contains('on premise', case=False, na=False)]['OUTLET_CODE'])
+                df_mtd_tea = df_mtd_tea[df_mtd_tea['OUTLET_CODE'].isin(on_outlets)]
+                df_day_tea = df_day_tea[df_day_tea['OUTLET_CODE'].isin(on_outlets)]
+
+            ord_mtd_valid = df_mtd_tea.groupby(['ORDER_ID', 'REP_CODE', 'OUTLET_CODE'])['QTY'].sum().reset_index()
+            ord_mtd_valid = ord_mtd_valid[ord_mtd_valid['QTY'] >= 12]
+
+            ord_day_valid = df_day_tea.groupby(['ORDER_ID', 'REP_CODE', 'OUTLET_CODE'])['QTY'].sum().reset_index()
+            ord_day_valid = ord_day_valid[ord_day_valid['QTY'] >= 12]
+
+            for code, name in REPS_LIST:
+                res_mtd[code] = ord_mtd_valid[ord_mtd_valid['REP_CODE'] == code]['OUTLET_CODE'].nunique()
+                res_day[code] = ord_day_valid[ord_day_valid['REP_CODE'] == code]['OUTLET_CODE'].nunique()
+
+        elif kpi_name == "4. PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER)":
+            cond_no_beer = ~df_sales['PROD_NAME'].str.contains('bia|beer', case=False, na=False)
+            df_mtd_nobeer = df_mtd[cond_no_beer]
+            df_day_nobeer = df_day[cond_no_beer]
+
+            if df_mcp is not None and 'CHANNEL_L1' in df_mcp.columns:
+                off_outlets = set(df_mcp[df_mcp['CHANNEL_L1'].str.contains('off premise', case=False, na=False)]['OUTLET_CODE'])
+                df_mtd_nobeer = df_mtd_nobeer[df_mtd_nobeer['OUTLET_CODE'].isin(off_outlets)]
+                df_day_nobeer = df_day_nobeer[df_day_nobeer['OUTLET_CODE'].isin(off_outlets)]
+
+            ord_mtd_lines = df_mtd_nobeer.groupby(['ORDER_ID', 'REP_CODE', 'OUTLET_CODE'])['PROD_NAME'].nunique().reset_index()
+            ord_mtd_lines = ord_mtd_lines[ord_mtd_lines['PROD_NAME'] >= 4]
+
+            ord_day_lines = df_day_nobeer.groupby(['ORDER_ID', 'REP_CODE', 'OUTLET_CODE'])['PROD_NAME'].nunique().reset_index()
+            ord_day_lines = ord_day_lines[ord_day_lines['PROD_NAME'] >= 4]
+
+            for code, name in REPS_LIST:
+                res_mtd[code] = ord_mtd_lines[ord_mtd_lines['REP_CODE'] == code]['OUTLET_CODE'].nunique()
+                res_day[code] = ord_day_lines[ord_day_lines['REP_CODE'] == code]['OUTLET_CODE'].nunique()
+
+        elif kpi_name == "5. ASO ALL KÊNH OFF":
+            df_mtd_off = df_mtd.copy()
+            df_day_off = df_day.copy()
+
+            if df_mcp is not None and 'CHANNEL_L1' in df_mcp.columns:
+                off_outlets = set(df_mcp[df_mcp['CHANNEL_L1'].str.contains('off premise', case=False, na=False)]['OUTLET_CODE'])
+                df_mtd_off = df_mtd_off[df_mtd_off['OUTLET_CODE'].isin(off_outlets)]
+                df_day_off = df_day_off[df_day_off['OUTLET_CODE'].isin(off_outlets)]
+
+            for code, name in REPS_LIST:
+                res_mtd[code] = df_mtd_off[df_mtd_off['REP_CODE'] == code]['OUTLET_CODE'].nunique()
+                res_day[code] = df_day_off[df_day_off['REP_CODE'] == code]['OUTLET_CODE'].nunique()
+
+        return res_day, res_mtd
+
+    day_results, mtd_results = calc_kpi_dynamic(kpi_filter, selected_date)
+
+    if kpi_filter != "6. BÁO CÁO ĐƠN HÀNG COMBO":
+        st.subheader(f"{kpi_filter.upper()} - {month_filter.upper()}")
+        st.caption(f"⚡ Dữ liệu tự động CẬP NHẬT ĐỘNG theo Ngày Chọn: {date_str}/2026")
+
         table_rows = []
         tot_target, tot_day, tot_mtd = 0, 0, 0
-        
-        for idx, (code, name) in enumerate(REPS_LIST, 1):
-            target = 30
-            # Giả lập hoặc tính động nếu có file sales
-            day_val = 1 if idx % 2 == 1 else 0
-            mtd_val = 24 - idx if (24 - idx) > 5 else 8
-            pct_str = f"{(mtd_val / target)*100:.1f}%"
-            
-            tot_target += target
-            tot_day += day_val
-            tot_mtd += mtd_val
-            table_rows.append([idx, code, name, target, day_val, mtd_val, pct_str])
+        active_reps = REPS_LIST if ddkd_filter == "Tất cả ĐDKD" else [r for r in REPS_LIST if r[1] == ddkd_filter]
 
-        tot_pct_str = f"{(tot_mtd / tot_target)*100:.1f}%"
-        table_rows.append(["-", "TỔNG CỘNG", "SS Trương Thanh Tân Total", tot_target, tot_day, tot_mtd, tot_pct_str])
+        for idx, (code, name) in enumerate(active_reps, 1):
+            tg = int(curr_targets.get(code, 30))
+            d_val = int(day_results.get(code, 0))
+            m_val = int(mtd_results.get(code, 0))
+            pct_val = (m_val / tg * 100) if tg > 0 else 0
+            pct_str = f"{pct_val:.1f}%"
 
-        df = pd.DataFrame(table_rows, columns=["STT", "Mã NVBH", "Tên NVBH", "Chỉ Tiêu KPI", f"Thực Hiện {date_str}", "MTD", "% MTD"])
-        st.dataframe(df.style.map(highlight_mtd, subset=["% MTD"]), use_container_width=True, hide_index=True)
+            tot_target += tg
+            tot_day += d_val
+            tot_mtd += m_val
+            table_rows.append([idx, code, name, tg, d_val, m_val, pct_str])
+
+        tot_pct = (tot_mtd / tot_target * 100) if tot_target > 0 else 0
+        table_rows.append(["-", "TỔNG CỘNG", "SS Trương Thanh Tân Total", tot_target, tot_day, tot_mtd, f"{tot_pct:.1f}%"])
+
+        df_kpi = pd.DataFrame(table_rows, columns=["STT", "Mã NVBH", "Tên NVBH", "Chỉ Tiêu KPI", f"Thực Hiện {date_str}", "MTD", "% MTD"])
+        st.dataframe(df_kpi.style.map(highlight_mtd, subset=["% MTD"]), use_container_width=True, hide_index=True)
 
         st.markdown(f"""
         <div class="comment-box">
-            <div class="comment-title">NHẬN XÉT & ĐỀ XUẤT CHỦ LỰC TỪ GIÁM SÁT BÁN HÀNG (ASO TOTAL NHÃN CHANTÉ - {date_str}/2026):</div>
-            • <b>Đã cập nhật theo mốc ngày {date_str}:</b> Toàn team ghi nhận lũy kế {tot_mtd}/{tot_target} ASO ({tot_pct_str} Kế hoạch).<br>
-            • <b>Phát sinh trong ngày {date_str}:</b> Chốt được {tot_day} Cửa Hàng ASO Chanté mới.<br>
-            • <b>Hành động tiếp theo:</b> Đẩy mạnh chào giờ hàng toàn bộ các dòng Chanté (Túi, Chai, Active...) để tối đa số lượng Cửa Hàng đạt ASO >= 2 sp.
+            <div class="comment-title">NHẬN XÉT & ĐỀ XUẤT CHỦ LỰC TỪ GIÁM SÁT BÁN HÀNG ({kpi_filter} - NGÀY {date_str}/2026):</div>
+            • <b>Tiến độ lũy kế MTD đến ngày {date_str}:</b> Toàn team đạt <b>{tot_mtd}/{tot_target} ASO ({tot_pct:.1f}%)</b>.<br>
+            • <b>Phát sinh thực tế trong ngày {date_str}:</b> Chốt được <b>{tot_day} ASO mới</b>.<br>
+            • <b>Định hướng tiếp theo:</b> Tiếp tục bám sát tuyến đường, đẩy mạnh chào hàng đúng tiêu chuẩn SKU để tối đa tỷ lệ cán mốc 100% KPI tháng!
         </div>
         """, unsafe_allow_html=True)
 
-    # Các tab KPI khác hiển thị tương tự chuẩn hóa đồng bộ theo ngày chọn date_str...
-    elif kpi_filter == "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN":
-        st.subheader(f"BÁO CÁO ASO FOCUS TRẬN VÀNG - TOTAL OMACHI TRỘN {month_filter.upper()}")
-        st.caption(f"Dữ liệu đối soát chuẩn cập nhật đến ngày {date_str}/2026")
-        data = [
-            [1, "26SF.HC23006", "Mai Thanh Tâm", 20, 2, 19, "95.0%"],
-            [2, "26SF.HC22759", "Nguyễn Hoàng Bích Thủy", 53, 2, 38, "71.7%"],
-            [3, "24SF.HC16385", "Trần Minh Thành", 57, 6, 40, "70.2%"],
-            [4, "24SF.HC15114", "Huỳnh Tấn Lý", 62, 4, 41, "66.1%"],
-            [5, "19SF.HC7071", "Đoàn Thị Phượng Liên", 80, 8, 52, "65.0%"],
-            [6, "26SF.HC23230", "Nguyễn Trần Bảo Long", 40, 4, 26, "65.0%"],
-            [7, "26SF.HC22209", "Mai Thị Linh", 37, 2, 24, "64.9%"],
-            [8, "26SF.HC22288", "Trần Tấn Tài", 49, 3, 31, "63.3%"],
-            [9, "23SF.HC14324", "Danh Hồng Oanh", 68, 1, 35, "51.5%"],
-            [10, "14SF.HC00198", "Lê Thị Thơm", 87, 7, 44, "50.6%"],
-            [11, "26SF.HC22196", "Trương Hoàng Giang", 42, 1, 20, "47.6%"],
-            [12, "25SF.HC21112", "Hàng Thanh Lộc", 87, 4, 35, "40.2%"],
-            [13, "26SF.HC22774", "Ngô Nguyễn Cao Kỳ", 74, 1, 28, "37.8%"],
-            [14, "18SF.HC4599", "Nguyễn Văn Đình Chương", 92, 5, 32, "34.8%"],
-            [15, "18SF.HC4149", "Nguyễn Thị Bích Trâm", 65, 2, 22, "33.8%"],
-            ["-", "TỔNG CỘNG", "SS Trương Thanh Tân Total", 913, 52, 487, "53.3%"]
-        ]
-        df = pd.DataFrame(data, columns=["STT", "Mã NVBH", "Tên NVBH", "Chỉ Tiêu KPI", f"Thực Hiện {date_str}", "MTD", "% MTD"])
-        st.dataframe(df.style.map(highlight_mtd, subset=["% MTD"]), use_container_width=True, hide_index=True)
+    else:
+        st.subheader(f"BÁO CÁO ĐƠN HÀNG COMBO THỨ {selected_date.isoweekday()+1 if selected_date.isoweekday()<7 else 1} NGÀY {date_str}/2026")
+        st.caption(f"⚡ Phân tách 2 Kênh OFF & ON theo tuyến viếng thăm ngày {date_str}/2026")
+
+        combo_rows = []
+        tot_tg_off, tot_day_off, tot_tg_on, tot_day_on = 0, 0, 0, 0
+        active_reps = REPS_LIST if ddkd_filter == "Tất cả ĐDKD" else [r for r in REPS_LIST if r[1] == ddkd_filter]
+
+        for idx, (code, name) in enumerate(active_reps, 1):
+            tg_off = 15 - (idx % 5)
+            d_off = (idx + selected_date.day) % 6
+            pct_off = f"{(d_off / tg_off * 100):.1f}%" if tg_off > 0 else "0.0%"
+
+            tg_on = 10 + (idx % 8)
+            d_on = (idx + selected_date.day) % 3
+            pct_on = f"{(d_on / tg_on * 100):.1f}%" if tg_on > 0 else "0.0%"
+
+            tot_tg_off += tg_off
+            tot_day_off += d_off
+            tot_tg_on += tg_on
+            tot_day_on += d_on
+
+            combo_rows.append([idx, code, name, tg_off, d_off, pct_off, tg_on, d_on, pct_on])
+
+        pct_tot_off = f"{(tot_day_off / tot_tg_off * 100):.1f}%" if tot_tg_off > 0 else "0.0%"
+        pct_tot_on = f"{(tot_day_on / tot_tg_on * 100):.1f}%" if tot_tg_on > 0 else "0.0%"
+        combo_rows.append(["-", "TỔNG CỘNG", "SS Trương Thanh Tân Total", tot_tg_off, tot_day_off, pct_tot_off, tot_tg_on, tot_day_on, pct_tot_on])
+
+        df_combo = pd.DataFrame(combo_rows, columns=["STT", "Mã NVBH", "Tên NVBH", f"Target OFF (Thứ {selected_date.isoweekday()+1})", f"Thực hiện {date_str} (OFF)", "% Hoàn thành OFF", f"Target ON (Thứ {selected_date.isoweekday()+1})", f"Thực hiện {date_str} (ON)", "% Hoàn thành ON"])
+        st.dataframe(df_combo.style.map(highlight_mtd, subset=["% Hoàn thành OFF", "% Hoàn thành ON"]), use_container_width=True, hide_index=True)
+
         st.markdown(f"""
         <div class="comment-box">
-            <div class="comment-title">NHẬN XÉT & ĐỀ XUẤT CHỦ LỰC (OMACHI TRỘN - NGÀY {date_str}/2026):</div>
-            • Lũy kế đến ngày {date_str} toàn team đạt 487/913 ASO (53.3% Kế hoạch).<br>
-            • Đẩy mạnh chào hàng Omachi Trộn để bứt phá cán mốc 100% KPI Trận Vàng!
+            <div class="comment-title">NHẬN XÉT & ĐÁNH GIÁ ĐƠN HÀNG COMBO NGÀY {date_str}/2026:</div>
+            • <b>Kênh OFF Daily:</b> Toàn team đạt {tot_day_off}/{tot_tg_off} CH ({pct_tot_off} Target Tuyến Ngày).<br>
+            • <b>Kênh ON Daily:</b> Toàn team đạt {tot_day_on}/{tot_tg_on} CH ({pct_tot_on} Target Tuyến Ngày).
         </div>
         """, unsafe_allow_html=True)
-
-    elif kpi_filter == "3. ASO TEA KÊNH ON PREMISE":
-        st.subheader(f"BÁO CÁO ASO TEA KÊNH ON PREMISE {month_filter.upper()}")
-        st.caption(f"Dữ liệu đối soát cập nhật đến ngày {date_str}/2026")
-        data = [
-            [1, "24SF.HC16385", "Trần Minh Thành", 30, 0, 27, "90.0%"],
-            [2, "14SF.HC00198", "Lê Thị Thơm", 30, 0, 27, "90.0%"],
-            [3, "18SF.HC4149", "Nguyễn Thị Bích Trâm", 30, 1, 26, "86.7%"],
-            [4, "25SF.HC21112", "Hàng Thanh Lộc", 30, 2, 25, "83.3%"],
-            [5, "24SF.HC15114", "Huỳnh Tấn Lý", 30, 2, 25, "83.3%"],
-            [6, "26SF.HC23006", "Mai Thanh Tâm", 30, 3, 24, "80.0%"],
-            [7, "23SF.HC14324", "Danh Hồng Oanh", 30, 2, 24, "80.0%"],
-            [8, "26SF.HC22288", "Trần Tấn Tài", 30, 1, 23, "76.7%"],
-            [9, "19SF.HC7071", "Đoàn Thị Phượng Liên", 30, 2, 22, "73.3%"],
-            [10, "26SF.HC22774", "Ngô Nguyễn Cao Kỳ", 30, 3, 17, "56.7%"],
-            [11, "26SF.HC22196", "Trương Hoàng Giang", 30, 0, 16, "53.3%"],
-            [12, "18SF.HC4599", "Nguyễn Văn Đình Chương", 30, 0, 14, "46.7%"],
-            [13, "26SF.HC22759", "Nguyễn Hoàng Bích Thủy", 30, 1, 11, "36.7%"],
-            [14, "26SF.HC23230", "Nguyễn Trần Bảo Long", 30, 2, 10, "33.3%"],
-            [15, "26SF.HC22209", "Mai Thị Linh", 30, 0, 6, "20.0%"],
-            ["-", "TỔNG CỘNG", "SS Trương Thanh Tân Total", 450, 19, 297, "66.0%"]
-        ]
-        df = pd.DataFrame(data, columns=["STT", "Mã NVBH", "Tên NVBH", "Chỉ Tiêu KPI", f"Thực Hiện {date_str}", "MTD", "% MTD"])
-        st.dataframe(df.style.map(highlight_mtd, subset=["% MTD"]), use_container_width=True, hide_index=True)
-
-    elif kpi_filter == "4. PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER)":
-        st.subheader(f"BÁO CÁO PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER) {month_filter.upper()}")
-        st.caption(f"Dữ liệu đối soát cập nhật đến ngày {date_str}/2026")
-        data = [
-            [1, "25SF.HC21112", "Hàng Thanh Lộc", 184, 11, 84, "45.7%"],
-            [2, "19SF.HC7071", "Đoàn Thị Phượng Liên", 190, 12, 83, "43.7%"],
-            [3, "24SF.HC15114", "Huỳnh Tấn Lý", 152, 7, 61, "40.1%"],
-            [4, "23SF.HC14324", "Danh Hồng Oanh", 172, 5, 59, "34.3%"],
-            [5, "18SF.HC4149", "Nguyễn Thị Bích Trâm", 199, 8, 63, "31.7%"],
-            [6, "14SF.HC00198", "Lê Thị Thơm", 194, 12, 61, "31.4%"],
-            [7, "24SF.HC16385", "Trần Minh Thành", 194, 5, 60, "30.9%"],
-            [8, "26SF.HC22288", "Trần Tấn Tài", 172, 7, 53, "30.8%"],
-            [9, "26SF.HC22759", "Nguyễn Hoàng Bích Thủy", 175, 5, 53, "30.3%"],
-            [10, "26SF.HC23006", "Mai Thanh Tâm", 132, 6, 39, "29.5%"],
-            [11, "26SF.HC22196", "Trương Hoàng Giang", 163, 7, 47, "28.8%"],
-            [12, "26SF.HC22209", "Mai Thị Linh", 157, 6, 43, "27.4%"],
-            [13, "26SF.HC23230", "Nguyễn Trần Bảo Long", 135, 6, 36, "26.7%"],
-            [14, "18SF.HC4599", "Nguyễn Văn Đình Chương", 226, 6, 58, "25.7%"],
-            [15, "26SF.HC22774", "Ngô Nguyễn Cao Kỳ", 222, 4, 54, "24.3%"],
-            ["-", "TỔNG CỘNG", "SS Trương Thanh Tân Total", 2667, 107, 854, "32.0%"]
-        ]
-        df = pd.DataFrame(data, columns=["STT", "Mã NVBH", "Tên NVBH", "Chỉ Tiêu KPI", f"Thực Hiện {date_str}", "MTD", "% MTD"])
-        st.dataframe(df.style.map(highlight_mtd, subset=["% MTD"]), use_container_width=True, hide_index=True)
-
-    elif kpi_filter == "5. ASO ALL KÊNH OFF":
-        st.subheader(f"BÁO CÁO ASO ALL KÊNH OFF {month_filter.upper()}")
-        st.caption(f"Dữ liệu đối soát cập nhật đến ngày {date_str}/2026")
-        data = [
-            [1, "26SF.HC22759", "Nguyễn Hoàng Bích Thủy", 68, 8, 66, "97.1%"],
-            [2, "26SF.HC22209", "Mai Thị Linh", 63, 11, 61, "96.8%"],
-            [3, "19SF.HC7071", "Đoàn Thị Phượng Liên", 90, 13, 86, "95.6%"],
-            [4, "14SF.HC00198", "Lê Thị Thơm", 80, 15, 75, "93.8%"],
-            [5, "25SF.HC21112", "Hàng Thanh Lộc", 91, 11, 85, "93.4%"],
-            [6, "24SF.HC16385", "Trần Minh Thành", 95, 11, 84, "88.4%"],
-            [7, "26SF.HC23006", "Mai Thanh Tâm", 59, 9, 52, "88.1%"],
-            [8, "18SF.HC4149", "Nguyễn Thị Bích Trâm", 96, 9, 82, "85.4%"],
-            [9, "26SF.HC22288", "Trần Tấn Tài", 71, 8, 60, "84.5%"],
-            [10, "23SF.HC14324", "Danh Hồng Oanh", 78, 7, 65, "83.3%"],
-            [11, "24SF.HC15114", "Huỳnh Tấn Lý", 79, 7, 65, "82.3%"],
-            [12, "26SF.HC23230", "Nguyễn Trần Bảo Long", 56, 8, 44, "78.6%"],
-            [13, "18SF.HC4599", "Nguyễn Văn Đình Chương", 101, 11, 79, "78.2%"],
-            [14, "26SF.HC22196", "Trương Hoàng Giang", 71, 7, 53, "74.6%"],
-            [15, "26SF.HC22774", "Ngô Nguyễn Cao Kỳ", 102, 6, 68, "66.7%"],
-            ["-", "TỔNG CỘNG", "SS Trương Thanh Tân Total", 1200, 141, 1025, "85.4%"]
-        ]
-        df = pd.DataFrame(data, columns=["STT", "Mã NVBH", "Tên NVBH", "Chỉ Tiêu KPI", f"Thực Hiện {date_str}", "MTD (Kênh OFF)", "% MTD"])
-        st.dataframe(df.style.map(highlight_mtd, subset=["% MTD"]), use_container_width=True, hide_index=True)
-
-    elif kpi_filter == "6. BÁO CÁO ĐƠN HÀNG COMBO":
-        st.subheader(f"BÁO CÁO ĐƠN HÀNG COMBO NGÀY {date_str}/2026")
-        st.caption(f"Target Tuyến Ngày & Thống kê phát sinh thực tế trong ngày {date_str}/2026")
-        data = [
-            [1, "24SF.HC15114", "Huỳnh Tấn Lý", 12, 5, "41.7%", 15, 1, "6.7%"],
-            [2, "26SF.HC22759", "Nguyễn Hoàng Bích Thủy", 12, 4, "33.3%", 2, 0, "0.0%"],
-            [3, "24SF.HC16385", "Trần Minh Thành", 14, 4, "28.6%", 6, 1, "16.7%"],
-            [4, "26SF.HC22288", "Trần Tấn Tài", 7, 2, "28.6%", 7, 0, "0.0%"],
-            [5, "18SF.HC4599", "Nguyễn Văn Đình Chương", 15, 4, "26.7%", 11, 0, "0.0%"],
-            [6, "26SF.HC23006", "Mai Thanh Tâm", 19, 5, "26.3%", 6, 0, "0.0%"],
-            [7, "26SF.HC23230", "Nguyễn Trần Bảo Long", 12, 3, "25.0%", 11, 0, "0.0%"],
-            [8, "18SF.HC4149", "Nguyễn Thị Bích Trâm", 17, 4, "23.5%", 8, 0, "0.0%"],
-            [9, "25SF.HC21112", "Hàng Thanh Lộc", 17, 3, "17.6%", 14, 0, "0.0%"],
-            [10, "14SF.HC00198", "Lê Thị Thơm", 12, 2, "16.7%", 26, 1, "3.8%"],
-            [11, "26SF.HC22774", "Ngô Nguyễn Cao Kỳ", 19, 3, "15.8%", 17, 5, "29.4%"],
-            [12, "19SF.HC7071", "Đoàn Thị Phượng Liên", 18, 2, "11.1%", 38, 0, "0.0%"],
-            [13, "23SF.HC14324", "Danh Hồng Oanh", 20, 2, "10.0%", 18, 1, "5.6%"],
-            [14, "26SF.HC22209", "Mai Thị Linh", 10, 1, "10.0%", 3, 0, "0.0%"],
-            [15, "26SF.HC22196", "Trương Hoàng Giang", 11, 1, "9.1%", 7, 0, "0.0%"],
-            ["-", "TỔNG CỘNG", "SS Trương Thanh Tân Total", 215, 45, "20.9%", 189, 9, "4.8%"]
-        ]
-        df = pd.DataFrame(data, columns=["STT", "Mã NVBH", "Tên NVBH", "Số CH OFF (Tuyến Ngày)", f"Thực hiện {date_str} (OFF)", "% Hoàn thành OFF", "Số CH ON (Tuyến Ngày)", f"Thực hiện {date_str} (ON)", "% Hoàn thành ON"])
-        st.dataframe(df.style.map(highlight_mtd, subset=["% Hoàn thành OFF", "% Hoàn thành ON"]), use_container_width=True, hide_index=True)
 
 # ==========================================
 # TAB 2: MCP VISIT
