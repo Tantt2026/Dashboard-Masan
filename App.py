@@ -280,11 +280,17 @@ def apply_raw_data_filters(df, tab_prefix):
     if df is None or len(df) == 0:
         return df
     df_filtered = df.copy()
-    col_filter1, col_filter2, col_filter3 = st.columns([1.5, 1.5, 2.0])
+    
+    # Bố trí 4 cột filter cho tab MCP, các tab khác dùng 3 cột
+    if tab_prefix == "mcp":
+        col_filter1, col_filter2, col_filter3, col_filter4 = st.columns([1.2, 1.2, 1.2, 1.4])
+    else:
+        col_filter1, col_filter2, col_filter3 = st.columns([1.5, 1.5, 2.0])
     
     rep_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['mã nv', 'nvbh', 'sm', 'tên nv', 'sm name', 'nhân viên'])]
     ch_code_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['mã kh', 'mã ch', 'outlet', 'customer', 'shipto'])]
     ch_name_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['tên kh', 'tên ch', 'name', 'khách hàng'])]
+    day_cols = [c for c in df.columns if any(k in str(c).lower() for k in ['thứ', 'day', 't2', 't3', 't4', 't5', 't6', 't7', 'cn'])]
 
     with col_filter1:
         selected_rep = st.selectbox(
@@ -307,6 +313,20 @@ def apply_raw_data_filters(df, tab_prefix):
         search_name = st.text_input("🏪 Lọc Tên Khách Hàng", key=f"{tab_prefix}_name")
         if search_name.strip() and ch_name_cols:
             df_filtered = df_filtered[df_filtered[ch_name_cols[0]].astype(str).str.contains(search_name.strip(), case=False, na=False)]
+
+    if tab_prefix == "mcp":
+        with col_filter4:
+            selected_day = st.selectbox(
+                "📅 Lọc Theo Thứ",
+                options=["Tất cả các thứ", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"],
+                key=f"{tab_prefix}_day"
+            )
+            if selected_day != "Tất cả các thứ" and day_cols:
+                day_kw = selected_day.replace("Thứ ", "T").replace("Chủ Nhật", "CN").lower()
+                mask_day = False
+                for dc in day_cols:
+                    mask_day = mask_day | df_filtered[dc].astype(str).str.lower().str.contains(day_kw, na=False)
+                df_filtered = df_filtered[mask_day]
 
     return df_filtered
 
