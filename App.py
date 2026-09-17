@@ -370,7 +370,7 @@ tab_kpi, tab_mcp, tab_cat, tab_brand = st.tabs([
     "📊 BÁO CÁO KPI", "🗺️ MCP VISIT", "📦 TRACKING MBS - CAT", "🏷️ TRACKING MBS - BRAND"
 ])
 
-# ----- TAB KPI (VIỀN ĐẬM, TIÊU ĐỀ XANH ĐẬM CHỮ TRẮNG BOLD) -----
+# ----- TAB KPI (VIỀN ĐEN 3PX, TIÊU ĐỀ XANH ĐẬM CHỮ TRẮNG BOLD) -----
 with tab_kpi:
     if selected_kpi != "COMBO":
         df_r, team_tgt, title = build_report(df, report_date, targets, selected_kpi, filter_nv)
@@ -398,14 +398,14 @@ with tab_kpi:
                     ('color', '#ffffff'),
                     ('font-weight', 'bold'),
                     ('text-align', 'center'),
-                    ('border', '1px solid #718096')
+                    ('border', '2px solid #000000')
                 ]},
                 {'selector': 'td', 'props': [
-                    ('border', '1px solid #cbd5e0')
+                    ('border', '1px solid #000000')
                 ]},
                 {'selector': 'table', 'props': [
                     ('border-collapse', 'collapse'),
-                    ('border', '2px solid #2d3748')
+                    ('border', '3px solid #000000')
                 ]}
             ])
         )
@@ -449,14 +449,14 @@ with tab_kpi:
                     ('color', '#ffffff'),
                     ('font-weight', 'bold'),
                     ('text-align', 'center'),
-                    ('border', '1px solid #718096')
+                    ('border', '2px solid #000000')
                 ]},
                 {'selector': 'td', 'props': [
-                    ('border', '1px solid #cbd5e0')
+                    ('border', '1px solid #000000')
                 ]},
                 {'selector': 'table', 'props': [
                     ('border-collapse', 'collapse'),
-                    ('border', '2px solid #2d3748')
+                    ('border', '3px solid #000000')
                 ]}
             ])
         )
