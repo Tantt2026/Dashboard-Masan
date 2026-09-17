@@ -93,11 +93,11 @@ st.markdown("""
     }
     #MainMenu, footer, header {visibility: hidden;}
     
-    /* CUSTOM TABLE HTML STYLING: 3PX BLACK BORDER, RED HEADER, BLUE EMPLOYEES */
+    /* CUSTOM TABLE HTML STYLING: STANDARD THIN BORDER */
     .custom-kpi-table {
         width: 100%;
         border-collapse: collapse;
-        border: 3px solid #000000 !important;
+        border: 1px solid #e2e8f0 !important;
         font-family: sans-serif;
         font-size: 14px;
         background-color: #ffffff;
@@ -107,11 +107,11 @@ st.markdown("""
         color: #9b2c2c !important;
         font-weight: bold !important;
         text-align: center !important;
-        border: 3px solid #000000 !important;
+        border: 1px solid #e2e8f0 !important;
         padding: 8px;
     }
     .custom-kpi-table td {
-        border: 3px solid #000000 !important;
+        border: 1px solid #e2e8f0 !important;
         padding: 6px 8px;
     }
 </style>
