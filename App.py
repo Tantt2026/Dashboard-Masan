@@ -187,18 +187,21 @@ def get_targets():
         for _, r in kpi.iterrows():
             sm, ktype, kname, tgt = str(r['SM code']).strip(), str(r['KPI type']).strip(), str(r['KPI Name']).strip(), r['Target']
             if pd.isna(tgt): continue
-            kname_lower = kname.lower()
-            if ktype == 'ASO_ALL': 
+            ktype_lower, kname_lower = ktype.lower(), kname.lower()
+            
+            # Phân loại thông minh dựa trên cả KPI type và KPI Name
+            if ktype_lower == 'aso_all' or 'all' in kname_lower: 
                 targets.setdefault(sm, {})['ASO_ALL'] = int(tgt)
-            elif ktype == 'PC_BT': 
+            elif ktype_lower == 'pc_bt' or 'line' in kname_lower or 'pc' in ktype_lower: 
                 targets.setdefault(sm, {})['PC_BT'] = int(tgt)
-            elif ktype == 'ASO_ON': 
+            elif ktype_lower == 'aso_on' or 'premise' in kname_lower or 'tea' in kname_lower: 
                 targets.setdefault(sm, {})['ASO_ON'] = int(tgt)
-            elif ktype == 'ASO_Focus' and 'xanh' in kname_lower: 
+            elif 'xanh' in kname_lower or 'chanté' in kname_lower or 'chante' in kname_lower: 
                 targets.setdefault(sm, {})['ASO_CHANTE'] = int(tgt)
-            elif ktype == 'ASO_Focus': 
-                # Bắt tất cả các loại ASO_Focus còn lại (Trận vàng / Trộn / YTG vàng)
-                targets.setdefault(sm, {})['ASO_OMACHI'] = int(tgt)
+            elif 'vàng' in kname_lower or 'omachi' in kname_lower or 'trộn' in kname_lower or 'trận vàng' in kname_lower or ktype_lower == 'aso_focus':
+                # Nếu thuộc nhóm Focus nhưng không phải Chanté (xanh) thì đích thị là Trận Vàng / Omachi Trộn
+                if not ('xanh' in kname_lower or 'chanté' in kname_lower):
+                    targets.setdefault(sm, {})['ASO_OMACHI'] = int(tgt)
         return targets
     except: return {}
 
