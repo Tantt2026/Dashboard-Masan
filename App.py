@@ -76,12 +76,30 @@ st.markdown("""
         font-size: 13px !important;
         margin-bottom: 2px;
     }
+    
+    /* CUSTOM METRIC CARDS: LIGHT BLUE BACKGROUND & CENTERED & BIG RED BOLD TEXT */
     div[data-testid="stMetric"] {
-        background: white;
-        border: 1px solid #e2e8f0;
+        background: #ebf8ff !important;
+        border: 1px solid #bee3f8 !important;
         border-radius: 8px;
-        padding: 10px 14px;
+        padding: 14px;
+        text-align: center !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
+    div[data-testid="stMetricValue"] {
+        color: #c53030 !important;
+        font-weight: 800 !important;
+        font-size: 2.5rem !important;
+        justify-content: center !important;
+    }
+    div[data-testid="stMetricLabel"] {
+        justify-content: center !important;
+    }
+    div[data-testid="stMetricLabel"] > div {
+        text-align: center !important;
+        font-weight: 700 !important;
+    }
+
     .note-box {
         background: #ebf8ff;
         border-left: 5px solid #3182ce;
