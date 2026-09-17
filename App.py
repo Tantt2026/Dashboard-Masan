@@ -123,7 +123,7 @@ with head_col2:
                 st.rerun()
             st.markdown("---")
             
-            u_sales = st.file_uploader("📂 Tải lên File Bán Hàng", type=["xlsx", "csv"], key="u_sales")
+            u_sales = st.file_uploader("📂 Tải lên File Bán Hàng (Data.xlsx)", type=["xlsx", "csv"], key="u_sales")
             if u_sales: 
                 st.session_state['df_sales_file'] = u_sales
                 st.success("Đã nạp file bán hàng thành công!")
@@ -184,20 +184,33 @@ st.markdown("---")
 selected_date = date_filter
 date_str = selected_date.strftime("%d/%m")
 
-# --- LOAD & PROCESS DATA DỰA TRÊN CODE MỚI CỦA BRO ---
+# --- LOAD & PROCESS DATA (TỰ ĐỘNG DÒ HEADER CHUẨN HOẶC DÒNG 3) ---
 @st.cache_data
 def load_and_process_data(rpt_path, mcp_path):
     is_ex = str(rpt_path).endswith(('.xlsx', '.xls')) or (hasattr(rpt_path, 'name') and rpt_path.name.endswith(('.xlsx', '.xls')))
-    df = pd.read_excel(rpt_path) if is_ex else pd.read_csv(rpt_path)
+    
+    # Dò tìm dòng header chính xác cho file Data.xlsx của Masan
+    raw_peek = pd.read_excel(rpt_path, header=None, nrows=10) if is_ex else pd.read_csv(rpt_path, header=None, nrows=10)
+    real_header_row = 0
+    for idx, row in raw_peek.iterrows():
+        row_str = " ".join([str(val).lower() for val in row.values])
+        if any(k in row_str for k in ['sản phẩm', 'product', 'sku', 'mã ch', 'ship-to npp']):
+            real_header_row = idx
+            break
+            
+    df = pd.read_excel(rpt_path, header=real_header_row) if is_ex else pd.read_csv(rpt_path, header=real_header_row)
+    df.columns = [str(c).strip() for c in df.columns]
     
     is_mcp_ex = str(mcp_path).endswith(('.xlsx', '.xls')) or (hasattr(mcp_path, 'name') and mcp_path.name.endswith(('.xlsx', '.xls')))
     mcp = pd.read_excel(mcp_path) if is_mcp_ex else pd.read_csv(mcp_path)
+    mcp.columns = [str(c).strip() for c in mcp.columns]
 
     # Lọc đơn đã hủy
-    if 'Tình trạng đơn hàng' in df.columns:
-        df = df[df['Tình trạng đơn hàng'] != 'Đã hủy'].copy()
+    status_col = next((c for c in df.columns if 'tình trạng' in c.lower()), None)
+    if status_col:
+        df = df[~df[status_col].astype(str).str.contains('hủy|cancel', case=False, na=False)].copy()
     
-    date_col = next((c for c in df.columns if 'ngày tạo đơn hàng' in c.lower() or 'ngay' in c.lower()), 'Ngày tạo đơn hàng')
+    date_col = next((c for c in df.columns if 'ngày tạo đơn hàng' in c.lower() or 'ngay' in c.lower()), df.columns[13])
     df['Ngày tạo đơn hàng'] = pd.to_datetime(df[date_col], errors='coerce')
     df['date'] = df['Ngày tạo đơn hàng'].dt.date
 
@@ -209,11 +222,11 @@ def load_and_process_data(rpt_path, mcp_path):
     mcp_map.columns = ['Outlet_code', 'L1']
     mcp_map['Outlet_code'] = mcp_map['Outlet_code'].astype(str).str.strip()
     
-    ch_sales_col = next((c for c in df.columns if 'mã ch' in c.lower() or 'outlet' in c.lower()), 'Mã CH')
+    ch_sales_col = next((c for c in df.columns if 'mã ch' in c.lower()), df.columns[16] if len(df.columns)>16 else df.columns[0])
     df['Mã CH'] = df[ch_sales_col].astype(str).str.strip()
     df = df.merge(mcp_map, left_on='Mã CH', right_on='Outlet_code', how='left')
     
-    prod_col = next((c for c in df.columns if 'tên sản phẩm' in c.lower() or 'product' in c.lower()), 'Tên sản phẩm')
+    prod_col = next((c for c in df.columns if 'tên sản phẩm' in c.lower() or 'product' in c.lower()), df.columns[24] if len(df.columns)>24 else df.columns[0])
     df['Tên SP lower'] = df[prod_col].astype(str).str.lower()
 
     return df, mcp
@@ -262,7 +275,7 @@ def get_targets(kpi_path=file_kpi_target):
 
 targets = get_targets()
 
-# --- HÀM BUILD BÁO CÁO KPI (DÙNG ĐOẠN CODE CHUẨN CỦA BRO) ---
+# --- HÀM BUILD BÁO CÁO KPI ---
 def build_report(df, report_date, targets, report_type):
     if df is None or len(df) == 0:
         return pd.DataFrame(), 0
