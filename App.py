@@ -95,11 +95,12 @@ st.markdown("""
     div[data-testid="stMetricLabel"] {
         justify-content: center !important;
     }
-    div[data-testid="stMetricLabel"] > div {
-        text-align: center !important;
+    div[data-testid="stMetricLabel"] *, div[data-testid="stMetricLabel"] p {
         color: #c53030 !important;
         font-weight: 800 !important;
         font-size: 1.3rem !important;
+        text-align: center !important;
+        justify-content: center !important;
     }
 
     .note-box {
