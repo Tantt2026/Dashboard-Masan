@@ -221,7 +221,7 @@ def find_col(df, candidates):
         if c.lower() in cols: return cols[c.lower()]
     return None
 
-# ====================== KPI LOGIC ======================
+# ====================== KPI LOGIC CHUẨN ======================
 def build_report(df, report_date, targets, report_type, filter_nv=None):
     df_mtd = df[df['date'] >= date(report_date.year, report_date.month, 1)].copy()
     if filter_nv and filter_nv != "Tất cả ĐDKD":
@@ -281,7 +281,6 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
 
     results = []
     for sm in all_sms:
-        # Vlookup chuẩn Target từ file Target_KPI theo Mã NVBH (sm)
         tgt = targets.get(sm, {}).get(key, 0)
         m = int(mtd.get(sm, 0))
         n = int(ngay.get(sm, 0))
