@@ -222,6 +222,24 @@ def find_col(df, candidates):
         if c.lower() in cols: return cols[c.lower()]
     return None
 
+def filter_by_thu(df, col_thu, f_thu):
+    if f_thu == "Tất cả các thứ" or not col_thu:
+        return df
+    thu_s = df[col_thu].astype(str).str.strip()
+    if f_thu in ["2", "3", "4", "5", "6", "7"]:
+        match_vals = [f_thu, f_thu + "5" if f_thu=="2" else (f_thu + "6" if f_thu=="3" else (f_thu + "7" if f_thu=="4" else ""))]
+        # dynamic mapping: 2->2,25; 3->3,36; 4->4,47... let's be precise:
+        mapping = {"2": ["2", "25"], "3": ["3", "36"], "4": ["4", "47"], "5": ["25", "5"], "6": ["36", "6"], "7": ["47", "7"]}
+        valid_set = mapping.get(f_thu, [f_thu])
+        return df[thu_s.isin(valid_set)]
+    elif f_thu == "25":
+        return df[thu_s.isin(["2", "5", "25"])]
+    elif f_thu == "36":
+        return df[thu_s.isin(["3", "6", "36"])]
+    elif f_thu == "47":
+        return df[thu_s.isin(["4", "7", "47"])]
+    return df[thu_s == f_thu]
+
 # ====================== KPI LOGIC CHUẨN ======================
 def build_report(df, report_date, targets, report_type, filter_nv=None):
     df_mtd = df[df['date'] >= date(report_date.year, report_date.month, 1)].copy()
@@ -528,12 +546,7 @@ with tab_mcp:
         if f_nv != "Tất cả ĐDKD" and col_nv: df_f = df_f[df_f[col_nv].astype(str)==f_nv]
         if f_ma and col_ma: df_f = df_f[df_f[col_ma].astype(str).str.contains(f_ma, case=False, na=False)]
         if f_ten and col_ten: df_f = df_f[df_f[col_ten].astype(str).str.contains(f_ten, case=False, na=False)]
-        if f_thu != "Tất cả các thứ" and col_thu:
-            thu_s = df_f[col_thu].astype(str).str.strip()
-            if f_thu in ["2","3","4","5","6","7"]: df_f = df_f[thu_s==f_thu]
-            elif f_thu=="25": df_f = df_f[thu_s.isin(["2","5","25"])]
-            elif f_thu=="36": df_f = df_f[thu_s.isin(["3","6","36"])]
-            elif f_thu=="47": df_f = df_f[thu_s.isin(["4","7","47"])]
+        df_f = filter_by_thu(df_f, col_thu, f_thu)
 
         for col in df_f.columns:
             if any(x in col.lower().replace(" ","") for x in ["3msales","3msales","doanh số","doanhso","sales"]):
@@ -574,12 +587,7 @@ with tab_cat:
         if f_nv != "Tất cả ĐDKD" and col_nv: df_f = df_f[df_f[col_nv].astype(str)==f_nv]
         if f_ma and col_ma: df_f = df_f[df_f[col_ma].astype(str).str.contains(f_ma, case=False, na=False)]
         if f_ten and col_ten: df_f = df_f[df_f[col_ten].astype(str).str.contains(f_ten, case=False, na=False)]
-        if f_thu != "Tất cả các thứ" and col_thu:
-            thu_s = df_f[col_thu].astype(str).str.strip()
-            if f_thu in ["2","3","4","5","6","7"]: df_f = df_f[thu_s==f_thu]
-            elif f_thu=="25": df_f = df_f[thu_s.isin(["2","5","25"])]
-            elif f_thu=="36": df_f = df_f[thu_s.isin(["3","6","36"])]
-            elif f_thu=="47": df_f = df_f[thu_s.isin(["4","7","47"])]
+        df_f = filter_by_thu(df_f, col_thu, f_thu)
 
         for col in df_f.columns:
             if "doanh số" in col.lower() or "doanhso" in col.lower().replace(" ",""):
@@ -620,12 +628,7 @@ with tab_brand:
         if f_nv != "Tất cả ĐDKD" and col_nv: df_f = df_f[df_f[col_nv].astype(str)==f_nv]
         if f_ma and col_ma: df_f = df_f[df_f[col_ma].astype(str).str.contains(f_ma, case=False, na=False)]
         if f_ten and col_ten: df_f = df_f[df_f[col_ten].astype(str).str.contains(f_ten, case=False, na=False)]
-        if f_thu != "Tất cả các thứ" and col_thu:
-            thu_s = df_f[col_thu].astype(str).str.strip()
-            if f_thu in ["2","3","4","5","6","7"]: df_f = df_f[thu_s==f_thu]
-            elif f_thu=="25": df_f = df_f[thu_s.isin(["2","5","25"])]
-            elif f_thu=="36": df_f = df_f[thu_s.isin(["3","6","36"])]
-            elif f_thu=="47": df_f = df_f[thu_s.isin(["4","7","47"])]
+        df_f = filter_by_thu(df_f, col_thu, f_thu)
 
         for col in df_f.columns:
             if "doanh số" in col.lower() or "doanhso" in col.lower().replace(" ",""):
