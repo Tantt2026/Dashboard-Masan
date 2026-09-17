@@ -76,32 +76,6 @@ st.markdown("""
         font-size: 13px !important;
         margin-bottom: 2px;
     }
-    
-    /* CUSTOM METRIC CARDS: LIGHT BLUE BACKGROUND & CENTERED & BIG RED BOLD TEXT */
-    div[data-testid="stMetric"] {
-        background: #ebf8ff !important;
-        border: 1px solid #bee3f8 !important;
-        border-radius: 8px;
-        padding: 14px;
-        text-align: center !important;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-    }
-    div[data-testid="stMetricValue"] {
-        color: #c53030 !important;
-        font-weight: 800 !important;
-        font-size: 2.5rem !important;
-        justify-content: center !important;
-    }
-    div[data-testid="stMetricLabel"] {
-        justify-content: center !important;
-    }
-    div[data-testid="stMetricLabel"] *, div[data-testid="stMetricLabel"] p {
-        color: #c53030 !important;
-        font-weight: 800 !important;
-        font-size: 1.3rem !important;
-        text-align: center !important;
-        justify-content: center !important;
-    }
 
     .note-box {
         background: #ebf8ff;
@@ -137,6 +111,15 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+# Helper function to render custom metric card
+def render_metric_card(label, value):
+    st.markdown(f"""
+    <div style="background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 8px; padding: 14px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+        <div style="color: #c53030; font-weight: 800; font-size: 1.4rem; margin-bottom: 6px;">{label}</div>
+        <div style="color: #c53030; font-weight: 800; font-size: 2.6rem;">{value}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ====================== ĐƯỜNG DẪN ======================
 DATA_DIR = "data"
@@ -454,10 +437,10 @@ with tab_kpi:
         st.caption(f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc: {filter_nv}")
 
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("🎯 Target", f"{team_tgt:,}")
-        c2.metric("📈 MTD", f"{total_mtd:,}")
-        c3.metric("📊 % MTD", pct_team)
-        c4.metric("🆕 Phát sinh Ngày", f"+{total_ngay}")
+        with c1: render_metric_card("🎯 Target", f"{team_tgt:,}")
+        with c2: render_metric_card("📈 MTD", f"{total_mtd:,}")
+        with c3: render_metric_card("📊 % MTD", pct_team)
+        with c4: render_metric_card("🆕 Phát sinh Ngày", f"+{total_ngay}")
 
         st.markdown(render_html_table(df_r), unsafe_allow_html=True)
 
@@ -484,10 +467,10 @@ with tab_kpi:
 
         st.subheader(f"6. BÁO CÁO ĐƠN HÀNG COMBO - THÁNG {report_date.strftime('%m/%Y')}")
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("MTD OFF", f"{total_off}", f"{round(total_off/1092*100,1)}%" if filter_nv=="Tất cả ĐDKD" else "")
-        c2.metric("MTD ON", f"{total_on}", f"{round(total_on/1092*100,1)}%" if filter_nv=="Tất cả ĐDKD" else "")
-        c3.metric("Ngày OFF", f"+{ngay_off}")
-        c4.metric("Ngày ON", f"+{ngay_on}")
+        with c1: render_metric_card("MTD OFF", f"{total_off}")
+        with c2: render_metric_card("MTD ON", f"{total_on}")
+        with c3: render_metric_card("Ngày OFF", f"+{ngay_off}")
+        with c4: render_metric_card("Ngày ON", f"+{ngay_on}")
 
         st.markdown(render_html_table(df_combo), unsafe_allow_html=True)
 
