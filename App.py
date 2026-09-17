@@ -171,8 +171,8 @@ def style_total_row(row):
     styles = []
     is_total = str(row.get('Mã NVBH', '')).strip() == 'TỔNG CỘNG'
     for col in row.index:
-        if is_total and col != '% MTD':
-            styles.append('background-color: #1a365d; color: white; font-weight: 700')
+        if is_total:
+            styles.append('color: #9b2c2c; font-weight: bold')
         else:
             styles.append('')
     return styles
@@ -370,7 +370,7 @@ tab_kpi, tab_mcp, tab_cat, tab_brand = st.tabs([
     "📊 BÁO CÁO KPI", "🗺️ MCP VISIT", "📦 TRACKING MBS - CAT", "🏷️ TRACKING MBS - BRAND"
 ])
 
-# ----- TAB KPI (VIỀN ĐEN 3PX, TIÊU ĐỀ XANH ĐẬM CHỮ TRẮNG BOLD) -----
+# ----- TAB KPI -----
 with tab_kpi:
     if selected_kpi != "COMBO":
         df_r, team_tgt, title = build_report(df, report_date, targets, selected_kpi, filter_nv)
@@ -398,18 +398,18 @@ with tab_kpi:
                     ('color', '#ffffff'),
                     ('font-weight', 'bold'),
                     ('text-align', 'center'),
-                    ('border', '4px solid #000000')
+                    ('border', '2px solid #000000')
                 ]},
                 {'selector': 'td', 'props': [
-                    ('border', '3px solid #000000')
+                    ('border', '1px solid #000000')
                 ]},
                 {'selector': 'table', 'props': [
                     ('border-collapse', 'collapse'),
-                    ('border', '5px solid #000000')
+                    ('border', '3px solid #000000')
                 ]}
             ])
         )
-        h_kpi = (len(df_r) + 1) * 38 + 20
+        h_kpi = (len(df_r) + 1) * 35 + 2
         st.dataframe(styled, use_container_width=True, hide_index=True, height=h_kpi)
 
         top3 = df_r.iloc[:-1].head(3)
@@ -460,10 +460,10 @@ with tab_kpi:
                 ]}
             ])
         )
-        h_combo = (len(df_combo) + 1) * 38 + 20
+        h_combo = (len(df_combo) + 1) * 35 + 2
         st.dataframe(styled_c, use_container_width=True, hide_index=True, height=h_combo)
 
-# ----- TAB MCP (GIỮ NGUYÊN ỔN ĐỊNH) -----
+# ----- TAB MCP -----
 with tab_mcp:
     st.subheader("🗺️ MCP VISIT & MAPPING DOANH SỐ BÁN HÀNG")
     if mcp.empty:
@@ -507,7 +507,7 @@ with tab_mcp:
         st.dataframe(df_f, use_container_width=True, height=550, hide_index=True)
         st.caption(f"Hiển thị: {len(df_f):,} / {len(mcp):,} cửa hàng")
 
-# ----- TAB CAT (GIỮ NGUYÊN ỔN ĐỊNH) -----
+# ----- TAB CAT -----
 with tab_cat:
     st.subheader("🎯 TRACKING MBS - THEO NGÀNH HÀNG (CATEGORY)")
     if df_cat.empty:
@@ -542,7 +542,7 @@ with tab_cat:
         st.dataframe(df_f, use_container_width=True, height=550, hide_index=True)
         st.caption(f"Hiển thị: {len(df_f):,} / {len(df_cat):,} dòng")
 
-# ----- TAB BRAND (GIỮ NGUYÊN ỔN ĐỊNH) -----
+# ----- TAB BRAND -----
 with tab_brand:
     st.subheader("🏷️ TRACKING MBS - THEO THƯƠNG HIỆU (BRAND)")
     if df_brand.empty:
