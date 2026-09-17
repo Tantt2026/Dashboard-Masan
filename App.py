@@ -312,10 +312,15 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
     team_tgt = int(df_out['Chỉ Tiêu KPI'].sum()) if not df_out.empty else 0
     total_pct = round(total_mtd/team_tgt*100, 1) if team_tgt else 0
 
-    total_row = pd.DataFrame([{'STT':'-', 'Mã NVBH':'TỔNG CỘNG',
-        'Tên NVBH':'SS Trương Thanh Tân Total' if filter_nv=="Tất cả ĐDKD" else filter_nv,
+    total_row = pd.DataFrame([{
+        'STT': '-',
+        'Mã NVBH': 'TỔNG CỘNG',
+        'Tên NVBH': 'SS Trương Thanh Tân Total' if filter_nv == "Tất cả ĐDKD" else filter_nv,
         'Chỉ Tiêu KPI': team_tgt,
-        'Thực Hiện Ngày':total_ngay, 'MTD':total_mtd, '% MTD':f"{total_pct}%"}])
+        'Thực Hiện Ngày': total_ngay,
+        'MTD': total_mtd,
+        '% MTD': f"{total_pct}%"
+    }])
     return pd.concat([df_out, total_row], ignore_index=True), team_tgt, title
 
 def build_combo(df, report_date, filter_nv=None):
@@ -351,17 +356,26 @@ def build_combo(df, report_date, filter_nv=None):
 
     rows = []
     for sm in all_sms:
-        rows.append({'Mã NVBH':sm, 'Tên NVBH':sm_names.get(sm,''),
-            'Phát sinh Ngày (OFF)':int(off_ngay.get(sm,0)), 'MTD (OFF)':int(off_mtd.get(sm,0)),
-            'Phát sinh Ngày (ON)':int(on_ngay.get(sm,0)), 'MTD (ON)':int(on_mtd.get(sm,0))})
+        rows.append({
+            'Mã NVBH': sm,
+            'Tên NVBH': sm_names.get(sm,''),
+            'Phát sinh Ngày (OFF)': int(off_ngay.get(sm,0)),
+            'MTD (OFF)': int(off_mtd.get(sm,0)),
+            'Phát sinh Ngày (ON)': int(on_ngay.get(sm,0)),
+            'MTD (ON)': int(on_mtd.get(sm,0))
+        })
     df_out = pd.DataFrame(rows).sort_values('MTD (OFF)', ascending=False).reset_index(drop=True)
     df_out.insert(0, 'STT', range(1, len(df_out)+1))
-    total_row = pd.DataFrame([{'STT':'-', 'Mã NVBH':'TỔNG CỘNG',
-        'Tên NVBH':'SS Trương Thanh Tân Total' if filter_nv=="Tất cả ĐDKD" else filter_nv,
-        'Phát sinh Ngày (OFF)':int(df_out['Phát sinh Ngày (OFF)'].sum()) if not df_out.empty else 0,
-        'MTD (OFF)':int(df_out['MTD (OFF)'].sum()) if not df_out.empty else 0,
-        'Phát sinh Ngày (ON)':int(df_out['Phát sinh Ngày (ON)'].sum()) if not df_out.empty else 0,
-        'MTD (ON)':int(df_out['MTD (ON)'].sum()) if not df_out.empty else 0}])
+
+    total_row = pd.DataFrame([{
+        'STT': '-',
+        'Mã NVBH': 'TỔNG CỘNG',
+        'Tên NVBH': 'SS Trương Thanh Tân Total' if filter_nv == "Tất cả ĐDKD" else filter_nv,
+        'Phát sinh Ngày (OFF)': int(df_out['Phát sinh Ngày (OFF)'].sum()) if not df_out.empty else 0,
+        'MTD (OFF)': int(df_out['MTD (OFF)'].sum()) if not df_out.empty else 0,
+        'Phát sinh Ngày (ON)': int(df_out['Phát sinh Ngày (ON)'].sum()) if not df_out.empty else 0,
+        'MTD (ON)': int(df_out['MTD (ON)'].sum()) if not df_out.empty else 0
+    }])
     return pd.concat([df_out, total_row], ignore_index=True)
 
 def render_html_table(df):
@@ -481,11 +495,9 @@ with tab_kpi:
 
         st.markdown(render_html_table(df_r), unsafe_allow_html=True)
 
-        # Tạo helper tính giá trị số của % MTD để sắp xếp chuẩn xác
         df_eval = df_r.iloc[:-1].copy()
         df_eval['_pct_val'] = df_eval['% MTD'].str.replace('%','').astype(float)
         
-        # Sắp xếp Top & Bottom theo % MTD
         df_sorted_pct = df_eval.sort_values(by='_pct_val', ascending=False)
         top3 = df_sorted_pct.head(3)
         bottom3 = df_sorted_pct.tail(3).iloc[::-1]
