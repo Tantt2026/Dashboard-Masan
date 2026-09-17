@@ -398,14 +398,14 @@ with tab_kpi:
                     ('color', '#ffffff'),
                     ('font-weight', 'bold'),
                     ('text-align', 'center'),
-                    ('border', '2px solid #000000')
+                    ('border', '4px solid #000000')
                 ]},
                 {'selector': 'td', 'props': [
-                    ('border', '1px solid #000000')
+                    ('border', '3px solid #000000')
                 ]},
                 {'selector': 'table', 'props': [
                     ('border-collapse', 'collapse'),
-                    ('border', '3px solid #000000')
+                    ('border', '5px solid #000000')
                 ]}
             ])
         )
