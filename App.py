@@ -370,7 +370,7 @@ tab_kpi, tab_mcp, tab_cat, tab_brand = st.tabs([
     "📊 BÁO CÁO KPI", "🗺️ MCP VISIT", "📦 TRACKING MBS - CAT", "🏷️ TRACKING MBS - BRAND"
 ])
 
-# ----- TAB KPI (BUNG TRỌN CHIỀU CAO KHÔNG CUỘN) -----
+# ----- TAB KPI (VIỀN ĐẬM, TIÊU ĐỀ XANH ĐẬM CHỮ TRẮNG BOLD) -----
 with tab_kpi:
     if selected_kpi != "COMBO":
         df_r, team_tgt, title = build_report(df, report_date, targets, selected_kpi, filter_nv)
@@ -395,9 +395,17 @@ with tab_kpi:
             .set_table_styles([
                 {'selector': 'th', 'props': [
                     ('background-color', '#1a365d'),
-                    ('color', 'white'),
-                    ('font-weight', '700'),
-                    ('text-align', 'center')
+                    ('color', '#ffffff'),
+                    ('font-weight', 'bold'),
+                    ('text-align', 'center'),
+                    ('border', '1px solid #718096')
+                ]},
+                {'selector': 'td', 'props': [
+                    ('border', '1px solid #cbd5e0')
+                ]},
+                {'selector': 'table', 'props': [
+                    ('border-collapse', 'collapse'),
+                    ('border', '2px solid #2d3748')
                 ]}
             ])
         )
@@ -432,9 +440,26 @@ with tab_kpi:
         c3.metric("Ngày OFF", f"+{ngay_off}")
         c4.metric("Ngày ON", f"+{ngay_on}")
 
-        styled_c = df_combo.style.apply(style_total_row, axis=1).set_table_styles([
-            {'selector': 'th', 'props': [('background-color','#1a365d'),('color','white'),('font-weight','700')]}
-        ])
+        styled_c = (
+            df_combo.style
+            .apply(style_total_row, axis=1)
+            .set_table_styles([
+                {'selector': 'th', 'props': [
+                    ('background-color', '#1a365d'),
+                    ('color', '#ffffff'),
+                    ('font-weight', 'bold'),
+                    ('text-align', 'center'),
+                    ('border', '1px solid #718096')
+                ]},
+                {'selector': 'td', 'props': [
+                    ('border', '1px solid #cbd5e0')
+                ]},
+                {'selector': 'table', 'props': [
+                    ('border-collapse', 'collapse'),
+                    ('border', '2px solid #2d3748')
+                ]}
+            ])
+        )
         h_combo = (len(df_combo) + 1) * 38 + 20
         st.dataframe(styled_c, use_container_width=True, hide_index=True, height=h_combo)
 
