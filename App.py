@@ -326,7 +326,7 @@ def build_combo(df, report_date, filter_nv=None):
         'MTD (ON)':int(df_out['MTD (ON)'].sum()) if not df_out.empty else 0}])
     return pd.concat([df_out, total_row], ignore_index=True)
 
-# Helper function to render HTML table safely
+# Helper function to render HTML table safely with white background and red bold text for TOTAL row
 def render_html_table(df):
     html = ['<table class="custom-kpi-table">']
     html.append('<thead><tr>')
@@ -343,7 +343,7 @@ def render_html_table(df):
             if pd.isna(val): val = ""
             
             if is_total:
-                html.append(f'<td style="color: #9b2c2c; font-weight: bold; text-align: center;">{val}</td>')
+                html.append(f'<td style="background-color: #ffffff; color: #9b2c2c; font-weight: bold; text-align: center;">{val}</td>')
             elif col == '% MTD':
                 style_bg = color_pct_bg(val)
                 html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
