@@ -227,8 +227,6 @@ def filter_by_thu(df, col_thu, f_thu):
         return df
     thu_s = df[col_thu].astype(str).str.strip()
     if f_thu in ["2", "3", "4", "5", "6", "7"]:
-        match_vals = [f_thu, f_thu + "5" if f_thu=="2" else (f_thu + "6" if f_thu=="3" else (f_thu + "7" if f_thu=="4" else ""))]
-        # dynamic mapping: 2->2,25; 3->3,36; 4->4,47... let's be precise:
         mapping = {"2": ["2", "25"], "3": ["3", "36"], "4": ["4", "47"], "5": ["25", "5"], "6": ["36", "6"], "7": ["47", "7"]}
         valid_set = mapping.get(f_thu, [f_thu])
         return df[thu_s.isin(valid_set)]
@@ -483,8 +481,11 @@ with tab_kpi:
 
         st.markdown(render_html_table(df_r), unsafe_allow_html=True)
 
-        top3 = df_r.iloc[:-1].head(3)
-        bottom3 = df_r.iloc[:-1].tail(3)
+        # Sắp xếp đúng logic: Top 3 MTD cao nhất, Bottom 3 MTD thấp nhất
+        df_sorted_mtd = df_r.iloc[:-1].sort_values(by='MTD', ascending=False)
+        top3 = df_sorted_mtd.head(3)
+        bottom3 = df_sorted_mtd.tail(3).iloc[::-1] # Đảo lại để thấp nhất lên đầu
+        
         top3_text = ", ".join([f"{r['Tên NVBH']} ({r['MTD']})" for _, r in top3.iterrows()])
         bottom3_text = ", ".join([f"{r['Tên NVBH']} ({r['MTD']})" for _, r in bottom3.iterrows()])
 
@@ -634,5 +635,5 @@ with tab_brand:
             if "doanh số" in col.lower() or "doanhso" in col.lower().replace(" ",""):
                 df_f[col] = pd.to_numeric(df_f[col], errors='coerce').apply(format_number_vn)
 
-        st.dataframe(df_f, use_container_width=True, height=450, hide_index=True)
+        st.dataframe(df_f, use_container_width=True, height=450, height=450, hide_index=True)
         st.caption(f"Hiển thị: {len(df_f):,} / {len(df_brand):,} dòng")
