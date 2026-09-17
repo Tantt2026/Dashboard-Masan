@@ -123,7 +123,7 @@ with head_col2:
                 st.rerun()
             st.markdown("---")
             
-            u_sales = st.file_uploader("📂 Tải lên File Bán Hàng (Data.xlsx)", type=["xlsx", "csv"], key="u_sales")
+            u_sales = st.file_uploader("📂 Tải lên File Bán Hàng", type=["xlsx", "csv"], key="u_sales")
             if u_sales: 
                 st.session_state['df_sales_file'] = u_sales
                 st.success("Đã nạp file bán hàng thành công!")
@@ -135,6 +135,10 @@ def find_available_sales_file():
     for f in os.listdir('.'):
         if any(kw in f.lower() for kw in ['ban_hang', 'sales', 'don_hang', 'rpt', 'chitietdonhang', 'data']):
             return f
+    if os.path.exists('data'):
+        for f in os.listdir('data'):
+            if any(kw in f.lower() for kw in ['ban_hang', 'sales', 'don_hang', 'rpt', 'chitietdonhang', 'data']):
+                return os.path.join('data', f)
     return None
 
 file_kpi_target = "Target_KPI.xlsx" if os.path.exists("Target_KPI.xlsx") else (os.path.join("data", "Target_KPI.xlsx") if os.path.exists(os.path.join("data", "Target_KPI.xlsx")) else None)
@@ -184,21 +188,21 @@ st.markdown("---")
 selected_date = date_filter
 date_str = selected_date.strftime("%d/%m")
 
-# --- LOAD & PROCESS DATA (TỰ ĐỘNG DÒ HEADER CHUẨN HOẶC DÒNG 3) ---
+# --- LOAD & PROCESS DATA VỚI HÀM TỰ ĐỘNG NHẬN DIỆN HEADER CHUẨN XÁC ---
 @st.cache_data
 def load_and_process_data(rpt_path, mcp_path):
     is_ex = str(rpt_path).endswith(('.xlsx', '.xls')) or (hasattr(rpt_path, 'name') and rpt_path.name.endswith(('.xlsx', '.xls')))
     
-    # Dò tìm dòng header chính xác cho file Data.xlsx của Masan
+    # Tự động dò tìm dòng header chứa từ khóa đặc trưng của Masan
     raw_peek = pd.read_excel(rpt_path, header=None, nrows=10) if is_ex else pd.read_csv(rpt_path, header=None, nrows=10)
-    real_header_row = 0
+    header_row = 0
     for idx, row in raw_peek.iterrows():
         row_str = " ".join([str(val).lower() for val in row.values])
-        if any(k in row_str for k in ['sản phẩm', 'product', 'sku', 'mã ch', 'ship-to npp']):
-            real_header_row = idx
+        if any(k in row_str for k in ['mã ch', 'ship-to', 'tình trạng đơn hàng', 'mã nvbh']):
+            header_row = idx
             break
             
-    df = pd.read_excel(rpt_path, header=real_header_row) if is_ex else pd.read_csv(rpt_path, header=real_header_row)
+    df = pd.read_excel(rpt_path, header=header_row) if is_ex else pd.read_csv(rpt_path, header=header_row)
     df.columns = [str(c).strip() for c in df.columns]
     
     is_mcp_ex = str(mcp_path).endswith(('.xlsx', '.xls')) or (hasattr(mcp_path, 'name') and mcp_path.name.endswith(('.xlsx', '.xls')))
@@ -208,10 +212,10 @@ def load_and_process_data(rpt_path, mcp_path):
     # Lọc đơn đã hủy
     status_col = next((c for c in df.columns if 'tình trạng' in c.lower()), None)
     if status_col:
-        df = df[~df[status_col].astype(str).str.contains('hủy|cancel', case=False, na=False)].copy()
+        df = df[df[status_col].astype(str).str.strip() != 'Đã hủy'].copy()
     
-    date_col = next((c for c in df.columns if 'ngày tạo đơn hàng' in c.lower() or 'ngay' in c.lower()), df.columns[13])
-    df['Ngày tạo đơn hàng'] = pd.to_datetime(df[date_col], errors='coerce')
+    date_col = next((c for c in df.columns if 'ngày tạo đơn hàng' in c.lower() or 'ngay' in c.lower()), df.columns[13] if len(df.columns)>13 else None)
+    df['Ngày tạo đơn hàng'] = pd.to_datetime(df[date_col], errors='coerce') if date_col else pd.NaT
     df['date'] = df['Ngày tạo đơn hàng'].dt.date
 
     # Map kênh từ MCP
@@ -222,12 +226,12 @@ def load_and_process_data(rpt_path, mcp_path):
     mcp_map.columns = ['Outlet_code', 'L1']
     mcp_map['Outlet_code'] = mcp_map['Outlet_code'].astype(str).str.strip()
     
-    ch_sales_col = next((c for c in df.columns if 'mã ch' in c.lower()), df.columns[16] if len(df.columns)>16 else df.columns[0])
-    df['Mã CH'] = df[ch_sales_col].astype(str).str.strip()
+    ch_sales_col = next((c for c in df.columns if 'mã ch' in c.lower()), df.columns[16] if len(df.columns)>16 else None)
+    df['Mã CH'] = df[ch_sales_col].astype(str).str.strip() if ch_sales_col else ""
     df = df.merge(mcp_map, left_on='Mã CH', right_on='Outlet_code', how='left')
     
-    prod_col = next((c for c in df.columns if 'tên sản phẩm' in c.lower() or 'product' in c.lower()), df.columns[24] if len(df.columns)>24 else df.columns[0])
-    df['Tên SP lower'] = df[prod_col].astype(str).str.lower()
+    prod_col = next((c for c in df.columns if 'tên sản phẩm' in c.lower()), df.columns[24] if len(df.columns)>24 else None)
+    df['Tên SP lower'] = df[prod_col].astype(str).str.lower() if prod_col else ""
 
     return df, mcp
 
