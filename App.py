@@ -189,19 +189,17 @@ def get_targets():
             if pd.isna(tgt): continue
             ktype_lower, kname_lower = ktype.lower(), kname.lower()
             
-            # Phân loại thông minh dựa trên cả KPI type và KPI Name
-            if ktype_lower == 'aso_all' or 'all' in kname_lower: 
+            # Map chuẩn xác theo file Excel Target_KPI thực tế
+            if ktype_lower == 'aso_all': 
                 targets.setdefault(sm, {})['ASO_ALL'] = int(tgt)
-            elif ktype_lower == 'pc_bt' or 'line' in kname_lower or 'pc' in ktype_lower: 
+            elif ktype_lower == 'pc_bt': 
                 targets.setdefault(sm, {})['PC_BT'] = int(tgt)
-            elif ktype_lower == 'aso_on' or 'premise' in kname_lower or 'tea' in kname_lower: 
+            elif ktype_lower == 'aso_on': 
                 targets.setdefault(sm, {})['ASO_ON'] = int(tgt)
-            elif 'xanh' in kname_lower or 'chanté' in kname_lower or 'chante' in kname_lower: 
+            elif ktype_lower == 'aso_focus' or 'xanh' in kname_lower: 
                 targets.setdefault(sm, {})['ASO_CHANTE'] = int(tgt)
-            elif 'vàng' in kname_lower or 'omachi' in kname_lower or 'trộn' in kname_lower or 'trận vàng' in kname_lower or ktype_lower == 'aso_focus':
-                # Nếu thuộc nhóm Focus nhưng không phải Chanté (xanh) thì đích thị là Trận Vàng / Omachi Trộn
-                if not ('xanh' in kname_lower or 'chanté' in kname_lower):
-                    targets.setdefault(sm, {})['ASO_OMACHI'] = int(tgt)
+            elif ktype_lower == 'aso_focus_2' or 'vàng' in kname_lower or 'trận vàng' in kname_lower: 
+                targets.setdefault(sm, {})['ASO_OMACHI'] = int(tgt)
         return targets
     except: return {}
 
