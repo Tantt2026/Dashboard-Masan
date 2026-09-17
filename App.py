@@ -394,8 +394,8 @@ with tab_kpi:
             .apply(style_total_row, axis=1)
             .set_table_styles([
                 {'selector': 'th', 'props': [
-                    ('background-color', '#1a365d'),
-                    ('color', '#ffffff'),
+                    ('background-color', '#ffffff'),
+                    ('color', '#9b2c2c'),
                     ('font-weight', 'bold'),
                     ('text-align', 'center'),
                     ('border', '2px solid #000000')
@@ -445,8 +445,8 @@ with tab_kpi:
             .apply(style_total_row, axis=1)
             .set_table_styles([
                 {'selector': 'th', 'props': [
-                    ('background-color', '#1a365d'),
-                    ('color', '#ffffff'),
+                    ('background-color', '#ffffff'),
+                    ('color', '#9b2c2c'),
                     ('font-weight', 'bold'),
                     ('text-align', 'center'),
                     ('border', '2px solid #000000')
