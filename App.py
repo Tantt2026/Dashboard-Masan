@@ -7,7 +7,8 @@ import os
 st.set_page_config(
     page_title="TRACKING KPI ĐDKD - SS Trương Thanh Tân",
     page_icon="📊",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
 # ====================== LOGO ======================
@@ -32,15 +33,9 @@ logo_svg = """
 </svg>
 """
 
-# ====================== CSS (FORCE LIGHT MODE) ======================
+# ====================== CSS ======================
 st.markdown("""
 <style>
-    /* Ép buộc toàn bộ nền app sang màu trắng và chữ tối màu (Light Mode cố định) */
-    .stApp {
-        background-color: #ffffff !important;
-        color: #1a202c !important;
-    }
-    
     .main-header {
         background: linear-gradient(90deg, #1a365d 0%, #2b6cb0 100%);
         color: white;
@@ -101,7 +96,6 @@ st.markdown("""
         margin-top: 12px;
         font-size: 13px;
         line-height: 1.5;
-        color: #2d3748;
     }
     #MainMenu, footer, header {visibility: hidden;}
     
@@ -124,7 +118,6 @@ st.markdown("""
     .custom-kpi-table td {
         border: 1px solid #e2e8f0 !important;
         padding: 5px 6px;
-        color: #2d3748;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -196,6 +189,7 @@ def get_targets():
             if pd.isna(tgt): continue
             ktype_lower, kname_lower = ktype.lower(), kname.lower()
             
+            # Map chuẩn xác theo file Excel Target_KPI thực tế
             if ktype_lower == 'aso_all': 
                 targets.setdefault(sm, {})['ASO_ALL'] = int(tgt)
             elif ktype_lower == 'pc_bt': 
@@ -391,13 +385,6 @@ def render_html_table(df):
     html.append('</table></div>')
     return "".join(html)
 
-# ====================== SIDEBAR & SETTINGS ======================
-with st.sidebar:
-    st.markdown("### ⚙️ CÀI ĐẶT HỆ THỐNG")
-    if st.button("🔄 Xóa Cache & Reload Data"):
-        st.cache_data.clear()
-        st.rerun()
-
 # ====================== GIAO DIỆN ======================
 st.markdown(f"""
 <div class="main-header">
@@ -408,6 +395,10 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
+if st.sidebar.button("🔄 Xóa Cache & Reload Data"):
+    st.cache_data.clear()
+    st.rerun()
 
 with st.spinner("Đang tải dữ liệu..."):
     df, mcp = load_main_data()
