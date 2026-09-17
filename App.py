@@ -36,7 +36,6 @@ logo_svg = """
 # ====================== CSS ======================
 st.markdown("""
 <style>
-    /* COMPACT MOBILE-OPTIMIZED HEADER */
     .main-header {
         background: linear-gradient(90deg, #1a365d 0%, #2b6cb0 100%);
         color: white;
@@ -100,7 +99,6 @@ st.markdown("""
     }
     #MainMenu, footer, header {visibility: hidden;}
     
-    /* CUSTOM TABLE HTML STYLING: COMPACT & MOBILE FRIENDLY */
     .custom-kpi-table {
         width: 100%;
         border-collapse: collapse;
@@ -124,7 +122,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Helper function to render compact custom metric card for mobile view
 def render_metric_card(label, value):
     st.markdown(f"""
     <div style="background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 8px; padding: 10px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.04); margin-bottom: 8px;">
@@ -190,10 +187,17 @@ def get_targets():
         for _, r in kpi.iterrows():
             sm, ktype, kname, tgt = str(r['SM code']).strip(), str(r['KPI type']).strip(), str(r['KPI Name']).strip(), r['Target']
             if pd.isna(tgt): continue
-            if ktype == 'ASO_ALL': targets.setdefault(sm, {})['ASO_ALL'] = int(tgt)
-            elif ktype == 'PC_BT': targets.setdefault(sm, {})['PC_BT'] = int(tgt)
-            elif ktype == 'ASO_ON': targets.setdefault(sm, {})['ASO_ON'] = int(tgt)
-            elif ktype == 'ASO_Focus' and 'xanh' in kname.lower(): targets.setdefault(sm, {})['ASO_CHANTE'] = int(tgt)
+            kname_lower = kname.lower()
+            if ktype == 'ASO_ALL': 
+                targets.setdefault(sm, {})['ASO_ALL'] = int(tgt)
+            elif ktype == 'PC_BT': 
+                targets.setdefault(sm, {})['PC_BT'] = int(tgt)
+            elif ktype == 'ASO_ON': 
+                targets.setdefault(sm, {})['ASO_ON'] = int(tgt)
+            elif ktype == 'ASO_Focus' and 'xanh' in kname_lower: 
+                targets.setdefault(sm, {})['ASO_CHANTE'] = int(tgt)
+            elif ktype == 'ASO_Focus' and ('vàng' in kname_lower or 'omachi' in kname_lower or 'trộn' in kname_lower): 
+                targets.setdefault(sm, {})['ASO_OMACHI'] = int(tgt)
         return targets
     except: return {}
 
@@ -263,7 +267,7 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
         first = df_mtd[mask].groupby(['Mã NVBH','Mã CH'])['date'].min().reset_index()
         first.columns = ['Mã NVBH','Mã CH','first_date']
         ngay = first[first['first_date']==report_date].groupby('Mã NVBH')['Mã CH'].nunique()
-        team_tgt, key, title = 754, None, "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN"
+        team_tgt, key, title = 913, 'ASO_OMACHI', "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN"
 
     elif report_type == 'CHANTE':
         mask = df_mtd['Tên SP lower'].str.contains('chanté|chante', na=False)
@@ -283,7 +287,6 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
         pct = round(m/tgt*100, 1) if tgt else 0
         results.append({'Mã NVBH':sm, 'Tên NVBH':sm_names.get(sm,''), 'Chỉ Tiêu KPI':tgt, 'Thực Hiện Ngày':n, 'MTD':m, '% MTD':f"{pct}%", '_ratio': (m/tgt if tgt else 0)})
 
-    # SORT BY % MTD ASCENDING (THẤP ĐẾN CAO)
     df_out = pd.DataFrame(results).sort_values('_ratio', ascending=True).drop(columns=['_ratio']).reset_index(drop=True)
     df_out.insert(0, 'STT', range(1, len(df_out)+1))
 
@@ -343,7 +346,6 @@ def build_combo(df, report_date, filter_nv=None):
         'MTD (ON)':int(df_out['MTD (ON)'].sum()) if not df_out.empty else 0}])
     return pd.concat([df_out, total_row], ignore_index=True)
 
-# Helper function to render HTML table safely with percentage background color for TOTAL row as well
 def render_html_table(df):
     html = ['<div style="overflow-x: auto;"><table class="custom-kpi-table">']
     html.append('<thead><tr>')
@@ -403,7 +405,7 @@ with st.spinner("Đang tải dữ liệu..."):
 
 nv_list = ["Tất cả ĐDKD"] + sorted(df['Tên NVBH'].dropna().unique().tolist())
 
-# Filter bar (Optimized for mobile grid stack)
+# Compact filter bar
 f1, f2, f3 = st.columns([1, 1, 1.3])
 with f1:
     st.markdown('<p class="filter-label">MONTH</p>', unsafe_allow_html=True)
@@ -450,14 +452,11 @@ with tab_kpi:
         st.subheader(f"{title} - THÁNG {report_date.strftime('%m/%Y')}")
         st.caption(f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc: {filter_nv}")
 
-        # Mobile-friendly 2x2 grid for metric cards
-        row1_c1, row1_c2 = st.columns(2)
-        with row1_c1: render_metric_card("🎯 Target", f"{team_tgt:,}")
-        with row1_c2: render_metric_card("📈 MTD", f"{total_mtd:,}")
-
-        row2_c1, row2_c2 = st.columns(2)
-        with row2_c1: render_metric_card("📊 % MTD", pct_team)
-        with row2_c2: render_metric_card("🆕 Phát sinh Ngày", f"+{total_ngay}")
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: render_metric_card("🎯 Target", f"{team_tgt:,}")
+        with c2: render_metric_card("📈 MTD", f"{total_mtd:,}")
+        with c3: render_metric_card("📊 % MTD", pct_team)
+        with c4: render_metric_card("🆕 Ngày", f"+{total_ngay}")
 
         st.markdown(render_html_table(df_r), unsafe_allow_html=True)
 
@@ -484,13 +483,11 @@ with tab_kpi:
 
         st.subheader(f"6. BÁO CÁO ĐƠN HÀNG COMBO - THÁNG {report_date.strftime('%m/%Y')}")
         
-        row1_c1, row1_c2 = st.columns(2)
-        with row1_c1: render_metric_card("MTD OFF", f"{total_off}")
-        with row1_c2: render_metric_card("MTD ON", f"{total_on}")
-
-        row2_c1, row2_c2 = st.columns(2)
-        with row2_c1: render_metric_card("Ngày OFF", f"+{ngay_off}")
-        with row2_c2: render_metric_card("Ngày ON", f"+{ngay_on}")
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: render_metric_card("MTD OFF", f"{total_off}")
+        with c2: render_metric_card("MTD ON", f"{total_on}")
+        with c3: render_metric_card("Ngày OFF", f"+{ngay_off}")
+        with c4: render_metric_card("Ngày ON", f"+{ngay_on}")
 
         st.markdown(render_html_table(df_combo), unsafe_allow_html=True)
 
