@@ -92,6 +92,28 @@ st.markdown("""
         line-height: 1.55;
     }
     #MainMenu, footer, header {visibility: hidden;}
+    
+    /* CUSTOM TABLE HTML STYLING TO ENSURE RED BOLD HEADERS & 3PX BLACK BORDER */
+    .custom-kpi-table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 3px solid #000000 !important;
+        font-family: sans-serif;
+        font-size: 14px;
+        background-color: #ffffff;
+    }
+    .custom-kpi-table th {
+        background-color: #ffffff !important;
+        color: #9b2c2c !important;
+        font-weight: bold !important;
+        text-align: center !important;
+        border: 2px solid #000000 !important;
+        padding: 8px;
+    }
+    .custom-kpi-table td {
+        border: 1px solid #000000 !important;
+        padding: 6px 8px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -159,23 +181,13 @@ def get_targets():
         return targets
     except: return {}
 
-def color_pct(val):
+def color_pct_bg(val):
     try:
         v = float(str(val).replace('%','').strip())
-        if v >= 70: return 'background-color: #c6f6d5; color:#22543d; font-weight:600'
-        elif v >= 50: return 'background-color: #fefcbf; color:#744210; font-weight:600'
-        else: return 'background-color: #fed7d7; color:#742a2a; font-weight:600'
+        if v >= 70: return 'background-color: #c6f6d5; color:#22543d; font-weight:600;'
+        elif v >= 50: return 'background-color: #fefcbf; color:#744210; font-weight:600;'
+        else: return 'background-color: #fed7d7; color:#742a2a; font-weight:600;'
     except: return ''
-
-def style_total_row(row):
-    styles = []
-    is_total = str(row.get('Mã NVBH', '')).strip() == 'TỔNG CỘNG'
-    for col in row.index:
-        if is_total:
-            styles.append('color: #9b2c2c; font-weight: bold')
-        else:
-            styles.append('')
-    return styles
 
 def format_number_vn(x):
     try:
@@ -189,7 +201,7 @@ def find_col(df, candidates):
         if c.lower() in cols: return cols[c.lower()]
     return None
 
-# ====================== KPI LOGIC (ĐÃ CHUẨN XÁC 100%) ======================
+# ====================== KPI LOGIC ======================
 def build_report(df, report_date, targets, report_type, filter_nv=None):
     df_mtd = df[df['date'] >= date(report_date.year, report_date.month, 1)].copy()
     if filter_nv and filter_nv != "Tất cả ĐDKD":
@@ -314,6 +326,37 @@ def build_combo(df, report_date, filter_nv=None):
         'MTD (ON)':int(df_out['MTD (ON)'].sum()) if not df_out.empty else 0}])
     return pd.concat([df_out, total_row], ignore_index=True)
 
+# Helper function to render table via HTML to guarantee custom CSS styles
+def render_html_table(df):
+    html = ['<table class="custom-kpi-table">']
+    # Header
+    html.append('<thead><tr>')
+    for col in df.columns:
+        html.append(f'<th>{col}</th>')
+    html.append('</tr></thead>')
+    
+    # Body
+    html.append('<tbody>')
+    for idx, row in df.iterrows():
+        is_total = str(row.get('Mã NVBH', '')).strip() == 'TỔNG CỘNG'
+        html.append('<tr>')
+        for col in df.columns:
+            val = row[col]
+            if pd.isna(val): val = ""
+            
+            if is_total:
+                html.append(f'<td style="color: #9b2c2c; font-weight: bold; text-align: center;">{val}</td>')
+            elif col == '% MTD':
+                style_bg = color_pct_bg(val)
+                html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
+            else:
+                align = 'center' if col in ['STT', 'Mã NVBH', 'Thực Hiện Ngày', 'MTD'] else 'left'
+                html.append(f'<td style="text-align: {align};">{val}</td>')
+        html.append('</tr>')
+    html.append('</tbody>')
+    html.append('</table>')
+    return "".join(html)
+
 # ====================== GIAO DIỆN ======================
 st.markdown(f"""
 <div class="main-header">
@@ -388,29 +431,8 @@ with tab_kpi:
         c3.metric("📊 % MTD", pct_team)
         c4.metric("🆕 Phát sinh Ngày", f"+{total_ngay}")
 
-        styled = (
-            df_r.style
-            .map(color_pct, subset=['% MTD'])
-            .apply(style_total_row, axis=1)
-            .set_table_styles([
-                {'selector': 'th', 'props': [
-                    ('background-color', '#ffffff'),
-                    ('color', '#9b2c2c'),
-                    ('font-weight', 'bold'),
-                    ('text-align', 'center'),
-                    ('border', '2px solid #000000')
-                ]},
-                {'selector': 'td', 'props': [
-                    ('border', '1px solid #000000')
-                ]},
-                {'selector': 'table', 'props': [
-                    ('border-collapse', 'collapse'),
-                    ('border', '3px solid #000000')
-                ]}
-            ])
-        )
-        h_kpi = (len(df_r) + 1) * 35 + 2
-        st.dataframe(styled, use_container_width=True, hide_index=True, height=h_kpi)
+        html_table = render_html_table(df_r)
+        st.markdown(html_table, unsafe_allow_html=True)
 
         top3 = df_r.iloc[:-1].head(3)
         bottom3 = df_r.iloc[:-1].tail(3)
@@ -440,28 +462,8 @@ with tab_kpi:
         c3.metric("Ngày OFF", f"+{ngay_off}")
         c4.metric("Ngày ON", f"+{ngay_on}")
 
-        styled_c = (
-            df_combo.style
-            .apply(style_total_row, axis=1)
-            .set_table_styles([
-                {'selector': 'th', 'props': [
-                    ('background-color', '#ffffff'),
-                    ('color', '#9b2c2c'),
-                    ('font-weight', 'bold'),
-                    ('text-align', 'center'),
-                    ('border', '2px solid #000000')
-                ]},
-                {'selector': 'td', 'props': [
-                    ('border', '1px solid #000000')
-                ]},
-                {'selector': 'table', 'props': [
-                    ('border-collapse', 'collapse'),
-                    ('border', '3px solid #000000')
-                ]}
-            ])
-        )
-        h_combo = (len(df_combo) + 1) * 35 + 2
-        st.dataframe(styled_c, use_container_width=True, hide_index=True, height=h_combo)
+        html_table_combo = render_html_table(df_combo)
+        st.markdown(html_table_combo, unsafe_allow_html=True)
 
 # ----- TAB MCP -----
 with tab_mcp:
