@@ -312,6 +312,285 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
     team_tgt = int(df_out['Chỉ Tiêu KPI'].sum()) if not df_out.empty else 0
     total_pct = round(total_mtd/team_tgt*100, 1) if team_tgt else 0
 
+    t_name = 'SS Trương Thanh Tân Total' if filter_nv == "Tất cả ĐDKD" else filter_nv
+    total_row = pd.DataFramest.markdown("""
+<style>
+    .main-header {
+        background: linear-gradient(90deg, #1a365d 0%, #2b6cb0 100%);
+        color: white;
+        padding: 10px 16px;
+        border-radius: 10px;
+        margin-bottom: 12px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .main-header .logo {
+        flex-shrink: 0;
+        background: white;
+        border-radius: 6px;
+        padding: 4px 8px;
+        display: flex;
+        align-items: center;
+    }
+    .main-header .title-block { flex: 1; text-align: center; }
+    .main-header h1 {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        line-height: 1.2;
+    }
+    .main-header h2 {
+        margin: 4px 0 0 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: #fefcbf;
+        letter-spacing: 0.3px;
+    }
+    
+    @media (max-width: 768px) {
+        .main-header {
+            flex-direction: column;
+            text-align: center;
+            padding: 10px;
+        }
+        .main-header h1 { font-size: 18px; }
+        .main-header h2 { font-size: 12px; }
+    }
+
+    .filter-label {
+        font-weight: 700 !important;
+        color: #c53030 !important;
+        font-size: 12px !important;
+        margin-bottom: 2px;
+    }
+
+    .note-box {
+        background: #ebf8ff;
+        border-left: 4px solid #3182ce;
+        padding: 10px 14px;
+        border-radius: 0 6px 6px 0;
+        margin-top: 12px;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+    #MainMenu, footer, header {visibility: hidden;}
+    
+    .custom-kpi-table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid #e2e8f0 !important;
+        font-family: sans-serif;
+        font-size: 13px;
+        background-color: #ffffff;
+    }
+    .custom-kpi-table th {
+        background-color: #ffffff !important;
+        color: #9b2c2c !important;
+        font-weight: bold !important;
+        text-align: center !important;
+        border: 1px solid #e2e8f0 !important;
+        padding: 6px;
+    }
+    .custom-kpi-table td {
+        border: 1px solid #e2e8f0 !important;
+        padding: 5px 6px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+def render_metric_card(label, value):
+    st.markdown(f"""
+    <div style="background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 8px; padding: 10px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.04); margin-bottom: 8px;">
+        <div style="color: #c53030; font-weight: 800; font-size: 1.1rem; margin-bottom: 4px;">{label}</div>
+        <div style="color: #c53030; font-weight: 800; font-size: 2rem;">{value}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ====================== ĐƯỜNG DẪN ======================
+DATA_DIR = "data"
+RPT_PATH   = os.path.join(DATA_DIR, "RPT_061.xlsx")
+MCP_PATH   = os.path.join(DATA_DIR, "Data_MCP.xlsx")
+KPI_PATH   = os.path.join(DATA_DIR, "Target_KPI.xlsx")
+CAT_PATH   = os.path.join(DATA_DIR, "Data_Cat.xlsx")
+BRAND_PATH = os.path.join(DATA_DIR, "Data_Brand.xlsx")
+
+# ====================== LOAD ======================
+@st.cache_data(ttl=600)
+def load_main_data():
+    if not os.path.exists(RPT_PATH) or not os.path.exists(MCP_PATH):
+        st.error("Thiếu file RPT_061.xlsx hoặc Data_MCP.xlsx")
+        st.stop()
+    df = pd.read_excel(RPT_PATH)
+    mcp = pd.read_excel(MCP_PATH)
+    df = df[df['Tình trạng đơn hàng'] != 'Đã hủy'].copy()
+    df['Ngày tạo đơn hàng'] = pd.to_datetime(df['Ngày tạo đơn hàng'], format='%d/%m/%Y %H:%M:%S', errors='coerce')
+    df['date'] = df['Ngày tạo đơn hàng'].dt.date
+    mcp_map = mcp[['Outlet_code', 'L1']].drop_duplicates('Outlet_code')
+    mcp_map['Outlet_code'] = mcp_map['Outlet_code'].astype(str)
+    df['Mã CH'] = df['Mã CH'].astype(str)
+    df = df.merge(mcp_map, left_on='Mã CH', right_on='Outlet_code', how='left')
+    df['Tên SP lower'] = df['Tên sản phẩm'].astype(str).str.lower()
+    return df, mcp
+
+@st.cache_data(ttl=600)
+def load_cat_data():
+    for name in ["Data_Cat.xlsx", "data_cat.xlsx"]:
+        path = os.path.join(DATA_DIR, name)
+        if os.path.exists(path):
+            try: return pd.read_excel(path)
+            except: pass
+    return pd.DataFrame()
+
+@st.cache_data(ttl=600)
+def load_brand_data():
+    for name in ["Data_Brand.xlsx", "data_brand.xlsx"]:
+        path = os.path.join(DATA_DIR, name)
+        if os.path.exists(path):
+            try: return pd.read_excel(path)
+            except: pass
+    return pd.DataFrame()
+
+@st.cache_data(ttl=600)
+def get_targets():
+    if not os.path.exists(KPI_PATH): return {}
+    try:
+        kpi = pd.read_excel(KPI_PATH, header=None).iloc[2:]
+        kpi.columns = ['Region','Month','Ship to','Distributor','SUP','SM pos','SM code','SM name',
+                       'Saleteam','KPI type','KPI Name','Target','Thực hiện','% actual','% Contrib','Chưa ra HĐ']
+        kpi = kpi.dropna(subset=['SM code'])
+        kpi['Target'] = pd.to_numeric(kpi['Target'], errors='coerce')
+        targets = {}
+        for _, r in kpi.iterrows():
+            sm, ktype, kname, tgt = str(r['SM code']).strip(), str(r['KPI type']).strip(), str(r['KPI Name']).strip(), r['Target']
+            if pd.isna(tgt): continue
+            ktype_lower, kname_lower = ktype.lower(), kname.lower()
+            
+            if ktype_lower == 'aso_all': 
+                targets.setdefault(sm, {})['ASO_ALL'] = int(tgt)
+            elif ktype_lower == 'pc_bt': 
+                targets.setdefault(sm, {})['PC_BT'] = int(tgt)
+            elif ktype_lower == 'aso_on': 
+                targets.setdefault(sm, {})['ASO_ON'] = int(tgt)
+            elif ktype_lower == 'aso_focus' or 'xanh' in kname_lower: 
+                targets.setdefault(sm, {})['ASO_CHANTE'] = int(tgt)
+            elif ktype_lower == 'aso_focus_2' or 'vàng' in kname_lower or 'trận vàng' in kname_lower: 
+                targets.setdefault(sm, {})['ASO_OMACHI'] = int(tgt)
+        return targets
+    except: return {}
+
+def color_pct_bg(val):
+    try:
+        v = float(str(val).replace('%','').strip())
+        if v >= 70: return 'background-color: #c6f6d5; color:#22543d; font-weight:600;'
+        elif v >= 50: return 'background-color: #fefcbf; color:#744210; font-weight:600;'
+        else: return 'background-color: #fed7d7; color:#742a2a; font-weight:600;'
+    except: return ''
+
+def format_number_vn(x):
+    try:
+        if pd.isnull(x) or str(x).lower() in ["none","nan",""]: return ""
+        return f"{float(x):,.0f}".replace(",", ".")
+    except: return x
+
+def find_col(df, candidates):
+    cols = {c.lower().strip(): c for c in df.columns}
+    for c in candidates:
+        if c.lower() in cols: return cols[c.lower()]
+    return None
+
+def filter_by_thu(df, col_thu, f_thu):
+    if f_thu == "Tất cả các thứ" or not col_thu:
+        return df
+    thu_s = df[col_thu].astype(str).str.strip()
+    if f_thu in ["2", "3", "4", "5", "6", "7"]:
+        mapping = {"2": ["2", "25"], "3": ["3", "36"], "4": ["4", "47"], "5": ["25", "5"], "6": ["36", "6"], "7": ["47", "7"]}
+        valid_set = mapping.get(f_thu, [f_thu])
+        return df[thu_s.isin(valid_set)]
+    elif f_thu == "25":
+        return df[thu_s.isin(["2", "5", "25"])]
+    elif f_thu == "36":
+        return df[thu_s.isin(["3", "6", "36"])]
+    elif f_thu == "47":
+        return df[thu_s.isin(["4", "7", "47"])]
+    return df[thu_s == f_thu]
+
+# ====================== KPI LOGIC CHUẨN ======================
+def build_report(df, report_date, targets, report_type, filter_nv=None):
+    df_mtd = df[df['date'] >= date(report_date.year, report_date.month, 1)].copy()
+    if filter_nv and filter_nv != "Tất cả ĐDKD":
+        df_mtd = df_mtd[df_mtd['Tên NVBH'] == filter_nv]
+    sm_names = df_mtd.groupby('Mã NVBH')['Tên NVBH'].first().to_dict()
+    all_sms = sorted(sm_names.keys())
+
+    if report_type == 'ASO_ALL':
+        off = df_mtd[df_mtd['L1']=='Kênh Off Premise'].copy()
+        mtd = off.groupby('Mã NVBH')['Mã CH'].nunique()
+        first = off.groupby(['Mã NVBH','Mã CH'])['date'].min().reset_index()
+        first.columns = ['Mã NVBH','Mã CH','first_date']
+        ngay = first[first['first_date']==report_date].groupby('Mã NVBH')['Mã CH'].nunique()
+        key, title = 'ASO_ALL', "5. ASO ALL KÊNH OFF"
+
+    elif report_type == 'PC_BT':
+        off = df_mtd[(df_mtd['L1']=='Kênh Off Premise') & ~df_mtd['Sub Division'].astype(str).str.contains('Beer|Bia', case=False, na=False)]
+        lines = off.groupby(['Mã NVBH','Mã đơn hàng'])['Mã sản phẩm'].nunique()
+        mtd = lines[lines>=4].reset_index().groupby('Mã NVBH')['Mã đơn hàng'].nunique()
+        df_today = df[df['date']==report_date]
+        if filter_nv and filter_nv != "Tất cả ĐDKD": df_today = df_today[df_today['Tên NVBH']==filter_nv]
+        off_t = df_today[(df_today['L1']=='Kênh Off Premise') & ~df_today['Sub Division'].astype(str).str.contains('Beer|Bia', case=False, na=False)]
+        lines_t = off_t.groupby(['Mã NVBH','Mã đơn hàng'])['Mã sản phẩm'].nunique()
+        ngay = lines_t[lines_t>=4].reset_index().groupby('Mã NVBH')['Mã đơn hàng'].nunique()
+        key, title = 'PC_BT', "4. PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER)"
+
+    elif report_type == 'ASO_TEA':
+        on = df_mtd[df_mtd['L1']=='Kênh On Premise']
+        tea = on[on['Tên SP lower'].str.contains('tea|trà|ô long|olong|búp non', na=False)].copy()
+        tea['qty'] = pd.to_numeric(tea['Tổng lẻ'], errors='coerce').fillna(0)
+        ch = tea.groupby(['Mã NVBH','Mã CH'])['qty'].sum()
+        mtd = ch[ch>=12].reset_index().groupby('Mã NVBH')['Mã CH'].nunique()
+        df_today = df[df['date']==report_date]
+        if filter_nv and filter_nv != "Tất cả ĐDKD": df_today = df_today[df_today['Tên NVBH']==filter_nv]
+        on_t = df_today[df_today['L1']=='Kênh On Premise']
+        tea_t = on_t[on_t['Tên SP lower'].str.contains('tea|trà|ô long|olong|búp non', na=False)]
+        ngay = tea_t.groupby('Mã NVBH')['Mã CH'].nunique()
+        key, title = 'ASO_ON', "3. ASO TEA KÊNH ON PREMISE"
+
+    elif report_type == 'OMACHI':
+        mask = df_mtd['Tên SP lower'].str.contains('omachi', na=False) & df_mtd['Tên SP lower'].str.contains('trộn|tron|xào|xao', na=False)
+        mtd = df_mtd[mask].groupby('Mã NVBH')['Mã CH'].nunique()
+        first = df_mtd[mask].groupby(['Mã NVBH','Mã CH'])['date'].min().reset_index()
+        first.columns = ['Mã NVBH','Mã CH','first_date']
+        ngay = first[first['first_date']==report_date].groupby('Mã NVBH')['Mã CH'].nunique()
+        key, title = 'ASO_OMACHI', "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN"
+
+    elif report_type == 'CHANTE':
+        mask = df_mtd['Tên SP lower'].str.contains('chanté|chante', na=False)
+        mtd = df_mtd[mask].groupby('Mã NVBH')['Mã CH'].nunique()
+        first = df_mtd[mask].groupby(['Mã NVBH','Mã CH'])['date'].min().reset_index()
+        first.columns = ['Mã NVBH','Mã CH','first_date']
+        ngay = first[first['first_date']==report_date].groupby('Mã NVBH')['Mã CH'].nunique()
+        key, title = 'ASO_CHANTE', "1. ASO FOCUS TOTAL NHÃN CHANTÉ"
+    else:
+        return pd.DataFrame(), 0, ""
+
+    results = []
+    for sm in all_sms:
+        tgt = targets.get(sm, {}).get(key, 0)
+        m = int(mtd.get(sm, 0))
+        n = int(ngay.get(sm, 0))
+        pct = round(m/tgt*100, 1) if tgt else 0
+        results.append({'Mã NVBH':sm, 'Tên NVBH':sm_names.get(sm,''), 'Chỉ Tiêu KPI':tgt, 'Thực Hiện Ngày':n, 'MTD':m, '% MTD':f"{pct}%", '_ratio': (m/tgt if tgt else 0)})
+
+    df_out = pd.DataFrame(results).sort_values('_ratio', ascending=True).drop(columns=['_ratio']).reset_index(drop=True)
+    df_out.insert(0, 'STT', range(1, len(df_out)+1))
+
+    total_ngay = int(df_out['Thực Hiện Ngày'].sum()) if not df_out.empty else 0
+    total_mtd = int(df_out['MTD'].sum()) if not df_out.empty else 0
+    team_tgt = int(df_out['Chỉ Tiêu KPI'].sum()) if not df_out.empty else 0
+    total_pct = round(total_mtd/team_tgt*100, 1) if team_tgt else 0
+
     total_row = pd.DataFrame([{
         'STT': '-', 
         'Mã NVBH': 'TỔNG CỘNG',
