@@ -32,9 +32,15 @@ logo_svg = """
 </svg>
 """
 
-# ====================== CSS ======================
+# ====================== CSS (FORCE LIGHT MODE) ======================
 st.markdown("""
 <style>
+    /* Ép buộc toàn bộ nền app sang màu trắng và chữ tối màu (Light Mode cố định) */
+    .stApp {
+        background-color: #ffffff !important;
+        color: #1a202c !important;
+    }
+    
     .main-header {
         background: linear-gradient(90deg, #1a365d 0%, #2b6cb0 100%);
         color: white;
@@ -95,6 +101,7 @@ st.markdown("""
         margin-top: 12px;
         font-size: 13px;
         line-height: 1.5;
+        color: #2d3748;
     }
     #MainMenu, footer, header {visibility: hidden;}
     
@@ -117,6 +124,7 @@ st.markdown("""
     .custom-kpi-table td {
         border: 1px solid #e2e8f0 !important;
         padding: 5px 6px;
+        color: #2d3748;
     }
 </style>
 """, unsafe_allow_html=True)
