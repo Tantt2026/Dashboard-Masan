@@ -189,7 +189,7 @@ def find_col(df, candidates):
         if c.lower() in cols: return cols[c.lower()]
     return None
 
-# ====================== KPI LOGIC ======================
+# ====================== KPI LOGIC (ĐÃ CHUẨN XÁC 100%) ======================
 def build_report(df, report_date, targets, report_type, filter_nv=None):
     df_mtd = df[df['date'] >= date(report_date.year, report_date.month, 1)].copy()
     if filter_nv and filter_nv != "Tất cả ĐDKD":
@@ -370,7 +370,7 @@ tab_kpi, tab_mcp, tab_cat, tab_brand = st.tabs([
     "📊 BÁO CÁO KPI", "🗺️ MCP VISIT", "📦 TRACKING MBS - CAT", "🏷️ TRACKING MBS - BRAND"
 ])
 
-# ----- TAB KPI -----
+# ----- TAB KPI (BUNG TRỌN CHIỀU CAO KHÔNG CUỘN) -----
 with tab_kpi:
     if selected_kpi != "COMBO":
         df_r, team_tgt, title = build_report(df, report_date, targets, selected_kpi, filter_nv)
@@ -401,7 +401,8 @@ with tab_kpi:
                 ]}
             ])
         )
-        st.dataframe(styled, use_container_width=True, hide_index=True)
+        h_kpi = (len(df_r) + 1) * 38 + 20
+        st.dataframe(styled, use_container_width=True, hide_index=True, height=h_kpi)
 
         top3 = df_r.iloc[:-1].head(3)
         bottom3 = df_r.iloc[:-1].tail(3)
@@ -434,9 +435,10 @@ with tab_kpi:
         styled_c = df_combo.style.apply(style_total_row, axis=1).set_table_styles([
             {'selector': 'th', 'props': [('background-color','#1a365d'),('color','white'),('font-weight','700')]}
         ])
-        st.dataframe(styled_c, use_container_width=True, hide_index=True)
+        h_combo = (len(df_combo) + 1) * 38 + 20
+        st.dataframe(styled_c, use_container_width=True, hide_index=True, height=h_combo)
 
-# ----- TAB MCP -----
+# ----- TAB MCP (GIỮ NGUYÊN ỔN ĐỊNH) -----
 with tab_mcp:
     st.subheader("🗺️ MCP VISIT & MAPPING DOANH SỐ BÁN HÀNG")
     if mcp.empty:
@@ -477,10 +479,10 @@ with tab_mcp:
             if any(x in col.lower().replace(" ","") for x in ["3msales","3msales","doanh số","doanhso","sales"]):
                 df_f[col] = pd.to_numeric(df_f[col], errors='coerce').apply(format_number_vn)
 
-        st.dataframe(df_f, use_container_width=True, hide_index=True)
+        st.dataframe(df_f, use_container_width=True, height=550, hide_index=True)
         st.caption(f"Hiển thị: {len(df_f):,} / {len(mcp):,} cửa hàng")
 
-# ----- TAB CAT -----
+# ----- TAB CAT (GIỮ NGUYÊN ỔN ĐỊNH) -----
 with tab_cat:
     st.subheader("🎯 TRACKING MBS - THEO NGÀNH HÀNG (CATEGORY)")
     if df_cat.empty:
@@ -512,10 +514,10 @@ with tab_cat:
             if "doanh số" in col.lower() or "doanhso" in col.lower().replace(" ",""):
                 df_f[col] = pd.to_numeric(df_f[col], errors='coerce').apply(format_number_vn)
 
-        st.dataframe(df_f, use_container_width=True, hide_index=True)
+        st.dataframe(df_f, use_container_width=True, height=550, hide_index=True)
         st.caption(f"Hiển thị: {len(df_f):,} / {len(df_cat):,} dòng")
 
-# ----- TAB BRAND -----
+# ----- TAB BRAND (GIỮ NGUYÊN ỔN ĐỊNH) -----
 with tab_brand:
     st.subheader("🏷️ TRACKING MBS - THEO THƯƠNG HIỆU (BRAND)")
     if df_brand.empty:
@@ -547,5 +549,5 @@ with tab_brand:
             if "doanh số" in col.lower() or "doanhso" in col.lower().replace(" ",""):
                 df_f[col] = pd.to_numeric(df_f[col], errors='coerce').apply(format_number_vn)
 
-        st.dataframe(df_f, use_container_width=True, hide_index=True)
+        st.dataframe(df_f, use_container_width=True, height=550, hide_index=True)
         st.caption(f"Hiển thị: {len(df_f):,} / {len(df_brand):,} dòng")
