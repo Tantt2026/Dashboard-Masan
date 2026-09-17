@@ -196,7 +196,8 @@ def get_targets():
                 targets.setdefault(sm, {})['ASO_ON'] = int(tgt)
             elif ktype == 'ASO_Focus' and 'xanh' in kname_lower: 
                 targets.setdefault(sm, {})['ASO_CHANTE'] = int(tgt)
-            elif ktype == 'ASO_Focus' and ('vàng' in kname_lower or 'omachi' in kname_lower or 'trộn' in kname_lower): 
+            elif ktype == 'ASO_Focus': 
+                # Bắt tất cả các loại ASO_Focus còn lại (Trận vàng / Trộn / YTG vàng)
                 targets.setdefault(sm, {})['ASO_OMACHI'] = int(tgt)
         return targets
     except: return {}
