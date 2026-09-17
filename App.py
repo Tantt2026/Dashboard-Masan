@@ -281,7 +281,7 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
 
     results = []
     for sm in all_sms:
-        # Vlookup target từ file Target_KPI theo Mã NVBH (sm)
+        # Vlookup chuẩn Target từ file Target_KPI theo Mã NVBH (sm)
         tgt = targets.get(sm, {}).get(key, 0)
         m = int(mtd.get(sm, 0))
         n = int(ngay.get(sm, 0))
