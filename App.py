@@ -97,7 +97,9 @@ st.markdown("""
     }
     div[data-testid="stMetricLabel"] > div {
         text-align: center !important;
-        font-weight: 700 !important;
+        color: #c53030 !important;
+        font-weight: 800 !important;
+        font-size: 1.3rem !important;
     }
 
     .note-box {
