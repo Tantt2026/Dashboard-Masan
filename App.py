@@ -265,9 +265,10 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
         m = int(mtd.get(sm, 0))
         n = int(ngay.get(sm, 0))
         pct = round(m/tgt*100, 1) if tgt else 0
-        results.append({'Mã NVBH':sm, 'Tên NVBH':sm_names.get(sm,''), 'Chỉ Tiêu KPI':tgt, 'Thực Hiện Ngày':n, 'MTD':m, '% MTD':f"{pct}%"})
+        results.append({'Mã NVBH':sm, 'Tên NVBH':sm_names.get(sm,''), 'Chỉ Tiêu KPI':tgt, 'Thực Hiện Ngày':n, 'MTD':m, '% MTD':f"{pct}%", '_ratio': (m/tgt if tgt else 0)})
 
-    df_out = pd.DataFrame(results).sort_values('MTD', ascending=False).reset_index(drop=True)
+    # SORT BY % MTD ASCENDING (THẤP ĐẾN CAO)
+    df_out = pd.DataFrame(results).sort_values('_ratio', ascending=True).drop(columns=['_ratio']).reset_index(drop=True)
     df_out.insert(0, 'STT', range(1, len(df_out)+1))
 
     total_ngay = int(df_out['Thực Hiện Ngày'].sum()) if not df_out.empty else 0
