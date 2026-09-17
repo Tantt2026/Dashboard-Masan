@@ -551,23 +551,35 @@ with tab_cat:
         col_nv = find_col(df_cat, ['SM Name','SM name','Tên NVBH','Nhân viên'])
         col_ma = find_col(df_cat, ['Outlet Code','Outlet_code','Mã CH','Mã khách hàng'])
         col_ten = find_col(df_cat, ['Outlet Name','Outlet_name','Tên CH','Tên khách hàng'])
+        col_thu = find_col(df_cat, ['Thứ'])
 
-        c1,c2 = st.columns(2)
+        c1, c2 = st.columns(2)
         with c1:
             st.markdown('<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD)</p>', unsafe_allow_html=True)
             nv_opts = ["Tất cả ĐDKD"] + (sorted(df_cat[col_nv].dropna().astype(str).unique().tolist()) if col_nv else [])
             f_nv = st.selectbox("", nv_opts, key="cat_nv", label_visibility="collapsed")
         with c2:
+            st.markdown('<p class="filter-label">📅 Lọc Theo Thứ</p>', unsafe_allow_html=True)
+            f_thu = st.selectbox("", ["Tất cả các thứ","2","3","4","5","6","7","25","36","47"], key="cat_thu", label_visibility="collapsed")
+
+        c3, c4 = st.columns(2)
+        with c3:
             st.markdown('<p class="filter-label">🆔 Lọc Mã Khách Hàng</p>', unsafe_allow_html=True)
             f_ma = st.text_input("", key="cat_ma", label_visibility="collapsed")
-
-        st.markdown('<p class="filter-label">🏪 Lọc Tên Khách Hàng</p>', unsafe_allow_html=True)
-        f_ten = st.text_input("", key="cat_ten", label_visibility="collapsed")
+        with c4:
+            st.markdown('<p class="filter-label">🏪 Lọc Tên Khách Hàng</p>', unsafe_allow_html=True)
+            f_ten = st.text_input("", key="cat_ten", label_visibility="collapsed")
 
         df_f = df_cat.copy()
         if f_nv != "Tất cả ĐDKD" and col_nv: df_f = df_f[df_f[col_nv].astype(str)==f_nv]
         if f_ma and col_ma: df_f = df_f[df_f[col_ma].astype(str).str.contains(f_ma, case=False, na=False)]
         if f_ten and col_ten: df_f = df_f[df_f[col_ten].astype(str).str.contains(f_ten, case=False, na=False)]
+        if f_thu != "Tất cả các thứ" and col_thu:
+            thu_s = df_f[col_thu].astype(str).str.strip()
+            if f_thu in ["2","3","4","5","6","7"]: df_f = df_f[thu_s==f_thu]
+            elif f_thu=="25": df_f = df_f[thu_s.isin(["2","5","25"])]
+            elif f_thu=="36": df_f = df_f[thu_s.isin(["3","6","36"])]
+            elif f_thu=="47": df_f = df_f[thu_s.isin(["4","7","47"])]
 
         for col in df_f.columns:
             if "doanh số" in col.lower() or "doanhso" in col.lower().replace(" ",""):
@@ -585,23 +597,35 @@ with tab_brand:
         col_nv = find_col(df_brand, ['SM Name','SM name','Tên NVBH','Nhân viên'])
         col_ma = find_col(df_brand, ['Outlet Code','Outlet_code','Mã CH','Mã khách hàng'])
         col_ten = find_col(df_brand, ['Outlet Name','Outlet_name','Tên CH','Tên khách hàng'])
+        col_thu = find_col(df_brand, ['Thứ'])
 
-        c1,c2 = st.columns(2)
+        c1, c2 = st.columns(2)
         with c1:
             st.markdown('<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD)</p>', unsafe_allow_html=True)
             nv_opts = ["Tất cả ĐDKD"] + (sorted(df_brand[col_nv].dropna().astype(str).unique().tolist()) if col_nv else [])
             f_nv = st.selectbox("", nv_opts, key="brand_nv", label_visibility="collapsed")
         with c2:
+            st.markdown('<p class="filter-label">📅 Lọc Theo Thứ</p>', unsafe_allow_html=True)
+            f_thu = st.selectbox("", ["Tất cả các thứ","2","3","4","5","6","7","25","36","47"], key="brand_thu", label_visibility="collapsed")
+
+        c3, c4 = st.columns(2)
+        with c3:
             st.markdown('<p class="filter-label">🆔 Lọc Mã Khách Hàng</p>', unsafe_allow_html=True)
             f_ma = st.text_input("", key="brand_ma", label_visibility="collapsed")
-
-        st.markdown('<p class="filter-label">🏪 Lọc Tên Khách Hàng</p>', unsafe_allow_html=True)
-        f_ten = st.text_input("", key="brand_ten", label_visibility="collapsed")
+        with c4:
+            st.markdown('<p class="filter-label">🏪 Lọc Tên Khách Hàng</p>', unsafe_allow_html=True)
+            f_ten = st.text_input("", key="brand_ten", label_visibility="collapsed")
 
         df_f = df_brand.copy()
         if f_nv != "Tất cả ĐDKD" and col_nv: df_f = df_f[df_f[col_nv].astype(str)==f_nv]
         if f_ma and col_ma: df_f = df_f[df_f[col_ma].astype(str).str.contains(f_ma, case=False, na=False)]
         if f_ten and col_ten: df_f = df_f[df_f[col_ten].astype(str).str.contains(f_ten, case=False, na=False)]
+        if f_thu != "Tất cả các thứ" and col_thu:
+            thu_s = df_f[col_thu].astype(str).str.strip()
+            if f_thu in ["2","3","4","5","6","7"]: df_f = df_f[thu_s==f_thu]
+            elif f_thu=="25": df_f = df_f[thu_s.isin(["2","5","25"])]
+            elif f_thu=="36": df_f = df_f[thu_s.isin(["3","6","36"])]
+            elif f_thu=="47": df_f = df_f[thu_s.isin(["4","7","47"])]
 
         for col in df_f.columns:
             if "doanh số" in col.lower() or "doanhso" in col.lower().replace(" ",""):
