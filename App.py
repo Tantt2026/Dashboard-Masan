@@ -7,8 +7,7 @@ import os
 st.set_page_config(
     page_title="TRACKING KPI ĐDKD - SS Trương Thanh Tân",
     page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="collapsed"
+    layout="wide"
 )
 
 # ====================== LOGO ======================
@@ -189,7 +188,6 @@ def get_targets():
             if pd.isna(tgt): continue
             ktype_lower, kname_lower = ktype.lower(), kname.lower()
             
-            # Map chuẩn xác theo file Excel Target_KPI thực tế
             if ktype_lower == 'aso_all': 
                 targets.setdefault(sm, {})['ASO_ALL'] = int(tgt)
             elif ktype_lower == 'pc_bt': 
@@ -385,20 +383,23 @@ def render_html_table(df):
     html.append('</table></div>')
     return "".join(html)
 
+# ====================== SIDEBAR & SETTINGS ======================
+with st.sidebar:
+    st.markdown("### ⚙️ CÀI ĐẶT HỆ THỐNG")
+    if st.button("🔄 Xóa Cache & Reload Data"):
+        st.cache_data.clear()
+        st.rerun()
+
 # ====================== GIAO DIỆN ======================
 st.markdown(f"""
 <div class="main-header">
     <div class="logo">{logo_svg}</div>
     <div class="title-block">
         <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</h1>
-        <h2>TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN </h2>
+        <h2>TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN TOTAL</h2>
     </div>
 </div>
 """, unsafe_allow_html=True)
-
-if st.sidebar.button("🔄 Xóa Cache & Reload Data"):
-    st.cache_data.clear()
-    st.rerun()
 
 with st.spinner("Đang tải dữ liệu..."):
     df, mcp = load_main_data()
