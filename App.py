@@ -96,6 +96,12 @@ st.markdown("""
         line-height: 1.5;
     }
     
+    /* Ép style cho nút popover (chọn cột hiển thị) thành màu đỏ và đậm */
+    [data-testid="stPopover"] button {
+        color: #c53030 !important;
+        font-weight: 700 !important;
+    }
+    
     footer {visibility: hidden;}
     #MainMenu, header {visibility: visible !important;}
     
@@ -727,7 +733,6 @@ with tab_mcp:
         else:
             default_cols_mcp = all_cols_mcp
 
-        # Nút con mắt popover thu gọn bảng chọn cột
         with st.popover("👁️ Chọn cột hiển thị (MCP)", use_container_width=False):
             selected_mcp_cols = st.multiselect("Bỏ chọn để ẩn cột:", all_cols_mcp, default=default_cols_mcp, key="mcp_cols_input")
         st.query_params["mcp_cols"] = ",".join(selected_mcp_cols)
@@ -842,7 +847,7 @@ with tab_brand:
         st.query_params["brand_nv"] = st.session_state.brand_nv_input
         st.query_params["brand_thu"] = st.session_state.brand_thu_input
         st.query_params["brand_ma"] = st.session_state.brand_ma_input
-        st.query_params["brand_ten"] = st.session_state.brand_brand_input if "brand_brand_input" in st.session_state else st.session_state.brand_ten_input
+        st.query_params["brand_ten"] = st.session_state.brand_ten_input
 
         df_f = df_brand.copy()
         if f_nv != "Tất cả ĐDKD" and col_nv: df_f = df_f[df_f[col_nv].astype(str)==f_nv]
