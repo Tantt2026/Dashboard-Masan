@@ -5,7 +5,7 @@ from datetime import date
 import os
 
 st.set_page_config(
-    page_title="TRACKING KPI ĐDKD - SS Nguyễn Thị Tường Vy",
+    page_title="TRACKING KPI ĐDKD - SS Trương Thanh Tân",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -98,7 +98,7 @@ st.markdown("""
         line-height: 1.5;
     }
     
-    /* Chỉ ẩn menu hamburger và footer, GIỮ LẠI header để hiển thị các nút setting, theme, rerun */
+    /* Chỉ ẩn menu hamburger và footer, giữ lại header/toolbar để hiển thị nút cài đặt giao diện (Theme Sáng/Tối) */
     #MainMenu, footer {visibility: hidden;}
     
     .custom-kpi-table {
@@ -139,15 +139,6 @@ MCP_PATH   = os.path.join(DATA_DIR, "Data_MCP.xlsx")
 KPI_PATH   = os.path.join(DATA_DIR, "Target_KPI.xlsx")
 CAT_PATH   = os.path.join(DATA_DIR, "Data_Cat.xlsx")
 BRAND_PATH = os.path.join(DATA_DIR, "Data_Brand.xlsx")
-
-# ====================== ĐOẠN DEBUG KIỂM TRA FILE ======================
-with st.expander("🛠️ BẢNG ĐIỀU KHIỂN DEBUG ĐƯỜNG DẪN & FILE (Bấm để mở)", expanded=False):
-    st.write("Kiểm tra thư mục data:", os.listdir(DATA_DIR) if os.path.exists(DATA_DIR) else "Thư mục data không tồn tại!")
-    st.write("File RPT tồn tại không?:", os.path.exists(RPT_PATH), f"({RPT_PATH})")
-    st.write("File MCP tồn tại không?:", os.path.exists(MCP_PATH), f"({MCP_PATH})")
-    st.write("File KPI tồn tại không?:", os.path.exists(KPI_PATH), f"({KPI_PATH})")
-    st.write("File Cat tồn tại không?:", os.path.exists(CAT_PATH), f"({CAT_PATH})")
-    st.write("File Brand tồn tại không?:", os.path.exists(BRAND_PATH), f"({BRAND_PATH})")
 
 # ====================== LOAD ======================
 @st.cache_data(ttl=600)
@@ -460,7 +451,7 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
     total_pct = round(total_mtd/team_tgt*100, 1) if team_tgt else 0
 
     total_row = pd.DataFrame([{'STT':'-', 'Mã NVBH':'TỔNG CỘNG',
-        'Tên NVBH':'SS Nguyễn Thị Tường Vy Total' if filter_nv=="Tất cả ĐDKD" else filter_nv,
+        'Tên NVBH':'Trương Thanh Tân Total' if filter_nv=="Tất cả ĐDKD" else filter_nv,
         'Chỉ Tiêu KPI': team_tgt,
         'Thực Hiện Ngày':total_ngay, 'MTD':total_mtd, '% MTD':f"{total_pct}%"}])
     return pd.concat([df_out, total_row], ignore_index=True), team_tgt, title
@@ -504,7 +495,7 @@ def build_combo(df, report_date, filter_nv=None):
     df_out = pd.DataFrame(rows).sort_values('MTD (OFF)', ascending=False).reset_index(drop=True)
     df_out.insert(0, 'STT', range(1, len(df_out)+1))
     total_row = pd.DataFrame([{'STT':'-', 'Mã NVBH':'TỔNG CỘNG',
-        'Tên NVBH':'SS Nguyễn Thị Tường Vy Total' if filter_nv=="Tất cả ĐDKD" else filter_nv,
+        'Tên NVBH':'Trương Thanh Tân Total' if filter_nv=="Tất cả ĐDKD" else filter_nv,
         'Phát sinh Ngày (OFF)':int(df_out['Phát sinh Ngày (OFF)'].sum()) if not df_out.empty else 0,
         'MTD (OFF)':int(df_out['MTD (OFF)'].sum()) if not df_out.empty else 0,
         'Phát sinh Ngày (ON)':int(df_out['Phát sinh Ngày (ON)'].sum()) if not df_out.empty else 0,
@@ -553,7 +544,7 @@ st.markdown(f"""
     <div class="logo">{logo_svg}</div>
     <div class="title-block">
         <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 11</h1>
-        <h2>TRACKING KPI ĐDKD - TEAM SS NGUYỄN THỊ TƯỜNG VY</h2>
+        <h2>TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN</h2>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -602,7 +593,7 @@ with f3:
 f4, f5 = st.columns([1, 1])
 with f4:
     st.markdown('<p class="filter-label">SALE SUP</p>', unsafe_allow_html=True)
-    st.selectbox("", ["Nguyễn Thị Tường Vy Total"], key="sup", label_visibility="collapsed")
+    st.selectbox("", ["Trương Thanh Tân Total"], key="sup", label_visibility="collapsed")
 with f5:
     st.markdown('<p class="filter-label">ĐDKD (Nhân viên)</p>', unsafe_allow_html=True)
     filter_nv = st.selectbox("", nv_list, key="ddkd", label_visibility="collapsed")
