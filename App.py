@@ -5,7 +5,7 @@ from datetime import date
 import os
 
 st.set_page_config(
-    page_title="TRACKING KPI ĐDKD - SS Trương Thanh Tân",
+    page_title="TRACKING KPI ĐDKD - SS Nguyễn Thị Tường Vy",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -97,7 +97,9 @@ st.markdown("""
         font-size: 13px;
         line-height: 1.5;
     }
-    #MainMenu, footer, header {visibility: hidden;}
+    
+    /* Chỉ ẩn menu hamburger và footer, GIỮ LẠI header để hiển thị các nút setting, theme, rerun */
+    #MainMenu, footer {visibility: hidden;}
     
     .custom-kpi-table {
         width: 100%;
@@ -137,6 +139,15 @@ MCP_PATH   = os.path.join(DATA_DIR, "Data_MCP.xlsx")
 KPI_PATH   = os.path.join(DATA_DIR, "Target_KPI.xlsx")
 CAT_PATH   = os.path.join(DATA_DIR, "Data_Cat.xlsx")
 BRAND_PATH = os.path.join(DATA_DIR, "Data_Brand.xlsx")
+
+# ====================== ĐOẠN DEBUG KIỂM TRA FILE ======================
+with st.expander("🛠️ BẢNG ĐIỀU KHIỂN DEBUG ĐƯỜNG DẪN & FILE (Bấm để mở)", expanded=False):
+    st.write("Kiểm tra thư mục data:", os.listdir(DATA_DIR) if os.path.exists(DATA_DIR) else "Thư mục data không tồn tại!")
+    st.write("File RPT tồn tại không?:", os.path.exists(RPT_PATH), f"({RPT_PATH})")
+    st.write("File MCP tồn tại không?:", os.path.exists(MCP_PATH), f"({MCP_PATH})")
+    st.write("File KPI tồn tại không?:", os.path.exists(KPI_PATH), f"({KPI_PATH})")
+    st.write("File Cat tồn tại không?:", os.path.exists(CAT_PATH), f"({CAT_PATH})")
+    st.write("File Brand tồn tại không?:", os.path.exists(BRAND_PATH), f"({BRAND_PATH})")
 
 # ====================== LOAD ======================
 @st.cache_data(ttl=600)
@@ -238,9 +249,8 @@ def filter_by_thu(df, col_thu, f_thu):
         return df[thu_s.isin(["4", "7", "47"])]
     return df[thu_s == f_thu]
 
-# ====================== HÀM XỬ LÝ DOANH SỐ MTD CHO MCP, CAT, BRAND ======================
+# ====================== HÀM XỬ LÝ DOANH SỐ MTD CHO 3 TAB (MCP, CAT, BRAND) ======================
 def process_mcp_sales(df_rpt, df_mcp):
-    """Rule chạy báo cáo File Data_MCP.xlsx"""
     if df_mcp.empty or df_rpt.empty: return df_mcp
     valid_df = df_rpt[df_rpt['Tình trạng đơn hàng'] != 'Đã hủy'].copy()
     val_col = find_col(valid_df, ['Tổng tiền', 'Giá trị sau CK', 'Doanh thu']) or 'Tổng tiền'
@@ -264,7 +274,6 @@ def process_mcp_sales(df_rpt, df_mcp):
     return df_out.drop(columns=drop_cols)
 
 def process_cat_sales(df_rpt, df_cat):
-    """Rule chạy báo cáo File Data_Cat.xlsx"""
     if df_cat.empty or df_rpt.empty: return df_cat
     
     sub_map = {
@@ -290,12 +299,10 @@ def process_cat_sales(df_rpt, df_cat):
         
     df_clean['Mã CH_str'] = df_clean['Mã CH'].astype(str).str.strip()
     
-    # 1. Doanh số thực đạt của CAT (Loại trừ đơn hàng 'Đã hủy')
     df_valid = df_clean[df_clean[status_col] != 'Đã hủy'] if status_col else df_clean
     agg_cat1 = df_valid.groupby(['Mã CH_str', 'Mapped_Cat'])[val_col].sum().reset_index()
     agg_cat1.columns = ['Outlet_key', 'Cat_Key', 'Val1']
     
-    # 2. Doanh số thực đạt của CAT (Not Cancel/Pending - Chỉ lấy đơn 'Đã đóng')
     df_closed = df_clean[df_clean[status_col] == 'Đã đóng'] if status_col else df_clean
     agg_cat2 = df_closed.groupby(['Mã CH_str', 'Mapped_Cat'])[val_col].sum().reset_index()
     agg_cat2.columns = ['Outlet_key', 'Cat_Key', 'Val2']
@@ -324,7 +331,6 @@ def process_cat_sales(df_rpt, df_cat):
     return df_out.drop(columns=drop_cols)
 
 def process_brand_sales(df_rpt, df_brand):
-    """Rule chạy báo cáo File Data_Brand.xlsx"""
     if df_brand.empty or df_rpt.empty: return df_brand
     
     brands_list = [
@@ -348,12 +354,10 @@ def process_brand_sales(df_rpt, df_brand):
     df_clean['Mapped_Brand'] = df_clean[sku_col].apply(match_brand)
     df_clean['Mã CH_str'] = df_clean['Mã CH'].astype(str).str.strip()
     
-    # 1. Doanh số thực đạt của brand (Loại trừ đơn hàng 'Đã hủy')
     df_valid = df_clean[df_clean[status_col] != 'Đã hủy'] if status_col else df_clean
     agg_b1 = df_valid.groupby(['Mã CH_str', 'Mapped_Brand'])[val_col].sum().reset_index()
     agg_b1.columns = ['Outlet_key', 'Brand_Key', 'Val1']
     
-    # 2. Doanh số thực đạt của brand (Not Cancel/Pending - Chỉ lấy đơn 'Đã đóng')
     df_closed = df_clean[df_clean[status_col] == 'Đã đóng'] if status_col else df_clean
     agg_b2 = df_closed.groupby(['Mã CH_str', 'Mapped_Brand'])[val_col].sum().reset_index()
     agg_b2.columns = ['Outlet_key', 'Brand_Key', 'Val2']
@@ -455,15 +459,10 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
     team_tgt = int(df_out['Chỉ Tiêu KPI'].sum()) if not df_out.empty else 0
     total_pct = round(total_mtd/team_tgt*100, 1) if team_tgt else 0
 
-    total_row = pd.DataFrame([{
-        'STT': '-',
-        'Mã NVBH': 'TỔNG CỘNG',
-        'Tên NVBH': 'SS Trương Thanh Tân Total' if filter_nv == "Tất cả ĐDKD" else filter_nv,
+    total_row = pd.DataFrame([{'STT':'-', 'Mã NVBH':'TỔNG CỘNG',
+        'Tên NVBH':'SS Nguyễn Thị Tường Vy Total' if filter_nv=="Tất cả ĐDKD" else filter_nv,
         'Chỉ Tiêu KPI': team_tgt,
-        'Thực Hiện Ngày': total_ngay,
-        'MTD': total_mtd,
-        '% MTD': f"{total_pct}%"
-    }])
+        'Thực Hiện Ngày':total_ngay, 'MTD':total_mtd, '% MTD':f"{total_pct}%"}])
     return pd.concat([df_out, total_row], ignore_index=True), team_tgt, title
 
 def build_combo(df, report_date, filter_nv=None):
@@ -499,26 +498,17 @@ def build_combo(df, report_date, filter_nv=None):
 
     rows = []
     for sm in all_sms:
-        rows.append({
-            'Mã NVBH': sm,
-            'Tên NVBH': sm_names.get(sm,''),
-            'Phát sinh Ngày (OFF)': int(off_ngay.get(sm,0)),
-            'MTD (OFF)': int(off_mtd.get(sm,0)),
-            'Phát sinh Ngày (ON)': int(on_ngay.get(sm,0)),
-            'MTD (ON)': int(on_mtd.get(sm,0))
-        })
+        rows.append({'Mã NVBH':sm, 'Tên NVBH':sm_names.get(sm,''),
+            'Phát sinh Ngày (OFF)':int(off_ngay.get(sm,0)), 'MTD (OFF)':int(off_mtd.get(sm,0)),
+            'Phát sinh Ngày (ON)':int(on_ngay.get(sm,0)), 'MTD (ON)':int(on_mtd.get(sm,0))})
     df_out = pd.DataFrame(rows).sort_values('MTD (OFF)', ascending=False).reset_index(drop=True)
     df_out.insert(0, 'STT', range(1, len(df_out)+1))
-
-    total_row = pd.DataFrame([{
-        'STT': '-',
-        'Mã NVBH': 'TỔNG CỘNG',
-        'Tên NVBH': 'SS Trương Thanh Tân Total' if filter_nv == "Tất cả ĐDKD" else filter_nv,
-        'Phát sinh Ngày (OFF)': int(df_out['Phát sinh Ngày (OFF)'].sum()) if not df_out.empty else 0,
-        'MTD (OFF)': int(df_out['MTD (OFF)'].sum()) if not df_out.empty else 0,
-        'Phát sinh Ngày (ON)': int(df_out['Phát sinh Ngày (ON)'].sum()) if not df_out.empty else 0,
-        'MTD (ON)': int(df_out['MTD (ON)'].sum()) if not df_out.empty else 0
-    }])
+    total_row = pd.DataFrame([{'STT':'-', 'Mã NVBH':'TỔNG CỘNG',
+        'Tên NVBH':'SS Nguyễn Thị Tường Vy Total' if filter_nv=="Tất cả ĐDKD" else filter_nv,
+        'Phát sinh Ngày (OFF)':int(df_out['Phát sinh Ngày (OFF)'].sum()) if not df_out.empty else 0,
+        'MTD (OFF)':int(df_out['MTD (OFF)'].sum()) if not df_out.empty else 0,
+        'Phát sinh Ngày (ON)':int(df_out['Phát sinh Ngày (ON)'].sum()) if not df_out.empty else 0,
+        'MTD (ON)':int(df_out['MTD (ON)'].sum()) if not df_out.empty else 0}])
     return pd.concat([df_out, total_row], ignore_index=True)
 
 def render_html_table(df):
@@ -562,8 +552,8 @@ st.markdown(f"""
 <div class="main-header">
     <div class="logo">{logo_svg}</div>
     <div class="title-block">
-        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</h1>
-        <h2>TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN</h2>
+        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 11</h1>
+        <h2>TRACKING KPI ĐDKD - TEAM SS NGUYỄN THỊ TƯỜNG VY</h2>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -581,7 +571,7 @@ with st.spinner("Đang tải dữ liệu..."):
     df_cat = load_cat_data()
     df_brand = load_brand_data()
     
-    # ÁP DỤNG RULE CHẠY DOANH SỐ MTD CHO MCP, CAT, BRAND
+    # ÁP DỤNG RULE CHẠY DOANH SỐ MTD CHO 3 TAB MCP, CAT, BRAND
     mcp = process_mcp_sales(df, mcp)
     df_cat = process_cat_sales(df, df_cat)
     df_brand = process_brand_sales(df, df_brand)
@@ -612,7 +602,7 @@ with f3:
 f4, f5 = st.columns([1, 1])
 with f4:
     st.markdown('<p class="filter-label">SALE SUP</p>', unsafe_allow_html=True)
-    st.selectbox("", ["Trương Thanh Tân Total"], key="sup", label_visibility="collapsed")
+    st.selectbox("", ["Nguyễn Thị Tường Vy Total"], key="sup", label_visibility="collapsed")
 with f5:
     st.markdown('<p class="filter-label">ĐDKD (Nhân viên)</p>', unsafe_allow_html=True)
     filter_nv = st.selectbox("", nv_list, key="ddkd", label_visibility="collapsed")
