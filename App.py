@@ -96,10 +96,11 @@ st.markdown("""
         line-height: 1.5;
     }
     
-    /* Ép style cho nút popover (chọn cột hiển thị) thành màu đỏ và đậm */
+    /* Ép style cho nút popover (chọn cột hiển thị) thành MÀU ĐỎ và IN ĐẬM */
     [data-testid="stPopover"] button {
-        color: #c53030 !important;
-        font-weight: 700 !important;
+        color: #e53e3e !important;
+        font-weight: 900 !important;
+        font-size: 14px !important;
     }
     
     footer {visibility: hidden;}
@@ -306,7 +307,7 @@ def process_cat_sales(df_rpt, df_cat):
     c_code = find_col(df_out, ['Outlet Code', 'Outlet_code', 'Mã CH'])
     c_cat = find_col(df_out, ['Danh sách full cat', 'Category', 'Cat'])
     col_val1 = find_col(df_out, ['Doanh số thực đạt của CAT', 'Doanh số thực đạt CAT'])
-    col_val2 = find_col(df_out, ['Doanh số thực đạt của CAT(Not Cancel/Pending)', 'Doanh số thực đạt của CAT (Not Cancel/Pending)'])
+    col_val2 = find_col(df_out, ['Doanh số thực đạt của CAT(Not Cancel/Pending)', 'Doanh số thực đạtของ CAT (Not Cancel/Pending)'])
     
     if not c_code or not c_cat: return df_out
     
@@ -361,7 +362,7 @@ def process_brand_sales(df_rpt, df_brand):
     c_code = find_col(df_out, ['Outlet Code', 'Outlet_code', 'Mã CH'])
     c_brand = find_col(df_out, ['Danh sách full brand', 'Brand', 'Brands'])
     col_val1 = find_col(df_out, ['Doanh số thực đạt của brand', 'Doanh số thực đạt brand'])
-    col_val2 = find_col(df_out, ['Doanh số thực đạt của brand (Not Cancel/Pending)', 'Doanh số thực đạtของ brand(Not Cancel/Pending)'])
+    col_val2 = find_col(df_out, ['Doanh số thực đạtของ brand (Not Cancel/Pending)', 'Doanh số thực đạt của brand(Not Cancel/Pending)'])
     
     if not c_code or not c_brand: return df_out
     
