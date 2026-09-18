@@ -98,8 +98,6 @@ st.markdown("""
         line-height: 1.5;
     }
     #MainMenu, footer {visibility: hidden;}
-/* Giữ header để hiện nút Light/Dark mode */
-header {visibility: visible !important;}
     
     .custom-kpi-table {
         width: 100%;
