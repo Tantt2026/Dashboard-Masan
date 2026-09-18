@@ -139,17 +139,60 @@ with col_reload:
         st.rerun()
 
 # ===== CSS THEME ĐỘNG =====
+# ===== CSS THEME ĐỘNG =====
 if dark_mode:
     st.markdown("""
     <style>
         .stApp { background-color: #0e1117 !important; color: #fafafa !important; }
         .main-header { background: linear-gradient(90deg, #1a365d 0%, #2b6cb0 100%) !important; }
         .note-box { background: #1a202c !important; border-left-color: #63b3ed !important; color: #e2e8f0 !important; }
+        
+        /* Bảng KPI */
         .custom-kpi-table { background-color: #1a202c !important; color: #e2e8f0 !important; }
         .custom-kpi-table th { background-color: #2d3748 !important; color: #fbd38d !important; }
-        .custom-kpi-table td { border-color: #4a5568 !important; }
+        .custom-kpi-table td { border-color: #4a5568 !important; color: #e2e8f0 !important; }
+        
+        /* Tên NVBH trong dark mode → chữ sáng */
+        .custom-kpi-table td[style*="color: #1a365d"] {
+            color: #90cdf4 !important;
+        }
+        
         div[data-testid="stMetric"] { background: #1a202c !important; border-color: #4a5568 !important; }
         .filter-label { color: #fc8181 !important; }
+        
+        /* Filter boxes dark */
+        div[data-baseweb="select"] > div,
+        div[data-baseweb="input"] > div,
+        .stDateInput > div > div {
+            background-color: #2d3748 !important;
+            color: #e2e8f0 !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+    <style>
+        .stApp { background-color: #ffffff !important; color: #1a202c !important; }
+        .main-header { background: linear-gradient(90deg, #1a365d 0%, #2b6cb0 100%) !important; }
+        .note-box { background: #ebf8ff !important; border-left-color: #3182ce !important; color: #1a202c !important; }
+        
+        /* Bảng KPI */
+        .custom-kpi-table { background-color: #ffffff !important; color: #1a202c !important; }
+        .custom-kpi-table th { background-color: #ffffff !important; color: #9b2c2c !important; }
+        .custom-kpi-table td { border-color: #e2e8f0 !important; color: #1a202c !important; }
+        
+        div[data-testid="stMetric"] { background: #ffffff !important; border-color: #e2e8f0 !important; }
+        .filter-label { color: #c53030 !important; }
+        
+        /* Filter boxes light – nền trắng */
+        div[data-baseweb="select"] > div,
+        div[data-baseweb="input"] > div,
+        .stDateInput > div > div,
+        .stSelectbox > div > div {
+            background-color: #ffffff !important;
+            color: #1a202c !important;
+            border: 1px solid #cbd5e0 !important;
+        }
     </style>
     """, unsafe_allow_html=True)
 else:
