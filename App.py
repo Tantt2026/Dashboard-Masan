@@ -159,7 +159,7 @@ def load_main_data():
 @st.cache_data(ttl=600)
 def load_cat_data():
     for name in ["Data_Cat.xlsx", "data_cat.xlsx"]:
-        path = os.path.join(DATA_DIR, name)
+        path = os.path.join(DATA_DIR, name) if os.path.exists(os.path.join(DATA_DIR, name)) else name
         if os.path.exists(path):
             try: return pd.read_excel(path)
             except: pass
@@ -168,7 +168,7 @@ def load_cat_data():
 @st.cache_data(ttl=600)
 def load_brand_data():
     for name in ["Data_Brand.xlsx", "data_brand.xlsx"]:
-        path = os.path.join(DATA_DIR, name)
+        path = os.path.join(DATA_DIR, name) if os.path.exists(os.path.join(DATA_DIR, name)) else name
         if os.path.exists(path):
             try: return pd.read_excel(path)
             except: pass
@@ -237,6 +237,149 @@ def filter_by_thu(df, col_thu, f_thu):
     elif f_thu == "47":
         return df[thu_s.isin(["4", "7", "47"])]
     return df[thu_s == f_thu]
+
+# ====================== HÀM XỬ LÝ DOANH SỐ MTD CHO MCP, CAT, BRAND ======================
+def process_mcp_sales(df_rpt, df_mcp):
+    """Rule chạy báo cáo File Data_MCP.xlsx"""
+    if df_mcp.empty or df_rpt.empty: return df_mcp
+    valid_df = df_rpt[df_rpt['Tình trạng đơn hàng'] != 'Đã hủy'].copy()
+    val_col = find_col(valid_df, ['Tổng tiền', 'Giá trị sau CK', 'Doanh thu']) or 'Tổng tiền'
+    valid_df['Mã CH_str'] = valid_df['Mã CH'].astype(str).str.strip()
+    sales_agg = valid_df.groupby('Mã CH_str')[val_col].sum().reset_index()
+    sales_agg.columns = ['Outlet_code_key', 'Total_Sales']
+    
+    df_out = df_mcp.copy()
+    code_col = find_col(df_out, ['Outlet_code', 'Outlet Code', 'Mã CH'])
+    sales_col = find_col(df_out, ['Doanh Số MTD', 'Doanh số MTD', 'Doanh_so_MTD'])
+    
+    if not code_col: return df_out
+    df_out['_key'] = df_out[code_col].astype(str).str.strip()
+    sales_agg['Outlet_code_key'] = sales_agg['Outlet_code_key'].astype(str)
+    df_out = df_out.merge(sales_agg, left_on='_key', right_on='Outlet_code_key', how='left')
+    
+    target_sales_col = sales_col if sales_col else 'Doanh Số MTD'
+    df_out[target_sales_col] = df_out['Total_Sales'].fillna(0.0)
+    
+    drop_cols = [c for c in ['_key', 'Outlet_code_key', 'Total_Sales'] if c in df_out.columns]
+    return df_out.drop(columns=drop_cols)
+
+def process_cat_sales(df_rpt, df_cat):
+    """Rule chạy báo cáo File Data_Cat.xlsx"""
+    if df_cat.empty or df_rpt.empty: return df_cat
+    
+    sub_map = {
+        'Beer': 'Bia',
+        'Coffee': 'Cà phê',
+        'Seasoning': 'Gia vị',
+        'Home Care': 'Hóa Mỹ Phẩm',
+        'Convenience Foods': 'Mì, Lẩu, Phở, Hủ Tiếu',
+        'Refreshment Drinks': 'Nước giải khát',
+        'Nutrition': 'Ngũ cốc',
+        'Processed Meats': 'Xúc xích, Thịt chế biến'
+    }
+    
+    df_clean = df_rpt.copy()
+    sub_div_col = find_col(df_clean, ['Sub Division', 'SubDivision', 'Phân nhóm'])
+    val_col = find_col(df_clean, ['Tổng tiền', 'Giá trị sau CK']) or 'Tổng tiền'
+    status_col = find_col(df_clean, ['Tình trạng đơn hàng', 'Trạng thái'])
+    
+    if sub_div_col:
+        df_clean['Mapped_Cat'] = df_clean[sub_div_col].map(sub_map).fillna(df_clean[sub_div_col])
+    else:
+        df_clean['Mapped_Cat'] = 'Khác'
+        
+    df_clean['Mã CH_str'] = df_clean['Mã CH'].astype(str).str.strip()
+    
+    # 1. Doanh số thực đạt của CAT (Loại trừ đơn hàng 'Đã hủy')
+    df_valid = df_clean[df_clean[status_col] != 'Đã hủy'] if status_col else df_clean
+    agg_cat1 = df_valid.groupby(['Mã CH_str', 'Mapped_Cat'])[val_col].sum().reset_index()
+    agg_cat1.columns = ['Outlet_key', 'Cat_Key', 'Val1']
+    
+    # 2. Doanh số thực đạt của CAT (Not Cancel/Pending - Chỉ lấy đơn 'Đã đóng')
+    df_closed = df_clean[df_clean[status_col] == 'Đã đóng'] if status_col else df_clean
+    agg_cat2 = df_closed.groupby(['Mã CH_str', 'Mapped_Cat'])[val_col].sum().reset_index()
+    agg_cat2.columns = ['Outlet_key', 'Cat_Key', 'Val2']
+    
+    df_out = df_cat.copy()
+    c_code = find_col(df_out, ['Outlet Code', 'Outlet_code', 'Mã CH'])
+    c_cat = find_col(df_out, ['Danh sách full cat', 'Category', 'Cat'])
+    col_val1 = find_col(df_out, ['Doanh số thực đạt của CAT', 'Doanh số thực đạt CAT'])
+    col_val2 = find_col(df_out, ['Doanh số thực đạt của CAT(Not Cancel/Pending)', 'Doanh số thực đạt của CAT (Not Cancel/Pending)'])
+    
+    if not c_code or not c_cat: return df_out
+    
+    df_out['_outlet_key'] = df_out[c_code].astype(str).str.strip()
+    df_out['_cat_key'] = df_out[c_cat].astype(str).str.strip()
+    
+    df_out = df_out.merge(agg_cat1, left_on=['_outlet_key', '_cat_key'], right_on=['Outlet_key', 'Cat_Key'], how='left')
+    if 'Outlet_key' in df_out.columns: df_out = df_out.drop(columns=['Outlet_key', 'Cat_Key'])
+    
+    df_out = df_out.merge(agg_cat2, left_on=['_outlet_key', '_cat_key'], right_on=['Outlet_key', 'Cat_Key'], how='left')
+    if 'Outlet_key' in df_out.columns: df_out = df_out.drop(columns=['Outlet_key', 'Cat_Key'])
+    
+    if col_val1: df_out[col_val1] = df_out['Val1'].fillna(0.0)
+    if col_val2: df_out[col_val2] = df_out['Val2'].fillna(0.0)
+    
+    drop_cols = [c for c in ['_outlet_key', '_cat_key', 'Val1', 'Val2'] if c in df_out.columns]
+    return df_out.drop(columns=drop_cols)
+
+def process_brand_sales(df_rpt, df_brand):
+    """Rule chạy báo cáo File Data_Brand.xlsx"""
+    if df_brand.empty or df_rpt.empty: return df_brand
+    
+    brands_list = [
+        "B'fast", "Bupnon TEA365", "Compact", "Chanté", "Chinsu", "Chinsu Story",
+        "Heo Cao Bồi", "Homey", "Joins", "Kokomi", "Nam Ngư", "NET", "Omachi",
+        "Ponnie", "Red Ruby", "Sachi", "SS", "Sunlight", "VGF", "Vinacafé", "Wake-up 247"
+    ]
+    
+    def match_brand(sku_str):
+        if pd.isna(sku_str): return "Khác"
+        s = str(sku_str).lower()
+        for b in brands_list:
+            if b.lower() in s: return b
+        return "Khác"
+        
+    df_clean = df_rpt.copy()
+    sku_col = find_col(df_clean, ['Group STD SKU', 'Tên sản phẩm', 'Product Name']) or 'Tên sản phẩm'
+    val_col = find_col(df_clean, ['Tổng tiền', 'Giá trị sau CK']) or 'Tổng tiền'
+    status_col = find_col(df_clean, ['Tình trạng đơn hàng', 'Trạng thái'])
+    
+    df_clean['Mapped_Brand'] = df_clean[sku_col].apply(match_brand)
+    df_clean['Mã CH_str'] = df_clean['Mã CH'].astype(str).str.strip()
+    
+    # 1. Doanh số thực đạt của brand (Loại trừ đơn hàng 'Đã hủy')
+    df_valid = df_clean[df_clean[status_col] != 'Đã hủy'] if status_col else df_clean
+    agg_b1 = df_valid.groupby(['Mã CH_str', 'Mapped_Brand'])[val_col].sum().reset_index()
+    agg_b1.columns = ['Outlet_key', 'Brand_Key', 'Val1']
+    
+    # 2. Doanh số thực đạt của brand (Not Cancel/Pending - Chỉ lấy đơn 'Đã đóng')
+    df_closed = df_clean[df_clean[status_col] == 'Đã đóng'] if status_col else df_clean
+    agg_b2 = df_closed.groupby(['Mã CH_str', 'Mapped_Brand'])[val_col].sum().reset_index()
+    agg_b2.columns = ['Outlet_key', 'Brand_Key', 'Val2']
+    
+    df_out = df_brand.copy()
+    c_code = find_col(df_out, ['Outlet Code', 'Outlet_code', 'Mã CH'])
+    c_brand = find_col(df_out, ['Danh sách full brand', 'Brand', 'Brands'])
+    col_val1 = find_col(df_out, ['Doanh số thực đạt của brand', 'Doanh số thực đạt brand'])
+    col_val2 = find_col(df_out, ['Doanh số thực đạt của brand (Not Cancel/Pending)', 'Doanh số thực đạt của brand(Not Cancel/Pending)'])
+    
+    if not c_code or not c_brand: return df_out
+    
+    df_out['_outlet_key'] = df_out[c_code].astype(str).str.strip()
+    df_out['_brand_key'] = df_out[c_brand].astype(str).str.strip()
+    
+    df_out = df_out.merge(agg_b1, left_on=['_outlet_key', '_brand_key'], right_on=['Outlet_key', 'Brand_Key'], how='left')
+    if 'Outlet_key' in df_out.columns: df_out = df_out.drop(columns=['Outlet_key', 'Brand_Key'])
+    
+    df_out = df_out.merge(agg_b2, left_on=['_outlet_key', '_brand_key'], right_on=['Outlet_key', 'Brand_Key'], how='left')
+    if 'Outlet_key' in df_out.columns: df_out = df_out.drop(columns=['Outlet_key', 'Brand_Key'])
+    
+    if col_val1: df_out[col_val1] = df_out['Val1'].fillna(0.0)
+    if col_val2: df_out[col_val2] = df_out['Val2'].fillna(0.0)
+    
+    drop_cols = [c for c in ['_outlet_key', '_brand_key', 'Val1', 'Val2'] if c in df_out.columns]
+    return df_out.drop(columns=drop_cols)
 
 # ====================== KPI LOGIC CHUẨN ======================
 def build_report(df, report_date, targets, report_type, filter_nv=None):
@@ -437,6 +580,11 @@ with st.spinner("Đang tải dữ liệu..."):
     targets = get_targets()
     df_cat = load_cat_data()
     df_brand = load_brand_data()
+    
+    # ÁP DỤNG RULE CHẠY DOANH SỐ MTD CHO MCP, CAT, BRAND
+    mcp = process_mcp_sales(df, mcp)
+    df_cat = process_cat_sales(df, df_cat)
+    df_brand = process_brand_sales(df, df_brand)
 
 nv_list = ["Tất cả ĐDKD"] + sorted(df['Tên NVBH'].dropna().unique().tolist())
 
@@ -566,7 +714,7 @@ with tab_mcp:
         df_f = filter_by_thu(df_f, col_thu, f_thu)
 
         for col in df_f.columns:
-            if any(x in col.lower().replace(" ","") for x in ["3msales","3msales","doanh số","doanhso","sales"]):
+            if any(x in col.lower().replace(" ","") for x in ["3msales","doanhsố","doanhso","sales","doanhsômtd"]):
                 df_f[col] = pd.to_numeric(df_f[col], errors='coerce').apply(format_number_vn)
 
         st.dataframe(df_f, use_container_width=True, height=450, hide_index=True)
