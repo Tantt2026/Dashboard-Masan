@@ -98,30 +98,33 @@ st.markdown("""
         line-height: 1.5;
     }
     
-    /* Ẩn hoàn toàn menu hamburger, footer và các nút thừa (Share, Star, Fork, GitHub,...) ở góc phải nhưng vẫn giữ lại menu Settings đổi giao diện */
+    /* Ẩn hoàn toàn menu hamburger, footer và các nút thừa ở góc phải nhưng vẫn giữ lại menu Settings đổi giao diện */
     #MainMenu, footer {visibility: hidden;}
     .stAppToolbar {display: none !important;}
     header[data-testid="stHeader"] {background: transparent !important;}
     
+    /* FIX GIAO DIỆN SÁNG/TỐI CHO BẢNG KPI: Dùng biến màu tự động của Streamlit để thích ứng hoàn hảo mọi Theme */
     .custom-kpi-table {
         width: 100%;
         border-collapse: collapse;
-        border: 1px solid #e2e8f0 !important;
+        border: 1px solid rgba(128, 128, 128, 0.3) !important;
         font-family: sans-serif;
         font-size: 13px;
-        background-color: #ffffff;
+        background-color: var(--background-color, #ffffff);
+        color: var(--text-color, #31333F);
     }
     .custom-kpi-table th {
-        background-color: #ffffff !important;
-        color: #9b2c2c !important;
+        background-color: var(--secondary-background-color, #f0f2f6) !important;
+        color: var(--text-color, #9b2c2c) !important;
         font-weight: bold !important;
         text-align: center !important;
-        border: 1px solid #e2e8f0 !important;
+        border: 1px solid rgba(128, 128, 128, 0.3) !important;
         padding: 6px;
     }
     .custom-kpi-table td {
-        border: 1px solid #e2e8f0 !important;
+        border: 1px solid rgba(128, 128, 128, 0.3) !important;
         padding: 5px 6px;
+        color: var(--text-color, #31333F);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -527,11 +530,11 @@ def render_html_table(df):
                     html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
             elif is_total:
                 if col == 'Tên NVBH':
-                    html.append(f'<td style="background-color: #ffffff; color: #9b2c2c; font-weight: bold; text-align: left; white-space: nowrap;">{val}</td>')
+                    html.append(f'<td style="color: #9b2c2c; font-weight: bold; text-align: left; white-space: nowrap;">{val}</td>')
                 else:
-                    html.append(f'<td style="background-color: #ffffff; color: #9b2c2c; font-weight: bold; text-align: center; white-space: nowrap;">{val}</td>')
+                    html.append(f'<td style="color: #9b2c2c; font-weight: bold; text-align: center; white-space: nowrap;">{val}</td>')
             elif col == 'Tên NVBH':
-                html.append(f'<td style="color: #1a365d; text-align: left; white-space: nowrap;">{val}</td>')
+                html.append(f'<td style="text-align: left; white-space: nowrap;">{val}</td>')
             else:
                 align = 'center' if col in ['STT', 'Mã NVBH', 'Thực Hiện Ngày', 'MTD', 'Phát sinh Ngày (OFF)', 'MTD (OFF)', 'Phát sinh Ngày (ON)', 'MTD (ON)', 'Chỉ Tiêu KPI'] else 'left'
                 html.append(f'<td style="text-align: {align}; white-space: nowrap;">{val}</td>')
@@ -545,7 +548,7 @@ st.markdown(f"""
 <div class="main-header">
     <div class="logo">{logo_svg}</div>
     <div class="title-block">
-        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</h1>
+        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 11</h1>
         <h2>TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN</h2>
     </div>
 </div>
