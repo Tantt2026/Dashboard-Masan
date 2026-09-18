@@ -80,12 +80,14 @@ st.markdown("""
         .main-header h1 { font-size: 18px; }
         .main-header h2 { font-size: 12px; }
     }
+
     .filter-label {
         font-weight: 700 !important;
         color: #c53030 !important;
         font-size: 12px !important;
         margin-bottom: 2px;
     }
+
     .note-box {
         background: #ebf8ff;
         border-left: 4px solid #3182ce;
@@ -95,7 +97,6 @@ st.markdown("""
         font-size: 13px;
         line-height: 1.5;
     }
-    #MainMenu, footer, header {visibility: hidden;}
     
     .custom-kpi-table {
         width: 100%;
@@ -379,6 +380,7 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
         df_mtd = df_mtd[df_mtd['Tên NVBH'] == filter_nv]
     sm_names = df_mtd.groupby('Mã NVBH')['Tên NVBH'].first().to_dict()
     all_sms = sorted(sm_names.keys())
+
     if report_type == 'ASO_ALL':
         off = df_mtd[df_mtd['L1']=='Kênh Off Premise'].copy()
         mtd = off.groupby('Mã NVBH')['Mã CH'].nunique()
@@ -386,6 +388,7 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
         first.columns = ['Mã NVBH','Mã CH','first_date']
         ngay = first[first['first_date']==report_date].groupby('Mã NVBH')['Mã CH'].nunique()
         key, title = 'ASO_ALL', "5. ASO ALL KÊNH OFF"
+
     elif report_type == 'PC_BT':
         off = df_mtd[(df_mtd['L1']=='Kênh Off Premise') & ~df_mtd['Sub Division'].astype(str).str.contains('Beer|Bia', case=False, na=False)]
         lines = off.groupby(['Mã NVBH','Mã đơn hàng'])['Mã sản phẩm'].nunique()
@@ -396,6 +399,7 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
         lines_t = off_t.groupby(['Mã NVBH','Mã đơn hàng'])['Mã sản phẩm'].nunique()
         ngay = lines_t[lines_t>=4].reset_index().groupby('Mã NVBH')['Mã đơn hàng'].nunique()
         key, title = 'PC_BT', "4. PC BT KÊNH OFF (ĐƠN ≥ 4 LINE - LOẠI BEER)"
+
     elif report_type == 'ASO_TEA':
         on = df_mtd[df_mtd['L1']=='Kênh On Premise']
         tea = on[on['Tên SP lower'].str.contains('tea|trà|ô long|olong|búp non', na=False)].copy()
@@ -408,6 +412,7 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
         tea_t = on_t[on_t['Tên SP lower'].str.contains('tea|trà|ô long|olong|búp non', na=False)]
         ngay = tea_t.groupby('Mã NVBH')['Mã CH'].nunique()
         key, title = 'ASO_ON', "3. ASO TEA KÊNH ON PREMISE"
+
     elif report_type == 'OMACHI':
         mask = df_mtd['Tên SP lower'].str.contains('omachi', na=False) & df_mtd['Tên SP lower'].str.contains('trộn|tron|xào|xao', na=False)
         mtd = df_mtd[mask].groupby('Mã NVBH')['Mã CH'].nunique()
@@ -415,6 +420,7 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
         first.columns = ['Mã NVBH','Mã CH','first_date']
         ngay = first[first['first_date']==report_date].groupby('Mã NVBH')['Mã CH'].nunique()
         key, title = 'ASO_OMACHI', "2. ASO FOCUS TRẬN VÀNG - OMACHI TRỘN"
+
     elif report_type == 'CHANTE':
         mask = df_mtd['Tên SP lower'].str.contains('chanté|chante', na=False)
         mtd = df_mtd[mask].groupby('Mã NVBH')['Mã CH'].nunique()
@@ -424,6 +430,7 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
         key, title = 'ASO_CHANTE', "1. ASO FOCUS TOTAL NHÃN CHANTÉ"
     else:
         return pd.DataFrame(), 0, ""
+
     results = []
     for sm in all_sms:
         tgt = targets.get(sm, {}).get(key, 0)
@@ -431,12 +438,15 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
         n = int(ngay.get(sm, 0))
         pct = round(m/tgt*100, 1) if tgt else 0
         results.append({'Mã NVBH':sm, 'Tên NVBH':sm_names.get(sm,''), 'Chỉ Tiêu KPI':tgt, 'Thực Hiện Ngày':n, 'MTD':m, '% MTD':f"{pct}%", '_ratio': (m/tgt if tgt else 0)})
+
     df_out = pd.DataFrame(results).sort_values('_ratio', ascending=True).drop(columns=['_ratio']).reset_index(drop=True)
     df_out.insert(0, 'STT', range(1, len(df_out)+1))
+
     total_ngay = int(df_out['Thực Hiện Ngày'].sum()) if not df_out.empty else 0
     total_mtd = int(df_out['MTD'].sum()) if not df_out.empty else 0
     team_tgt = int(df_out['Chỉ Tiêu KPI'].sum()) if not df_out.empty else 0
     total_pct = round(total_mtd/team_tgt*100, 1) if team_tgt else 0
+
     total_row = pd.DataFrame([{
         'STT': '-',
         'Mã NVBH': 'TỔNG CỘNG',
@@ -454,6 +464,7 @@ def build_combo(df, report_date, filter_nv=None):
         df_mtd = df_mtd[df_mtd['Tên NVBH'] == filter_nv]
     sm_names = df_mtd.groupby('Mã NVBH')['Tên NVBH'].first().to_dict()
     all_sms = sorted(sm_names.keys())
+
     def is_combo(row):
         km = str(row.get('Hàng KM','N')).upper()=='Y'
         giatri = float(pd.to_numeric(row.get('Giá trị hàng KM',0), errors='coerce') or 0)
@@ -462,18 +473,22 @@ def build_combo(df, report_date, filter_nv=None):
         if ch=='Kênh Off Premise': return km or giatri>0 or ck>=10000
         if ch=='Kênh On Premise': return km
         return False
+
     df_mtd = df_mtd.copy()
     df_mtd['is_c'] = df_mtd.apply(is_combo, axis=1)
     off_mtd = df_mtd[(df_mtd['is_c']) & (df_mtd['L1']=='Kênh Off Premise')].groupby('Mã NVBH')['Mã CH'].nunique()
     on_mtd  = df_mtd[(df_mtd['is_c']) & (df_mtd['L1']=='Kênh On Premise')].groupby('Mã NVBH')['Mã CH'].nunique()
+
     off_c = df_mtd[(df_mtd['is_c']) & (df_mtd['L1']=='Kênh Off Premise')]
     first_off = off_c.groupby(['Mã NVBH','Mã CH'])['date'].min().reset_index()
     first_off.columns = ['Mã NVBH','Mã CH','first_date']
     off_ngay = first_off[first_off['first_date']==report_date].groupby('Mã NVBH')['Mã CH'].nunique()
+
     on_c = df_mtd[(df_mtd['is_c']) & (df_mtd['L1']=='Kênh On Premise')]
     first_on = on_c.groupby(['Mã NVBH','Mã CH'])['date'].min().reset_index()
     first_on.columns = ['Mã NVBH','Mã CH','first_date']
     on_ngay = first_on[first_on['first_date']==report_date].groupby('Mã NVBH')['Mã CH'].nunique()
+
     rows = []
     for sm in all_sms:
         rows.append({
@@ -486,6 +501,7 @@ def build_combo(df, report_date, filter_nv=None):
         })
     df_out = pd.DataFrame(rows).sort_values('MTD (OFF)', ascending=False).reset_index(drop=True)
     df_out.insert(0, 'STT', range(1, len(df_out)+1))
+
     total_row = pd.DataFrame([{
         'STT': '-',
         'Mã NVBH': 'TỔNG CỘNG',
@@ -544,7 +560,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Nút Xóa Cache & Reload Data
+# Nút Xóa Cache & Reload Data hiện trực tiếp trên màn hình chính
 col_reload, col_empty = st.columns([2, 5])
 with col_reload:
     if st.button("🔄 Xóa Cache & Reload Dữ Liệu"):
@@ -557,6 +573,7 @@ with st.spinner("Đang tải dữ liệu..."):
     df_cat = load_cat_data()
     df_brand = load_brand_data()
     
+    # ÁP DỤNG RULE CHẠY DOANH SỐ MTD CHO MCP, CAT, BRAND
     mcp = process_mcp_sales(df, mcp)
     df_cat = process_cat_sales(df, df_cat)
     df_brand = process_brand_sales(df, df_brand)
@@ -606,14 +623,18 @@ with tab_kpi:
         total_mtd = int(total_row['MTD'])
         total_ngay = int(total_row['Thực Hiện Ngày'])
         pct_team = total_row['% MTD']
+
         st.subheader(f"{title} - THÁNG {report_date.strftime('%m/%Y')}")
         st.caption(f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc: {filter_nv}")
+
         c1, c2, c3, c4 = st.columns(4)
         with c1: render_metric_card("🎯 Target", f"{team_tgt:,}")
         with c2: render_metric_card("📈 MTD", f"{total_mtd:,}")
         with c3: render_metric_card("📊 % MTD", pct_team)
         with c4: render_metric_card("🆕 Ngày", f"+{total_ngay}")
+
         st.markdown(render_html_table(df_r), unsafe_allow_html=True)
+
         df_eval = df_r.iloc[:-1].copy()
         df_eval['_pct_val'] = df_eval['% MTD'].str.replace('%','').astype(float)
         
@@ -623,6 +644,7 @@ with tab_kpi:
         
         top3_text = ", ".join([f"{r['Tên NVBH']} ({r['% MTD']})" for _, r in top3.iterrows()])
         bottom3_text = ", ".join([f"{r['Tên NVBH']} ({r['% MTD']})" for _, r in bottom3.iterrows()])
+
         st.markdown(f"""
         <div class="note-box">
             <b>NHẬN XÉT ({title} - {report_date.strftime('%d/%m/%Y')}):</b><br>
@@ -638,6 +660,7 @@ with tab_kpi:
         total_on = int(total_row['MTD (ON)'])
         ngay_off = int(total_row['Phát sinh Ngày (OFF)'])
         ngay_on = int(total_row['Phát sinh Ngày (ON)'])
+
         st.subheader(f"6. BÁO CÁO ĐƠN HÀNG COMBO - THÁNG {report_date.strftime('%m/%Y')}")
         
         c1, c2, c3, c4 = st.columns(4)
@@ -645,6 +668,7 @@ with tab_kpi:
         with c2: render_metric_card("MTD ON", f"{total_on}")
         with c3: render_metric_card("Ngày OFF", f"+{ngay_off}")
         with c4: render_metric_card("Ngày ON", f"+{ngay_on}")
+
         st.markdown(render_html_table(df_combo), unsafe_allow_html=True)
 
 # ----- TAB MCP -----
@@ -657,6 +681,7 @@ with tab_mcp:
         col_ma = find_col(mcp, ['Outlet_code','Outlet Code','Mã CH','Mã khách hàng','Poscode'])
         col_ten = find_col(mcp, ['Outlet_name','Outlet Name','Tên CH','Tên khách hàng'])
         col_thu = find_col(mcp, ['Thứ','Frequency','Tần suất'])
+
         c1,c2 = st.columns(2)
         with c1:
             st.markdown('<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD)</p>', unsafe_allow_html=True)
@@ -665,6 +690,7 @@ with tab_mcp:
         with c2:
             st.markdown('<p class="filter-label">📅 Lọc Theo Thứ</p>', unsafe_allow_html=True)
             f_thu = st.selectbox("", ["Tất cả các thứ","2","3","4","5","6","7","25","36","47"], key="mcp_thu", label_visibility="collapsed")
+
         c3,c4 = st.columns(2)
         with c3:
             st.markdown('<p class="filter-label">🆔 Lọc Mã Khách Hàng</p>', unsafe_allow_html=True)
@@ -672,14 +698,17 @@ with tab_mcp:
         with c4:
             st.markdown('<p class="filter-label">🏪 Lọc Tên Khách Hàng</p>', unsafe_allow_html=True)
             f_ten = st.text_input("", key="mcp_ten", label_visibility="collapsed")
+
         df_f = mcp.copy()
         if f_nv != "Tất cả ĐDKD" and col_nv: df_f = df_f[df_f[col_nv].astype(str)==f_nv]
         if f_ma and col_ma: df_f = df_f[df_f[col_ma].astype(str).str.contains(f_ma, case=False, na=False)]
         if f_ten and col_ten: df_f = df_f[df_f[col_ten].astype(str).str.contains(f_ten, case=False, na=False)]
         df_f = filter_by_thu(df_f, col_thu, f_thu)
+
         for col in df_f.columns:
             if any(x in col.lower().replace(" ","") for x in ["3msales","doanhsố","doanhso","sales","doanhsômtd"]):
                 df_f[col] = pd.to_numeric(df_f[col], errors='coerce').apply(format_number_vn)
+
         st.dataframe(df_f, use_container_width=True, height=450, hide_index=True)
         st.caption(f"Hiển thị: {len(df_f):,} / {len(mcp):,} cửa hàng")
 
@@ -693,6 +722,7 @@ with tab_cat:
         col_ma = find_col(df_cat, ['Outlet Code','Outlet_code','Mã CH','Mã khách hàng'])
         col_ten = find_col(df_cat, ['Outlet Name','Outlet_name','Tên CH','Tên khách hàng'])
         col_thu = find_col(df_cat, ['Thứ'])
+
         c1, c2 = st.columns(2)
         with c1:
             st.markdown('<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD)</p>', unsafe_allow_html=True)
@@ -701,6 +731,7 @@ with tab_cat:
         with c2:
             st.markdown('<p class="filter-label">📅 Lọc Theo Thứ</p>', unsafe_allow_html=True)
             f_thu = st.selectbox("", ["Tất cả các thứ","2","3","4","5","6","7","25","36","47"], key="cat_thu", label_visibility="collapsed")
+
         c3, c4 = st.columns(2)
         with c3:
             st.markdown('<p class="filter-label">🆔 Lọc Mã Khách Hàng</p>', unsafe_allow_html=True)
@@ -708,14 +739,17 @@ with tab_cat:
         with c4:
             st.markdown('<p class="filter-label">🏪 Lọc Tên Khách Hàng</p>', unsafe_allow_html=True)
             f_ten = st.text_input("", key="cat_ten", label_visibility="collapsed")
+
         df_f = df_cat.copy()
         if f_nv != "Tất cả ĐDKD" and col_nv: df_f = df_f[df_f[col_nv].astype(str)==f_nv]
         if f_ma and col_ma: df_f = df_f[df_f[col_ma].astype(str).str.contains(f_ma, case=False, na=False)]
         if f_ten and col_ten: df_f = df_f[df_f[col_ten].astype(str).str.contains(f_ten, case=False, na=False)]
         df_f = filter_by_thu(df_f, col_thu, f_thu)
+
         for col in df_f.columns:
             if "doanh số" in col.lower() or "doanhso" in col.lower().replace(" ",""):
                 df_f[col] = pd.to_numeric(df_f[col], errors='coerce').apply(format_number_vn)
+
         st.dataframe(df_f, use_container_width=True, height=450, hide_index=True)
         st.caption(f"Hiển thị: {len(df_f):,} / {len(df_cat):,} dòng")
 
@@ -729,6 +763,7 @@ with tab_brand:
         col_ma = find_col(df_brand, ['Outlet Code','Outlet_code','Mã CH','Mã khách hàng'])
         col_ten = find_col(df_brand, ['Outlet Name','Outlet_name','Tên CH','Tên khách hàng'])
         col_thu = find_col(df_brand, ['Thứ'])
+
         c1, c2 = st.columns(2)
         with c1:
             st.markdown('<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD)</p>', unsafe_allow_html=True)
@@ -737,6 +772,7 @@ with tab_brand:
         with c2:
             st.markdown('<p class="filter-label">📅 Lọc Theo Thứ</p>', unsafe_allow_html=True)
             f_thu = st.selectbox("", ["Tất cả các thứ","2","3","4","5","6","7","25","36","47"], key="brand_thu", label_visibility="collapsed")
+
         c3, c4 = st.columns(2)
         with c3:
             st.markdown('<p class="filter-label">🆔 Lọc Mã Khách Hàng</p>', unsafe_allow_html=True)
@@ -744,13 +780,16 @@ with tab_brand:
         with c4:
             st.markdown('<p class="filter-label">🏪 Lọc Tên Khách Hàng</p>', unsafe_allow_html=True)
             f_ten = st.text_input("", key="brand_ten", label_visibility="collapsed")
+
         df_f = df_brand.copy()
         if f_nv != "Tất cả ĐDKD" and col_nv: df_f = df_f[df_f[col_nv].astype(str)==f_nv]
         if f_ma and col_ma: df_f = df_f[df_f[col_ma].astype(str).str.contains(f_ma, case=False, na=False)]
         if f_ten and col_ten: df_f = df_f[df_f[col_ten].astype(str).str.contains(f_ten, case=False, na=False)]
         df_f = filter_by_thu(df_f, col_thu, f_thu)
+
         for col in df_f.columns:
             if "doanh số" in col.lower() or "doanhso" in col.lower().replace(" ",""):
                 df_f[col] = pd.to_numeric(df_f[col], errors='coerce').apply(format_number_vn)
+
         st.dataframe(df_f, use_container_width=True, height=450, hide_index=True)
         st.caption(f"Hiển thị: {len(df_f):,} / {len(df_brand):,} dòng")
