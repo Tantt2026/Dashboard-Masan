@@ -150,7 +150,6 @@ if dark_mode:
         .custom-kpi-table th { background-color: #2d3748 !important; color: #fbd38d !important; }
         .custom-kpi-table td { border-color: #4a5568 !important; color: #e2e8f0 !important; }
         
-        /* Tên NVBH trong dark mode */
         .custom-kpi-table td[style*="color: #1a365d"] {
             color: #90cdf4 !important;
         }
@@ -188,44 +187,6 @@ else:
             color: #1a202c !important;
             border: 1px solid #cbd5e0 !important;
         }
-    </style>
-    """, unsafe_allow_html=True)
-    st.markdown("""
-    <style>
-        .stApp { background-color: #ffffff !important; color: #1a202c !important; }
-        .main-header { background: linear-gradient(90deg, #1a365d 0%, #2b6cb0 100%) !important; }
-        .note-box { background: #ebf8ff !important; border-left-color: #3182ce !important; color: #1a202c !important; }
-        
-        /* Bảng KPI */
-        .custom-kpi-table { background-color: #ffffff !important; color: #1a202c !important; }
-        .custom-kpi-table th { background-color: #ffffff !important; color: #9b2c2c !important; }
-        .custom-kpi-table td { border-color: #e2e8f0 !important; color: #1a202c !important; }
-        
-        div[data-testid="stMetric"] { background: #ffffff !important; border-color: #e2e8f0 !important; }
-        .filter-label { color: #c53030 !important; }
-        
-        /* Filter boxes light – nền trắng */
-        div[data-baseweb="select"] > div,
-        div[data-baseweb="input"] > div,
-        .stDateInput > div > div,
-        .stSelectbox > div > div {
-            background-color: #ffffff !important;
-            color: #1a202c !important;
-            border: 1px solid #cbd5e0 !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-else:
-    st.markdown("""
-    <style>
-        .stApp { background-color: #ffffff !important; color: #1a202c !important; }
-        .main-header { background: linear-gradient(90deg, #1a365d 0%, #2b6cb0 100%) !important; }
-        .note-box { background: #ebf8ff !important; border-left-color: #3182ce !important; color: #1a202c !important; }
-        .custom-kpi-table { background-color: #ffffff !important; color: #1a202c !important; }
-        .custom-kpi-table th { background-color: #ffffff !important; color: #9b2c2c !important; }
-        .custom-kpi-table td { border-color: #e2e8f0 !important; }
-        div[data-testid="stMetric"] { background: #ffffff !important; border-color: #e2e8f0 !important; }
-        .filter-label { color: #c53030 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -303,7 +264,8 @@ def get_targets():
             elif ktype == 'aso_focus' or 'xanh' in kname: targets.setdefault(sm, {})['ASO_CHANTE'] = int(tgt)
             elif 'vàng' in kname or 'trận vàng' in kname: targets.setdefault(sm, {})['ASO_OMACHI'] = int(tgt)
         return targets
-    except: return {}
+    except:
+        return {}
 
 def color_pct_bg(val):
     try:
@@ -311,13 +273,15 @@ def color_pct_bg(val):
         if v >= 70: return 'background-color: #c6f6d5; color:#22543d; font-weight:600;'
         elif v >= 50: return 'background-color: #fefcbf; color:#744210; font-weight:600;'
         else: return 'background-color: #fed7d7; color:#742a2a; font-weight:600;'
-    except: return ''
+    except:
+        return ''
 
 def format_number_vn(x):
     try:
         if pd.isnull(x) or str(x).lower() in ["none","nan",""]: return ""
         return f"{float(x):,.0f}".replace(",", ".")
-    except: return x
+    except:
+        return x
 
 def find_col(df, candidates):
     cols = {c.lower().strip(): c for c in df.columns}
