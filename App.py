@@ -80,14 +80,12 @@ st.markdown("""
         .main-header h1 { font-size: 18px; }
         .main-header h2 { font-size: 12px; }
     }
-
     .filter-label {
         font-weight: 700 !important;
         color: #c53030 !important;
         font-size: 12px !important;
         margin-bottom: 2px;
     }
-
     .note-box {
         background: #ebf8ff;
         border-left: 4px solid #3182ce;
@@ -97,8 +95,31 @@ st.markdown("""
         font-size: 13px;
         line-height: 1.5;
     }
-    #MainMenu, footer {visibility: hidden;}
-    
+
+    /* Ẩn MainMenu + Footer */
+    #MainMenu, footer {visibility: hidden !important;}
+
+    /* Hiện header để có nút Light/Dark */
+    header {
+        visibility: visible !important;
+        background: transparent !important;
+    }
+
+    /* Ẩn các nút không cần thiết: Share, Star, Edit, GitHub */
+    [data-testid="stToolbar"] button[title="Share"],
+    [data-testid="stToolbar"] button[title="Star this app"],
+    [data-testid="stToolbar"] a[href*="github"],
+    button[kind="header"],
+    button[kind="headerNoPadding"],
+    [data-testid="stBaseButton-header"],
+    [data-testid="stBaseButton-headerNoPadding"] {
+        display: none !important;
+    }
+
+    [data-testid="stToolbar"] {
+        visibility: visible !important;
+    }
+
     .custom-kpi-table {
         width: 100%;
         border-collapse: collapse;
@@ -238,9 +259,8 @@ def filter_by_thu(df, col_thu, f_thu):
         return df[thu_s.isin(["4", "7", "47"])]
     return df[thu_s == f_thu]
 
-# ====================== HÀM XỬ LÝ DOANH SỐ MTD CHO MCP, CAT, BRAND ======================
+# ====================== HÀM XỬ LÝ DOANH SỐ MTD ======================
 def process_mcp_sales(df_rpt, df_mcp):
-    """Rule chạy báo cáo File Data_MCP.xlsx"""
     if df_mcp.empty or df_rpt.empty: return df_mcp
     valid_df = df_rpt[df_rpt['Tình trạng đơn hàng'] != 'Đã hủy'].copy()
     val_col = find_col(valid_df, ['Tổng tiền', 'Giá trị sau CK', 'Doanh thu']) or 'Tổng tiền'
@@ -264,7 +284,6 @@ def process_mcp_sales(df_rpt, df_mcp):
     return df_out.drop(columns=drop_cols)
 
 def process_cat_sales(df_rpt, df_cat):
-    """Rule chạy báo cáo File Data_Cat.xlsx"""
     if df_cat.empty or df_rpt.empty: return df_cat
     
     sub_map = {
@@ -290,12 +309,10 @@ def process_cat_sales(df_rpt, df_cat):
         
     df_clean['Mã CH_str'] = df_clean['Mã CH'].astype(str).str.strip()
     
-    # 1. Doanh số thực đạt của CAT (Loại trừ đơn hàng 'Đã hủy')
     df_valid = df_clean[df_clean[status_col] != 'Đã hủy'] if status_col else df_clean
     agg_cat1 = df_valid.groupby(['Mã CH_str', 'Mapped_Cat'])[val_col].sum().reset_index()
     agg_cat1.columns = ['Outlet_key', 'Cat_Key', 'Val1']
     
-    # 2. Doanh số thực đạt của CAT (Not Cancel/Pending - Chỉ lấy đơn 'Đã đóng')
     df_closed = df_clean[df_clean[status_col] == 'Đã đóng'] if status_col else df_clean
     agg_cat2 = df_closed.groupby(['Mã CH_str', 'Mapped_Cat'])[val_col].sum().reset_index()
     agg_cat2.columns = ['Outlet_key', 'Cat_Key', 'Val2']
@@ -324,7 +341,6 @@ def process_cat_sales(df_rpt, df_cat):
     return df_out.drop(columns=drop_cols)
 
 def process_brand_sales(df_rpt, df_brand):
-    """Rule chạy báo cáo File Data_Brand.xlsx"""
     if df_brand.empty or df_rpt.empty: return df_brand
     
     brands_list = [
@@ -348,12 +364,10 @@ def process_brand_sales(df_rpt, df_brand):
     df_clean['Mapped_Brand'] = df_clean[sku_col].apply(match_brand)
     df_clean['Mã CH_str'] = df_clean['Mã CH'].astype(str).str.strip()
     
-    # 1. Doanh số thực đạt của brand (Loại trừ đơn hàng 'Đã hủy')
     df_valid = df_clean[df_clean[status_col] != 'Đã hủy'] if status_col else df_clean
     agg_b1 = df_valid.groupby(['Mã CH_str', 'Mapped_Brand'])[val_col].sum().reset_index()
     agg_b1.columns = ['Outlet_key', 'Brand_Key', 'Val1']
     
-    # 2. Doanh số thực đạt của brand (Not Cancel/Pending - Chỉ lấy đơn 'Đã đóng')
     df_closed = df_clean[df_clean[status_col] == 'Đã đóng'] if status_col else df_clean
     agg_b2 = df_closed.groupby(['Mã CH_str', 'Mapped_Brand'])[val_col].sum().reset_index()
     agg_b2.columns = ['Outlet_key', 'Brand_Key', 'Val2']
@@ -381,7 +395,7 @@ def process_brand_sales(df_rpt, df_brand):
     drop_cols = [c for c in ['_outlet_key', '_brand_key', 'Val1', 'Val2'] if c in df_out.columns]
     return df_out.drop(columns=drop_cols)
 
-# ====================== KPI LOGIC CHUẨN ======================
+# ====================== KPI LOGIC ======================
 def build_report(df, report_date, targets, report_type, filter_nv=None):
     df_mtd = df[df['date'] >= date(report_date.year, report_date.month, 1)].copy()
     if filter_nv and filter_nv != "Tất cả ĐDKD":
@@ -484,6 +498,7 @@ def build_combo(df, report_date, filter_nv=None):
 
     df_mtd = df_mtd.copy()
     df_mtd['is_c'] = df_mtd.apply(is_combo, axis=1)
+
     off_mtd = df_mtd[(df_mtd['is_c']) & (df_mtd['L1']=='Kênh Off Premise')].groupby('Mã NVBH')['Mã CH'].nunique()
     on_mtd  = df_mtd[(df_mtd['is_c']) & (df_mtd['L1']=='Kênh On Premise')].groupby('Mã NVBH')['Mã CH'].nunique()
 
@@ -568,7 +583,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Nút Xóa Cache & Reload Data hiện trực tiếp trên màn hình chính
 col_reload, col_empty = st.columns([2, 5])
 with col_reload:
     if st.button("🔄 Xóa Cache & Reload Dữ Liệu"):
@@ -581,14 +595,12 @@ with st.spinner("Đang tải dữ liệu..."):
     df_cat = load_cat_data()
     df_brand = load_brand_data()
     
-    # ÁP DỤNG RULE CHẠY DOANH SỐ MTD CHO MCP, CAT, BRAND
     mcp = process_mcp_sales(df, mcp)
     df_cat = process_cat_sales(df, df_cat)
     df_brand = process_brand_sales(df, df_brand)
 
 nv_list = ["Tất cả ĐDKD"] + sorted(df['Tên NVBH'].dropna().unique().tolist())
 
-# Compact filter bar
 f1, f2, f3 = st.columns([1, 1, 1.3])
 with f1:
     st.markdown('<p class="filter-label">MONTH</p>', unsafe_allow_html=True)
