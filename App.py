@@ -99,18 +99,13 @@ st.markdown("""
         border: 1px solid #e2e8f0 !important;
         font-family: sans-serif;
         font-size: 13px;
-        background-color: #ffffff;
     }
     .custom-kpi-table th {
-        background-color: #ffffff !important;
-        color: #9b2c2c !important;
         font-weight: bold !important;
         text-align: center !important;
-        border: 1px solid #e2e8f0 !important;
         padding: 6px;
     }
     .custom-kpi-table td {
-        border: 1px solid #e2e8f0 !important;
         padding: 5px 6px;
     }
 </style>
@@ -134,7 +129,7 @@ with col_theme:
     dark_mode = st.toggle("🌙 Giao diện tối", value=True, key="theme_toggle")
 
 with col_reload:
-    if st.button("🔄 Xóa Cache & Reload Dữ Liệu"):
+    if st.button("🔄 Xóa Cache & Reload Dữ Liệu", key="btn_reload"):
         st.cache_data.clear()
         st.rerun()
 
@@ -147,11 +142,17 @@ if dark_mode:
         .note-box { background: #1a202c !important; border-left-color: #63b3ed !important; color: #e2e8f0 !important; }
         
         .custom-kpi-table { background-color: #1a202c !important; color: #e2e8f0 !important; }
-        .custom-kpi-table th { background-color: #2d3748 !important; color: #fbd38d !important; }
-        .custom-kpi-table td { border-color: #4a5568 !important; color: #e2e8f0 !important; }
+        .custom-kpi-table th { background-color: #2d3748 !important; color: #fbd38d !important; border: 1px solid #4a5568 !important; }
+        .custom-kpi-table td { border: 1px solid #4a5568 !important; color: #e2e8f0 !important; }
         
-        .custom-kpi-table td[style*="color: #1a365d"] {
-            color: #90cdf4 !important;
+        /* Tên NVBH dark */
+        .custom-kpi-table td[style*="color: #1a365d"] { color: #90cdf4 !important; }
+        
+        /* Dòng TOTAL dark: nền xanh đậm + chữ trắng */
+        .total-row td {
+            background-color: #1a365d !important;
+            color: #ffffff !important;
+            font-weight: 700 !important;
         }
         
         div[data-testid="stMetric"] { background: #1a202c !important; border-color: #4a5568 !important; }
@@ -163,6 +164,13 @@ if dark_mode:
             background-color: #2d3748 !important;
             color: #e2e8f0 !important;
         }
+        
+        /* Nút Reload dark */
+        div[data-testid="stButton"] button {
+            background-color: #2d3748 !important;
+            color: #e2e8f0 !important;
+            border: 1px solid #4a5568 !important;
+        }
     </style>
     """, unsafe_allow_html=True)
 else:
@@ -173,8 +181,15 @@ else:
         .note-box { background: #ebf8ff !important; border-left-color: #3182ce !important; color: #1a202c !important; }
         
         .custom-kpi-table { background-color: #ffffff !important; color: #1a202c !important; }
-        .custom-kpi-table th { background-color: #ffffff !important; color: #9b2c2c !important; }
-        .custom-kpi-table td { border-color: #e2e8f0 !important; color: #1a202c !important; }
+        .custom-kpi-table th { background-color: #ffffff !important; color: #9b2c2c !important; border: 1px solid #e2e8f0 !important; }
+        .custom-kpi-table td { border: 1px solid #e2e8f0 !important; color: #1a202c !important; }
+        
+        /* Dòng TOTAL light: nền xanh đậm + chữ trắng */
+        .total-row td {
+            background-color: #1a365d !important;
+            color: #ffffff !important;
+            font-weight: 700 !important;
+        }
         
         div[data-testid="stMetric"] { background: #ffffff !important; border-color: #e2e8f0 !important; }
         .filter-label { color: #c53030 !important; }
@@ -184,6 +199,13 @@ else:
         .stDateInput > div > div,
         .stSelectbox > div > div {
             background-color: #ffffff !important;
+            color: #1a202c !important;
+            border: 1px solid #cbd5e0 !important;
+        }
+        
+        /* Nút Reload light */
+        div[data-testid="stButton"] button {
+            background-color: #edf2f7 !important;
             color: #1a202c !important;
             border: 1px solid #cbd5e0 !important;
         }
@@ -530,15 +552,16 @@ def render_html_table(df):
     html.append('</tr></thead><tbody>')
     for _, row in df.iterrows():
         is_total = str(row.get('Mã NVBH', '')).strip() == 'TỔNG CỘNG'
-        html.append('<tr>')
+        row_class = ' class="total-row"' if is_total else ''
+        html.append(f'<tr{row_class}>')
         for col in df.columns:
             val = row[col] if not pd.isna(row[col]) else ""
             if col == '% MTD':
                 style_bg = color_pct_bg(val)
-                html.append(f'<td style="{style_bg} text-align: center; {"font-weight: bold;" if is_total else ""}">{val}</td>')
+                html.append(f'<td style="{style_bg} text-align: center; font-weight: {"700" if is_total else "600"};">{val}</td>')
             elif is_total:
                 align = 'left' if col == 'Tên NVBH' else 'center'
-                html.append(f'<td style="background-color: #ffffff; color: #9b2c2c; font-weight: bold; text-align: {align}; white-space: nowrap;">{val}</td>')
+                html.append(f'<td style="text-align: {align}; white-space: nowrap;">{val}</td>')
             elif col == 'Tên NVBH':
                 html.append(f'<td style="color: #1a365d; text-align: left; white-space: nowrap;">{val}</td>')
             else:
