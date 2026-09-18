@@ -97,7 +97,9 @@ st.markdown("""
         font-size: 13px;
         line-height: 1.5;
     }
-    #MainMenu, footer, header {visibility: hidden;}
+    #MainMenu, footer {visibility: hidden;}
+/* Giữ header để hiện nút Light/Dark mode */
+header {visibility: visible !important;}
     
     .custom-kpi-table {
         width: 100%;
