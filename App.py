@@ -96,37 +96,28 @@ st.markdown("""
         margin-top: 12px;
         font-size: 13px;
         line-height: 1.5;
-        color: #1a202c;
     }
+    #MainMenu, footer, header {visibility: hidden;}
     
-    /* Ẩn hoàn toàn menu hamburger, footer và các nút thừa ở góc phải nhưng vẫn giữ lại menu Settings đổi giao diện */
-    #MainMenu, footer {visibility: hidden;}
-    .stAppToolbar {display: none !important;}
-    header[data-testid="stHeader"] {background: transparent !important;}
-    
-    /* FIX HOÀN HẢO CHO CẢ LIGHT VÀ DARK MODE: Ép bảng hiển thị tương thích nền tối/sáng tự động */
     .custom-kpi-table {
         width: 100%;
         border-collapse: collapse;
-        border: 1px solid #444c56 !important;
+        border: 1px solid #e2e8f0 !important;
         font-family: sans-serif;
         font-size: 13px;
-        background-color: #0e1117;
-        color: #ffffff;
+        background-color: #ffffff;
     }
     .custom-kpi-table th {
-        background-color: #161b22 !important;
-        color: #ff7b72 !important;
+        background-color: #ffffff !important;
+        color: #9b2c2c !important;
         font-weight: bold !important;
         text-align: center !important;
-        border: 1px solid #444c56 !important;
-        padding: 8px 6px;
+        border: 1px solid #e2e8f0 !important;
+        padding: 6px;
     }
     .custom-kpi-table td {
-        border: 1px solid #30363d !important;
-        padding: 6px;
-        color: #f0f6fc;
-        background-color: #0e1117;
+        border: 1px solid #e2e8f0 !important;
+        padding: 5px 6px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -214,9 +205,9 @@ def get_targets():
 def color_pct_bg(val):
     try:
         v = float(str(val).replace('%','').strip())
-        if v >= 70: return 'background-color: #1b4332; color:#52b788; font-weight:600;'
-        elif v >= 50: return 'background-color: #43281c; color:#ffb703; font-weight:600;'
-        else: return 'background-color: #5c1d1d; color:#ff6b6b; font-weight:600;'
+        if v >= 70: return 'background-color: #c6f6d5; color:#22543d; font-weight:600;'
+        elif v >= 50: return 'background-color: #fefcbf; color:#744210; font-weight:600;'
+        else: return 'background-color: #fed7d7; color:#742a2a; font-weight:600;'
     except: return ''
 
 def format_number_vn(x):
@@ -247,8 +238,9 @@ def filter_by_thu(df, col_thu, f_thu):
         return df[thu_s.isin(["4", "7", "47"])]
     return df[thu_s == f_thu]
 
-# ====================== HÀM XỬ LÝ DOANH SỐ MTD CHO 3 TAB (MCP, CAT, BRAND) ======================
+# ====================== HÀM XỬ LÝ DOANH SỐ MTD CHO MCP, CAT, BRAND ======================
 def process_mcp_sales(df_rpt, df_mcp):
+    """Rule chạy báo cáo File Data_MCP.xlsx"""
     if df_mcp.empty or df_rpt.empty: return df_mcp
     valid_df = df_rpt[df_rpt['Tình trạng đơn hàng'] != 'Đã hủy'].copy()
     val_col = find_col(valid_df, ['Tổng tiền', 'Giá trị sau CK', 'Doanh thu']) or 'Tổng tiền'
@@ -272,6 +264,7 @@ def process_mcp_sales(df_rpt, df_mcp):
     return df_out.drop(columns=drop_cols)
 
 def process_cat_sales(df_rpt, df_cat):
+    """Rule chạy báo cáo File Data_Cat.xlsx"""
     if df_cat.empty or df_rpt.empty: return df_cat
     
     sub_map = {
@@ -297,10 +290,12 @@ def process_cat_sales(df_rpt, df_cat):
         
     df_clean['Mã CH_str'] = df_clean['Mã CH'].astype(str).str.strip()
     
+    # 1. Doanh số thực đạt của CAT (Loại trừ đơn hàng 'Đã hủy')
     df_valid = df_clean[df_clean[status_col] != 'Đã hủy'] if status_col else df_clean
     agg_cat1 = df_valid.groupby(['Mã CH_str', 'Mapped_Cat'])[val_col].sum().reset_index()
     agg_cat1.columns = ['Outlet_key', 'Cat_Key', 'Val1']
     
+    # 2. Doanh số thực đạt của CAT (Not Cancel/Pending - Chỉ lấy đơn 'Đã đóng')
     df_closed = df_clean[df_clean[status_col] == 'Đã đóng'] if status_col else df_clean
     agg_cat2 = df_closed.groupby(['Mã CH_str', 'Mapped_Cat'])[val_col].sum().reset_index()
     agg_cat2.columns = ['Outlet_key', 'Cat_Key', 'Val2']
@@ -329,6 +324,7 @@ def process_cat_sales(df_rpt, df_cat):
     return df_out.drop(columns=drop_cols)
 
 def process_brand_sales(df_rpt, df_brand):
+    """Rule chạy báo cáo File Data_Brand.xlsx"""
     if df_brand.empty or df_rpt.empty: return df_brand
     
     brands_list = [
@@ -352,10 +348,12 @@ def process_brand_sales(df_rpt, df_brand):
     df_clean['Mapped_Brand'] = df_clean[sku_col].apply(match_brand)
     df_clean['Mã CH_str'] = df_clean['Mã CH'].astype(str).str.strip()
     
+    # 1. Doanh số thực đạt của brand (Loại trừ đơn hàng 'Đã hủy')
     df_valid = df_clean[df_clean[status_col] != 'Đã hủy'] if status_col else df_clean
     agg_b1 = df_valid.groupby(['Mã CH_str', 'Mapped_Brand'])[val_col].sum().reset_index()
     agg_b1.columns = ['Outlet_key', 'Brand_Key', 'Val1']
     
+    # 2. Doanh số thực đạt của brand (Not Cancel/Pending - Chỉ lấy đơn 'Đã đóng')
     df_closed = df_clean[df_clean[status_col] == 'Đã đóng'] if status_col else df_clean
     agg_b2 = df_closed.groupby(['Mã CH_str', 'Mapped_Brand'])[val_col].sum().reset_index()
     agg_b2.columns = ['Outlet_key', 'Brand_Key', 'Val2']
@@ -457,10 +455,15 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
     team_tgt = int(df_out['Chỉ Tiêu KPI'].sum()) if not df_out.empty else 0
     total_pct = round(total_mtd/team_tgt*100, 1) if team_tgt else 0
 
-    total_row = pd.DataFrame([{'STT':'-', 'Mã NVBH':'TỔNG CỘNG',
-        'Tên NVBH':'Trương Thanh Tân Total' if filter_nv=="Tất cả ĐDKD" else filter_nv,
+    total_row = pd.DataFrame([{
+        'STT': '-',
+        'Mã NVBH': 'TỔNG CỘNG',
+        'Tên NVBH': 'SS Trương Thanh Tân Total' if filter_nv == "Tất cả ĐDKD" else filter_nv,
         'Chỉ Tiêu KPI': team_tgt,
-        'Thực Hiện Ngày':total_ngay, 'MTD':total_mtd, '% MTD':f"{total_pct}%"}])
+        'Thực Hiện Ngày': total_ngay,
+        'MTD': total_mtd,
+        '% MTD': f"{total_pct}%"
+    }])
     return pd.concat([df_out, total_row], ignore_index=True), team_tgt, title
 
 def build_combo(df, report_date, filter_nv=None):
@@ -496,17 +499,26 @@ def build_combo(df, report_date, filter_nv=None):
 
     rows = []
     for sm in all_sms:
-        rows.append({'Mã NVBH':sm, 'Tên NVBH':sm_names.get(sm,''),
-            'Phát sinh Ngày (OFF)':int(off_ngay.get(sm,0)), 'MTD (OFF)':int(off_mtd.get(sm,0)),
-            'Phát sinh Ngày (ON)':int(on_ngay.get(sm,0)), 'MTD (ON)':int(on_mtd.get(sm,0))})
+        rows.append({
+            'Mã NVBH': sm,
+            'Tên NVBH': sm_names.get(sm,''),
+            'Phát sinh Ngày (OFF)': int(off_ngay.get(sm,0)),
+            'MTD (OFF)': int(off_mtd.get(sm,0)),
+            'Phát sinh Ngày (ON)': int(on_ngay.get(sm,0)),
+            'MTD (ON)': int(on_mtd.get(sm,0))
+        })
     df_out = pd.DataFrame(rows).sort_values('MTD (OFF)', ascending=False).reset_index(drop=True)
     df_out.insert(0, 'STT', range(1, len(df_out)+1))
-    total_row = pd.DataFrame([{'STT':'-', 'Mã NVBH':'TỔNG CỘNG',
-        'Tên NVBH':'Trương Thanh Tân Total' if filter_nv=="Tất cả ĐDKD" else filter_nv,
-        'Phát sinh Ngày (OFF)':int(df_out['Phát sinh Ngày (OFF)'].sum()) if not df_out.empty else 0,
-        'MTD (OFF)':int(df_out['MTD (OFF)'].sum()) if not df_out.empty else 0,
-        'Phát sinh Ngày (ON)':int(df_out['Phát sinh Ngày (ON)'].sum()) if not df_out.empty else 0,
-        'MTD (ON)':int(df_out['MTD (ON)'].sum()) if not df_out.empty else 0}])
+
+    total_row = pd.DataFrame([{
+        'STT': '-',
+        'Mã NVBH': 'TỔNG CỘNG',
+        'Tên NVBH': 'SS Trương Thanh Tân Total' if filter_nv == "Tất cả ĐDKD" else filter_nv,
+        'Phát sinh Ngày (OFF)': int(df_out['Phát sinh Ngày (OFF)'].sum()) if not df_out.empty else 0,
+        'MTD (OFF)': int(df_out['MTD (OFF)'].sum()) if not df_out.empty else 0,
+        'Phát sinh Ngày (ON)': int(df_out['Phát sinh Ngày (ON)'].sum()) if not df_out.empty else 0,
+        'MTD (ON)': int(df_out['MTD (ON)'].sum()) if not df_out.empty else 0
+    }])
     return pd.concat([df_out, total_row], ignore_index=True)
 
 def render_html_table(df):
@@ -532,14 +544,14 @@ def render_html_table(df):
                     html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
             elif is_total:
                 if col == 'Tên NVBH':
-                    html.append(f'<td style="background-color: #161b22; color: #ff7b72; font-weight: bold; text-align: left; white-space: nowrap;">{val}</td>')
+                    html.append(f'<td style="background-color: #ffffff; color: #9b2c2c; font-weight: bold; text-align: left; white-space: nowrap;">{val}</td>')
                 else:
-                    html.append(f'<td style="background-color: #161b22; color: #ff7b72; font-weight: bold; text-align: center; white-space: nowrap;">{val}</td>')
+                    html.append(f'<td style="background-color: #ffffff; color: #9b2c2c; font-weight: bold; text-align: center; white-space: nowrap;">{val}</td>')
             elif col == 'Tên NVBH':
-                html.append(f'<td style="color: #f0f6fc; text-align: left; white-space: nowrap;">{val}</td>')
+                html.append(f'<td style="color: #1a365d; text-align: left; white-space: nowrap;">{val}</td>')
             else:
                 align = 'center' if col in ['STT', 'Mã NVBH', 'Thực Hiện Ngày', 'MTD', 'Phát sinh Ngày (OFF)', 'MTD (OFF)', 'Phát sinh Ngày (ON)', 'MTD (ON)', 'Chỉ Tiêu KPI'] else 'left'
-                html.append(f'<td style="color: #f0f6fc; text-align: {align}; white-space: nowrap;">{val}</td>')
+                html.append(f'<td style="text-align: {align}; white-space: nowrap;">{val}</td>')
         html.append('</tr>')
     html.append('</tbody>')
     html.append('</table></div>')
@@ -569,7 +581,7 @@ with st.spinner("Đang tải dữ liệu..."):
     df_cat = load_cat_data()
     df_brand = load_brand_data()
     
-    # ÁP DỤNG RULE CHẠY DOANH SỐ MTD CHO 3 TAB MCP, CAT, BRAND
+    # ÁP DỤNG RULE CHẠY DOANH SỐ MTD CHO MCP, CAT, BRAND
     mcp = process_mcp_sales(df, mcp)
     df_cat = process_cat_sales(df, df_cat)
     df_brand = process_brand_sales(df, df_brand)
