@@ -96,6 +96,7 @@ st.markdown("""
         margin-top: 12px;
         font-size: 13px;
         line-height: 1.5;
+        color: #1a202c;
     }
     
     /* Ẩn hoàn toàn menu hamburger, footer và các nút thừa ở góc phải nhưng vẫn giữ lại menu Settings đổi giao diện */
@@ -103,28 +104,29 @@ st.markdown("""
     .stAppToolbar {display: none !important;}
     header[data-testid="stHeader"] {background: transparent !important;}
     
-    /* FIX GIAO DIỆN SÁNG/TỐI CHO BẢNG KPI: Dùng biến màu tự động của Streamlit để thích ứng hoàn hảo mọi Theme */
+    /* FIX HOÀN HẢO CHO CẢ LIGHT VÀ DARK MODE: Ép bảng hiển thị tương thích nền tối/sáng tự động */
     .custom-kpi-table {
         width: 100%;
         border-collapse: collapse;
-        border: 1px solid rgba(128, 128, 128, 0.3) !important;
+        border: 1px solid #444c56 !important;
         font-family: sans-serif;
         font-size: 13px;
-        background-color: var(--background-color, #ffffff);
-        color: var(--text-color, #31333F);
+        background-color: #0e1117;
+        color: #ffffff;
     }
     .custom-kpi-table th {
-        background-color: var(--secondary-background-color, #f0f2f6) !important;
-        color: var(--text-color, #9b2c2c) !important;
+        background-color: #161b22 !important;
+        color: #ff7b72 !important;
         font-weight: bold !important;
         text-align: center !important;
-        border: 1px solid rgba(128, 128, 128, 0.3) !important;
-        padding: 6px;
+        border: 1px solid #444c56 !important;
+        padding: 8px 6px;
     }
     .custom-kpi-table td {
-        border: 1px solid rgba(128, 128, 128, 0.3) !important;
-        padding: 5px 6px;
-        color: var(--text-color, #31333F);
+        border: 1px solid #30363d !important;
+        padding: 6px;
+        color: #f0f6fc;
+        background-color: #0e1117;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -212,9 +214,9 @@ def get_targets():
 def color_pct_bg(val):
     try:
         v = float(str(val).replace('%','').strip())
-        if v >= 70: return 'background-color: #c6f6d5; color:#22543d; font-weight:600;'
-        elif v >= 50: return 'background-color: #fefcbf; color:#744210; font-weight:600;'
-        else: return 'background-color: #fed7d7; color:#742a2a; font-weight:600;'
+        if v >= 70: return 'background-color: #1b4332; color:#52b788; font-weight:600;'
+        elif v >= 50: return 'background-color: #43281c; color:#ffb703; font-weight:600;'
+        else: return 'background-color: #5c1d1d; color:#ff6b6b; font-weight:600;'
     except: return ''
 
 def format_number_vn(x):
@@ -530,14 +532,14 @@ def render_html_table(df):
                     html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
             elif is_total:
                 if col == 'Tên NVBH':
-                    html.append(f'<td style="color: #9b2c2c; font-weight: bold; text-align: left; white-space: nowrap;">{val}</td>')
+                    html.append(f'<td style="background-color: #161b22; color: #ff7b72; font-weight: bold; text-align: left; white-space: nowrap;">{val}</td>')
                 else:
-                    html.append(f'<td style="color: #9b2c2c; font-weight: bold; text-align: center; white-space: nowrap;">{val}</td>')
+                    html.append(f'<td style="background-color: #161b22; color: #ff7b72; font-weight: bold; text-align: center; white-space: nowrap;">{val}</td>')
             elif col == 'Tên NVBH':
-                html.append(f'<td style="text-align: left; white-space: nowrap;">{val}</td>')
+                html.append(f'<td style="color: #f0f6fc; text-align: left; white-space: nowrap;">{val}</td>')
             else:
                 align = 'center' if col in ['STT', 'Mã NVBH', 'Thực Hiện Ngày', 'MTD', 'Phát sinh Ngày (OFF)', 'MTD (OFF)', 'Phát sinh Ngày (ON)', 'MTD (ON)', 'Chỉ Tiêu KPI'] else 'left'
-                html.append(f'<td style="text-align: {align}; white-space: nowrap;">{val}</td>')
+                html.append(f'<td style="color: #f0f6fc; text-align: {align}; white-space: nowrap;">{val}</td>')
         html.append('</tr>')
     html.append('</tbody>')
     html.append('</table></div>')
@@ -548,7 +550,7 @@ st.markdown(f"""
 <div class="main-header">
     <div class="logo">{logo_svg}</div>
     <div class="title-block">
-        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 11</h1>
+        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</h1>
         <h2>TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN</h2>
     </div>
 </div>
