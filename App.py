@@ -716,7 +716,6 @@ with tab_mcp:
             if any(x in col.lower().replace(" ","") for x in ["3msales","doanhsố","doanhso","sales","doanhsômtd"]):
                 df_f[col] = pd.to_numeric(df_f[col], errors='coerce').apply(format_number_vn)
         
-        # Thêm Multiselect chọn cột hiển thị và lưu state
         all_cols_mcp = df_f.columns.tolist()
         saved_mcp_cols = st.query_params.get("mcp_cols", None)
         if saved_mcp_cols:
@@ -728,7 +727,9 @@ with tab_mcp:
         else:
             default_cols_mcp = all_cols_mcp
 
-        selected_mcp_cols = st.multiselect("👁️ Chọn cột hiển thị (MCP)", all_cols_mcp, default=default_cols_mcp, key="mcp_cols_input")
+        # Nút con mắt popover thu gọn bảng chọn cột
+        with st.popover("👁️ Chọn cột hiển thị (MCP)", use_container_width=False):
+            selected_mcp_cols = st.multiselect("Bỏ chọn để ẩn cột:", all_cols_mcp, default=default_cols_mcp, key="mcp_cols_input")
         st.query_params["mcp_cols"] = ",".join(selected_mcp_cols)
 
         st.dataframe(df_f[selected_mcp_cols], use_container_width=True, height=450, hide_index=True)
@@ -795,7 +796,8 @@ with tab_cat:
         else:
             default_cols_cat = all_cols_cat
 
-        selected_cat_cols = st.multiselect("👁️ Chọn cột hiển thị (Category)", all_cols_cat, default=default_cols_cat, key="cat_cols_input")
+        with st.popover("👁️ Chọn cột hiển thị (Category)", use_container_width=False):
+            selected_cat_cols = st.multiselect("Bỏ chọn để ẩn cột:", all_cols_cat, default=default_cols_cat, key="cat_cols_input")
         st.query_params["cat_cols"] = ",".join(selected_cat_cols)
 
         st.dataframe(df_f[selected_cat_cols], use_container_width=True, height=450, hide_index=True)
@@ -840,7 +842,7 @@ with tab_brand:
         st.query_params["brand_nv"] = st.session_state.brand_nv_input
         st.query_params["brand_thu"] = st.session_state.brand_thu_input
         st.query_params["brand_ma"] = st.session_state.brand_ma_input
-        st.query_params["brand_ten"] = st.session_state.brand_ten_input
+        st.query_params["brand_ten"] = st.session_state.brand_brand_input if "brand_brand_input" in st.session_state else st.session_state.brand_ten_input
 
         df_f = df_brand.copy()
         if f_nv != "Tất cả ĐDKD" and col_nv: df_f = df_f[df_f[col_nv].astype(str)==f_nv]
@@ -862,7 +864,8 @@ with tab_brand:
         else:
             default_cols_brand = all_cols_brand
 
-        selected_brand_cols = st.multiselect("👁️ Chọn cột hiển thị (Brand)", all_cols_brand, default=default_cols_brand, key="brand_cols_input")
+        with st.popover("👁️ Chọn cột hiển thị (Brand)", use_container_width=False):
+            selected_brand_cols = st.multiselect("Bỏ chọn để ẩn cột:", all_cols_brand, default=default_cols_brand, key="brand_cols_input")
         st.query_params["brand_cols"] = ",".join(selected_brand_cols)
 
         st.dataframe(df_f[selected_brand_cols], use_container_width=True, height=450, hide_index=True)
