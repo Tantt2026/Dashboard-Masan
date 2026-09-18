@@ -583,7 +583,12 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-col_reload, col_empty = st.columns([2, 5])
+# ===== NÚT CHUYỂN GIAO DIỆN + RELOAD =====
+col_theme, col_reload, col_empty = st.columns([1.4, 2, 4])
+
+with col_theme:
+    dark_mode = st.toggle("🌙 Giao diện tối", value=True, key="theme_toggle")
+
 with col_reload:
     if st.button("🔄 Xóa Cache & Reload Dữ Liệu"):
         st.cache_data.clear()
