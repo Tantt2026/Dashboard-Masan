@@ -98,7 +98,7 @@ st.markdown("""
         line-height: 1.5;
     }
     
-    /* Ẩn hoàn toàn menu hamburger, footer và các nút thừa (Share, Star, Fork, GitHub,...) ở góc phải */
+    /* Ẩn hoàn toàn menu hamburger, footer và các nút thừa (Share, Star, Fork, GitHub,...) ở góc phải nhưng vẫn giữ lại menu Settings đổi giao diện */
     #MainMenu, footer {visibility: hidden;}
     .stAppToolbar {display: none !important;}
     header[data-testid="stHeader"] {background: transparent !important;}
@@ -304,7 +304,7 @@ def process_cat_sales(df_rpt, df_cat):
     c_code = find_col(df_out, ['Outlet Code', 'Outlet_code', 'Mã CH'])
     c_cat = find_col(df_out, ['Danh sách full cat', 'Category', 'Cat'])
     col_val1 = find_col(df_out, ['Doanh số thực đạt của CAT', 'Doanh số thực đạt CAT'])
-    col_val2 = find_col(df_out, ['Doanh số thực đạt của CAT(Not Cancel/Pending)', 'Doanh số thực đạtຂອງ CAT (Not Cancel/Pending)'])
+    col_val2 = find_col(df_out, ['Doanh số thực đạt của CAT(Not Cancel/Pending)', 'Doanh số thực đạt của CAT (Not Cancel/Pending)'])
     
     if not c_code or not c_cat: return df_out
     
