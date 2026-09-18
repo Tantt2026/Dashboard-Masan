@@ -96,7 +96,6 @@ st.markdown("""
         line-height: 1.5;
     }
     
-    /* Ẩn footer, hiện lại header + nút 3 chấm (MainMenu) */
     footer {visibility: hidden;}
     #MainMenu, header {visibility: visible !important;}
     
@@ -547,7 +546,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Nút Xóa Cache & Reload Data
 col_reload, col_empty = st.columns([2, 5])
 with col_reload:
     if st.button("🔄 Xóa Cache & Reload Dữ Liệu"):
@@ -566,7 +564,6 @@ with st.spinner("Đang tải dữ liệu..."):
 
 nv_list = ["Tất cả ĐDKD"] + sorted(df['Tên NVBH'].dropna().unique().tolist())
 
-# Compact filter bar
 f1, f2, f3 = st.columns([1, 1, 1.3])
 with f1:
     st.markdown('<p class="filter-label">MONTH</p>', unsafe_allow_html=True)
@@ -650,7 +647,7 @@ with tab_kpi:
         with c4: render_metric_card("Ngày ON", f"+{ngay_on}")
         st.markdown(render_html_table(df_combo), unsafe_allow_html=True)
 
-# ----- TAB MCP -----
+# ----- TAB MCP (CÓ LƯU STATE QUA URL) -----
 with tab_mcp:
     st.subheader("🗺️ MCP VISIT & MAPPING DOANH SỐ BÁN HÀNG")
     if mcp.empty:
@@ -660,21 +657,37 @@ with tab_mcp:
         col_ma = find_col(mcp, ['Outlet_code','Outlet Code','Mã CH','Mã khách hàng','Poscode'])
         col_ten = find_col(mcp, ['Outlet_name','Outlet Name','Tên CH','Tên khách hàng'])
         col_thu = find_col(mcp, ['Thứ','Frequency','Tần suất'])
-        c1,c2 = st.columns(2)
+        
+        saved_mcp_nv = st.query_params.get("mcp_nv", "Tất cả ĐDKD")
+        saved_mcp_thu = st.query_params.get("mcp_thu", "Tất cả các thứ")
+        saved_mcp_ma = st.query_params.get("mcp_ma", "")
+        saved_mcp_ten = st.query_params.get("mcp_ten", "")
+
+        c1, c2 = st.columns(2)
         with c1:
             st.markdown('<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD)</p>', unsafe_allow_html=True)
             nv_opts = ["Tất cả ĐDKD"] + (sorted(mcp[col_nv].dropna().astype(str).unique().tolist()) if col_nv else [])
-            f_nv = st.selectbox("", nv_opts, key="mcp_nv", label_visibility="collapsed")
+            default_nv_idx = nv_opts.index(saved_mcp_nv) if saved_mcp_nv in nv_opts else 0
+            f_nv = st.selectbox("", nv_opts, index=default_nv_idx, key="mcp_nv_input", label_visibility="collapsed")
         with c2:
             st.markdown('<p class="filter-label">📅 Lọc Theo Thứ</p>', unsafe_allow_html=True)
-            f_thu = st.selectbox("", ["Tất cả các thứ","2","3","4","5","6","7","25","36","47"], key="mcp_thu", label_visibility="collapsed")
-        c3,c4 = st.columns(2)
+            thu_opts = ["Tất cả các thứ","2","3","4","5","6","7","25","36","47"]
+            default_thu_idx = thu_opts.index(saved_mcp_thu) if saved_mcp_thu in thu_opts else 0
+            f_thu = st.selectbox("", thu_opts, index=default_thu_idx, key="mcp_thu_input", label_visibility="collapsed")
+            
+        c3, c4 = st.columns(2)
         with c3:
             st.markdown('<p class="filter-label">🆔 Lọc Mã Khách Hàng</p>', unsafe_allow_html=True)
-            f_ma = st.text_input("", key="mcp_ma", label_visibility="collapsed")
+            f_ma = st.text_input("", value=saved_mcp_ma, key="mcp_ma_input", label_visibility="collapsed")
         with c4:
             st.markdown('<p class="filter-label">🏪 Lọc Tên Khách Hàng</p>', unsafe_allow_html=True)
-            f_ten = st.text_input("", key="mcp_ten", label_visibility="collapsed")
+            f_ten = st.text_input("", value=saved_mcp_ten, key="mcp_ten_input", label_visibility="collapsed")
+            
+        st.query_params["mcp_nv"] = f_nv
+        st.query_params["mcp_thu"] = f_thu
+        st.query_params["mcp_ma"] = f_ma
+        st.query_params["mcp_ten"] = f_ten
+
         df_f = mcp.copy()
         if f_nv != "Tất cả ĐDKD" and col_nv: df_f = df_f[df_f[col_nv].astype(str)==f_nv]
         if f_ma and col_ma: df_f = df_f[df_f[col_ma].astype(str).str.contains(f_ma, case=False, na=False)]
@@ -686,7 +699,7 @@ with tab_mcp:
         st.dataframe(df_f, use_container_width=True, height=450, hide_index=True)
         st.caption(f"Hiển thị: {len(df_f):,} / {len(mcp):,} cửa hàng")
 
-# ----- TAB CAT -----
+# ----- TAB CAT (CÓ LƯU STATE QUA URL) -----
 with tab_cat:
     st.subheader("🎯 TRACKING MBS - THEO NGÀNH HÀNG (CATEGORY)")
     if df_cat.empty:
@@ -696,21 +709,37 @@ with tab_cat:
         col_ma = find_col(df_cat, ['Outlet Code','Outlet_code','Mã CH','Mã khách hàng'])
         col_ten = find_col(df_cat, ['Outlet Name','Outlet_name','Tên CH','Tên khách hàng'])
         col_thu = find_col(df_cat, ['Thứ'])
+        
+        saved_cat_nv = st.query_params.get("cat_nv", "Tất cả ĐDKD")
+        saved_cat_thu = st.query_params.get("cat_thu", "Tất cả các thứ")
+        saved_cat_ma = st.query_params.get("cat_ma", "")
+        saved_cat_ten = st.query_params.get("cat_ten", "")
+
         c1, c2 = st.columns(2)
         with c1:
             st.markdown('<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD)</p>', unsafe_allow_html=True)
             nv_opts = ["Tất cả ĐDKD"] + (sorted(df_cat[col_nv].dropna().astype(str).unique().tolist()) if col_nv else [])
-            f_nv = st.selectbox("", nv_opts, key="cat_nv", label_visibility="collapsed")
+            default_nv_idx = nv_opts.index(saved_cat_nv) if saved_cat_nv in nv_opts else 0
+            f_nv = st.selectbox("", nv_opts, index=default_nv_idx, key="cat_nv_input", label_visibility="collapsed")
         with c2:
             st.markdown('<p class="filter-label">📅 Lọc Theo Thứ</p>', unsafe_allow_html=True)
-            f_thu = st.selectbox("", ["Tất cả các thứ","2","3","4","5","6","7","25","36","47"], key="cat_thu", label_visibility="collapsed")
+            thu_opts = ["Tất cả các thứ","2","3","4","5","6","7","25","36","47"]
+            default_thu_idx = thu_opts.index(saved_cat_thu) if saved_cat_thu in thu_opts else 0
+            f_thu = st.selectbox("", thu_opts, index=default_thu_idx, key="cat_thu_input", label_visibility="collapsed")
+            
         c3, c4 = st.columns(2)
         with c3:
             st.markdown('<p class="filter-label">🆔 Lọc Mã Khách Hàng</p>', unsafe_allow_html=True)
-            f_ma = st.text_input("", key="cat_ma", label_visibility="collapsed")
+            f_ma = st.text_input("", value=saved_cat_ma, key="cat_ma_input", label_visibility="collapsed")
         with c4:
             st.markdown('<p class="filter-label">🏪 Lọc Tên Khách Hàng</p>', unsafe_allow_html=True)
-            f_ten = st.text_input("", key="cat_ten", label_visibility="collapsed")
+            f_ten = st.text_input("", value=saved_cat_ten, key="cat_ten_input", label_visibility="collapsed")
+            
+        st.query_params["cat_nv"] = f_nv
+        st.query_params["cat_thu"] = f_thu
+        st.query_params["cat_ma"] = f_ma
+        st.query_params["cat_ten"] = f_ten
+
         df_f = df_cat.copy()
         if f_nv != "Tất cả ĐDKD" and col_nv: df_f = df_f[df_f[col_nv].astype(str)==f_nv]
         if f_ma and col_ma: df_f = df_f[df_f[col_ma].astype(str).str.contains(f_ma, case=False, na=False)]
@@ -722,7 +751,7 @@ with tab_cat:
         st.dataframe(df_f, use_container_width=True, height=450, hide_index=True)
         st.caption(f"Hiển thị: {len(df_f):,} / {len(df_cat):,} dòng")
 
-# ----- TAB BRAND -----
+# ----- TAB BRAND (CÓ LƯU STATE QUA URL) -----
 with tab_brand:
     st.subheader("🏷️ TRACKING MBS - THEO THƯƠNG HIỆU (BRAND)")
     if df_brand.empty:
@@ -732,21 +761,37 @@ with tab_brand:
         col_ma = find_col(df_brand, ['Outlet Code','Outlet_code','Mã CH','Mã khách hàng'])
         col_ten = find_col(df_brand, ['Outlet Name','Outlet_name','Tên CH','Tên khách hàng'])
         col_thu = find_col(df_brand, ['Thứ'])
+        
+        saved_brand_nv = st.query_params.get("brand_nv", "Tất cả ĐDKD")
+        saved_brand_thu = st.query_params.get("brand_thu", "Tất cả các thứ")
+        saved_brand_ma = st.query_params.get("brand_ma", "")
+        saved_brand_ten = st.query_params.get("brand_ten", "")
+
         c1, c2 = st.columns(2)
         with c1:
             st.markdown('<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD)</p>', unsafe_allow_html=True)
             nv_opts = ["Tất cả ĐDKD"] + (sorted(df_brand[col_nv].dropna().astype(str).unique().tolist()) if col_nv else [])
-            f_nv = st.selectbox("", nv_opts, key="brand_nv", label_visibility="collapsed")
+            default_nv_idx = nv_opts.index(saved_brand_nv) if saved_brand_nv in nv_opts else 0
+            f_nv = st.selectbox("", nv_opts, index=default_nv_idx, key="brand_nv_input", label_visibility="collapsed")
         with c2:
             st.markdown('<p class="filter-label">📅 Lọc Theo Thứ</p>', unsafe_allow_html=True)
-            f_thu = st.selectbox("", ["Tất cả các thứ","2","3","4","5","6","7","25","36","47"], key="brand_thu", label_visibility="collapsed")
+            thu_opts = ["Tất cả các thứ","2","3","4","5","6","7","25","36","47"]
+            default_thu_idx = thu_opts.index(saved_brand_thu) if saved_brand_thu in thu_opts else 0
+            f_thu = st.selectbox("", thu_opts, index=default_thu_idx, key="brand_thu_input", label_visibility="collapsed")
+            
         c3, c4 = st.columns(2)
         with c3:
             st.markdown('<p class="filter-label">🆔 Lọc Mã Khách Hàng</p>', unsafe_allow_html=True)
-            f_ma = st.text_input("", key="brand_ma", label_visibility="collapsed")
+            f_ma = st.text_input("", value=saved_brand_ma, key="brand_ma_input", label_visibility="collapsed")
         with c4:
             st.markdown('<p class="filter-label">🏪 Lọc Tên Khách Hàng</p>', unsafe_allow_html=True)
-            f_ten = st.text_input("", key="brand_ten", label_visibility="collapsed")
+            f_ten = st.text_input("", value=saved_brand_ten, key="brand_ten_input", label_visibility="collapsed")
+            
+        st.query_params["brand_nv"] = f_nv
+        st.query_params["brand_thu"] = f_thu
+        st.query_params["brand_ma"] = f_ma
+        st.query_params["brand_ten"] = f_ten
+
         df_f = df_brand.copy()
         if f_nv != "Tất cả ĐDKD" and col_nv: df_f = df_f[df_f[col_nv].astype(str)==f_nv]
         if f_ma and col_ma: df_f = df_f[df_f[col_ma].astype(str).str.contains(f_ma, case=False, na=False)]
