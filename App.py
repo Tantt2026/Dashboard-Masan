@@ -362,7 +362,7 @@ def process_brand_sales(df_rpt, df_brand):
     c_code = find_col(df_out, ['Outlet Code', 'Outlet_code', 'Mã CH'])
     c_brand = find_col(df_out, ['Danh sách full brand', 'Brand', 'Brands'])
     col_val1 = find_col(df_out, ['Doanh số thực đạt của brand', 'Doanh số thực đạt brand'])
-    col_val2 = find_col(df_out, ['Doanh số thực đạt của brand (Not Cancel/Pending)', 'Doanh số thực đạt của brand(Not Cancel/Pending)'])
+    col_val2 = find_col(df_out, ['Doanh số thực đạtของ brand (Not Cancel/Pending)', 'Doanh số thực đạtของ brand(Not Cancel/Pending)'])
     
     if not c_code or not c_brand: return df_out
     
@@ -721,7 +721,7 @@ with tab_mcp:
             st.markdown('<p class="filter-label">🏪 Lọc Tên Khách Hàng</p>', unsafe_allow_html=True)
             f_ten = st.text_input("", value=saved_mcp_ten, key="mcp_ten_input", on_change=update_mcp_params, label_visibility="collapsed")
 
-        # Hàng 3: VIP MCH & Doanh Số MTD (chọn nhiều dữ liệu)
+        # Hàng 3: VIP MCH & Doanh Số MTD (Dựa trên doanh số thực tế của khách hàng)
         c5, c6 = st.columns(2)
         with c5:
             st.markdown('<p class="filter-label">⭐ Lọc VIP MCH (Chọn nhiều)</p>', unsafe_allow_html=True)
@@ -729,11 +729,15 @@ with tab_mcp:
             valid_default_vip = [v for v in default_vip_list if v in vip_opts]
             f_vip = st.multiselect("", vip_opts, default=valid_default_vip, key="mcp_vip_input", on_change=update_mcp_params, label_visibility="collapsed")
         with c6:
-            st.markdown('<p class="filter-label">💰 Lọc Doanh Số MTD (Chọn nhiều)</p>', unsafe_allow_html=True)
-            # Tạo các nhóm khoảng doanh số thực tế từ cột Doanh Số MTD
-            ds_ranges = ["0 (Chưa phát sinh)", "1 - 1.000.000", "1.000.001 - 5.000.000", "> 5.000.000"]
-            valid_default_ds = [d for d in default_ds_list if d in ds_ranges]
-            f_ds = st.multiselect("", ds_ranges, default=valid_default_ds, key="mcp_ds_input", on_change=update_mcp_params, label_visibility="collapsed")
+            st.markdown('<p class="filter-label">💰 Lọc Doanh Số MTD Thực Tế (Chọn nhiều)</p>', unsafe_allow_html=True)
+            # Lấy danh sách các mức doanh số thực tế có trong dữ liệu và format format_number_vn
+            if col_ds:
+                raw_ds_vals = sorted(mcp[col_ds].dropna().unique().tolist())
+                ds_opts = [format_number_vn(v) for v in raw_ds_vals]
+            else:
+                ds_opts = []
+            valid_default_ds = [d for d in default_ds_list if d in ds_opts]
+            f_ds = st.multiselect("", ds_opts, default=valid_default_ds, key="mcp_ds_input", on_change=update_mcp_params, label_visibility="collapsed")
             
         st.query_params["mcp_nv"] = st.session_state.mcp_nv_input
         st.query_params["mcp_thu"] = st.session_state.mcp_thu_input
@@ -749,17 +753,9 @@ with tab_mcp:
         if f_vip and col_vip: df_f = df_f[df_f[col_vip].astype(str).isin(f_vip)]
         
         if f_ds and col_ds:
-            num_ds = pd.to_numeric(df_f[col_ds], errors='coerce').fillna(0)
-            ds_mask = pd.Series(False, index=df_f.index)
-            if "0 (Chưa phát sinh)" in f_ds:
-                ds_mask = ds_mask | (num_ds == 0)
-            if "1 - 1.000.000" in f_ds:
-                ds_mask = ds_mask | ((num_ds >= 1) & (num_ds <= 1000000))
-            if "1.000.001 - 5.000.000" in f_ds:
-                ds_mask = ds_mask | ((num_ds > 1000000) & (num_ds <= 5000000))
-            if "> 5.000.000" in f_ds:
-                ds_mask = ds_mask | (num_ds > 5000000)
-            df_f = df_f[ds_mask]
+            # So khớp doanh số thực tế đã format hoặc numeric value
+            formatted_col_ds = df_f[col_ds].apply(format_number_vn).astype(str)
+            df_f = df_f[formatted_col_ds.isin(f_ds)]
 
         df_f = filter_by_thu(df_f, col_thu, f_thu)
         for col in df_f.columns:
