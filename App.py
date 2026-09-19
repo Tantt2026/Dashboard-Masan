@@ -136,7 +136,7 @@ def render_metric_card(label, value):
     </div>
     """, unsafe_allow_html=True)
 
-# ====================== ĐƯỜNG DẪN (ĐÃ TRỎ VÀO THƯ MỤC data/) ======================
+# ====================== ĐƯỜNG DẪN ======================
 DATA_DIR = "data"
 RPT_PATH   = os.path.join(DATA_DIR, "RPT_061.xlsx")
 MCP_PATH   = os.path.join(DATA_DIR, "Data_MCP.xlsx")
@@ -144,7 +144,6 @@ KPI_PATH   = os.path.join(DATA_DIR, "Target_KPI.xlsx")
 CAT_PATH   = os.path.join(DATA_DIR, "Data_Cat.xlsx")
 BRAND_PATH = os.path.join(DATA_DIR, "Data_Brand.xlsx")
 
-# Tìm đúng tên file Combo OFF và ON trong thư mục data/
 combo_off_files = [f for f in os.listdir(DATA_DIR) if "Combo" in f and "OFF" in f]
 combo_on_files  = [f for f in os.listdir(DATA_DIR) if "Combo" in f and "On" in f]
 COMBO_OFF_PATH = os.path.join(DATA_DIR, combo_off_files[0]) if combo_off_files else os.path.join(DATA_DIR, "Tân_Combo Kênh OFF.xlsx")
@@ -277,7 +276,6 @@ def filter_by_thu_multi(df, col_thu, f_thu_list):
             mask = mask | (thu_s == f_thu)
     return df[mask]
 
-# ====================== HÀM XỬ LÝ DOANH SỐ MTD ======================
 def process_mcp_sales(df_rpt, df_mcp):
     if df_mcp.empty or df_rpt.empty: return df_mcp
     valid_df = df_rpt[df_rpt['Tình trạng đơn hàng'] != 'Đã hủy'].copy()
@@ -303,28 +301,18 @@ def process_mcp_sales(df_rpt, df_mcp):
 
 def process_cat_sales(df_rpt, df_cat):
     if df_cat.empty or df_rpt.empty: return df_cat
-    
     sub_map = {
-        'Beer': 'Bia',
-        'Coffee': 'Cà phê',
-        'Seasoning': 'Gia vị',
-        'Home Care': 'Hóa Mỹ Phẩm',
-        'Convenience Foods': 'Mì, Lẩu, Phở, Hủ Tiếu',
-        'Refreshment Drinks': 'Nước giải khát',
-        'Nutrition': 'Ngũ cốc',
-        'Processed Meats': 'Xúc xích, Thịt chế biến'
+        'Beer': 'Bia', 'Coffee': 'Cà phê', 'Seasoning': 'Gia vị', 'Home Care': 'Hóa Mỹ Phẩm',
+        'Convenience Foods': 'Mì, Lẩu, Phở, Hủ Tiếu', 'Refreshment Drinks': 'Nước giải khát',
+        'Nutrition': 'Ngũ cốc', 'Processed Meats': 'Xúc xích, Thịt chế biến'
     }
-    
     df_clean = df_rpt.copy()
     sub_div_col = find_col(df_clean, ['Sub Division', 'SubDivision', 'Phân nhóm'])
     val_col = find_col(df_clean, ['Tổng tiền', 'Giá trị sau CK']) or 'Tổng tiền'
     status_col = find_col(df_clean, ['Tình trạng đơn hàng', 'Trạng thái'])
     
-    if sub_div_col:
-        df_clean['Mapped_Cat'] = df_clean[sub_div_col].map(sub_map).fillna(df_clean[sub_div_col])
-    else:
-        df_clean['Mapped_Cat'] = 'Khác'
-        
+    if sub_div_col: df_clean['Mapped_Cat'] = df_clean[sub_div_col].map(sub_map).fillna(df_clean[sub_div_col])
+    else: df_clean['Mapped_Cat'] = 'Khác'
     df_clean['Mã CH_str'] = df_clean['Mã CH'].astype(str).str.strip()
     
     df_valid = df_clean[df_clean[status_col] != 'Đã hủy'] if status_col else df_clean
@@ -342,13 +330,11 @@ def process_cat_sales(df_rpt, df_cat):
     col_val2 = find_col(df_out, ['Doanh số thực đạt của CAT(Not Cancel/Pending)', 'Doanh số thực đạt của CAT (Not Cancel/Pending)'])
     
     if not c_code or not c_cat: return df_out
-    
     df_out['_outlet_key'] = df_out[c_code].astype(str).str.strip()
     df_out['_cat_key'] = df_out[c_cat].astype(str).str.strip()
     
     df_out = df_out.merge(agg_cat1, left_on=['_outlet_key', '_cat_key'], right_on=['Outlet_key', 'Cat_Key'], how='left')
     if 'Outlet_key' in df_out.columns: df_out = df_out.drop(columns=['Outlet_key', 'Cat_Key'])
-    
     df_out = df_out.merge(agg_cat2, left_on=['_outlet_key', '_cat_key'], right_on=['Outlet_key', 'Cat_Key'], how='left')
     if 'Outlet_key' in df_out.columns: df_out = df_out.drop(columns=['Outlet_key', 'Cat_Key'])
     
@@ -360,13 +346,11 @@ def process_cat_sales(df_rpt, df_cat):
 
 def process_brand_sales(df_rpt, df_brand):
     if df_brand.empty or df_rpt.empty: return df_brand
-    
     brands_list = [
         "B'fast", "Bupnon TEA365", "Compact", "Chanté", "Chinsu", "Chinsu Story",
         "Heo Cao Bồi", "Homey", "Joins", "Kokomi", "Nam Ngư", "NET", "Omachi",
         "Ponnie", "Red Ruby", "Sachi", "SS", "Sunlight", "VGF", "Vinacafé", "Wake-up 247"
     ]
-    
     def match_brand(sku_str):
         if pd.isna(sku_str): return "Khác"
         s = str(sku_str).lower()
@@ -394,16 +378,14 @@ def process_brand_sales(df_rpt, df_brand):
     c_code = find_col(df_out, ['Outlet Code', 'Outlet_code', 'Mã CH'])
     c_brand = find_col(df_out, ['Danh sách full brand', 'Brand', 'Brands'])
     col_val1 = find_col(df_out, ['Doanh số thực đạt của brand', 'Doanh số thực đạt brand'])
-    col_val2 = find_col(df_out, ['Doanh số thực đạt của brand (Not Cancel/Pending)', 'Doanh số thực đạt ของ brand(Not Cancel/Pending)'])
+    col_val2 = find_col(df_out, ['Doanh số thực đạt của brand (Not Cancel/Pending)', 'Doanh số thực đạtของ brand(Not Cancel/Pending)'])
     
     if not c_code or not c_brand: return df_out
-    
     df_out['_outlet_key'] = df_out[c_code].astype(str).str.strip()
     df_out['_brand_key'] = df_out[c_brand].astype(str).str.strip()
     
     df_out = df_out.merge(agg_b1, left_on=['_outlet_key', '_brand_key'], right_on=['Outlet_key', 'Brand_Key'], how='left')
     if 'Outlet_key' in df_out.columns: df_out = df_out.drop(columns=['Outlet_key', 'Brand_Key'])
-    
     df_out = df_out.merge(agg_b2, left_on=['_outlet_key', '_brand_key'], right_on=['Outlet_key', 'Brand_Key'], how='left')
     if 'Outlet_key' in df_out.columns: df_out = df_out.drop(columns=['Outlet_key', 'Brand_Key'])
     
@@ -413,7 +395,6 @@ def process_brand_sales(df_rpt, df_brand):
     drop_cols = [c for c in ['_outlet_key', '_brand_key', 'Val1', 'Val2'] if c in df_out.columns]
     return df_out.drop(columns=drop_cols)
 
-# ====================== KPI LOGIC CHUẨN ======================
 def build_report(df, report_date, targets, report_type, filter_nv=None):
     df_mtd = df[df['date'] >= date(report_date.year, report_date.month, 1)].copy()
     if filter_nv and filter_nv != "Tất cả ĐDKD":
@@ -562,6 +543,7 @@ def build_combo_matrix(df, report_date, df_off_master, df_on_master, filter_nv=N
             'Phát sinh Ngày (OFF)': n_off,
             'MTD (OFF)': m_off,
             '% MTD (OFF)': f"{pct_off}%",
+            '_pct_off_val': (m_off / tgt_off if tgt_off else 0),
             'Target (ON)': tgt_on,
             'Phát sinh Ngày (ON)': n_on,
             'MTD (ON)': m_on,
@@ -570,7 +552,8 @@ def build_combo_matrix(df, report_date, df_off_master, df_on_master, filter_nv=N
         
     df_out = pd.DataFrame(rows)
     if not df_out.empty:
-        df_out = df_out.sort_values('MTD (OFF)', ascending=False).reset_index(drop=True)
+        # Sắp xếp theo % MTD (OFF) từ thấp đến cao
+        df_out = df_out.sort_values('_pct_off_val', ascending=True).drop(columns=['_pct_off_val']).reset_index(drop=True)
         df_out.insert(0, 'STT', range(1, len(df_out)+1))
         
     tot_tgt_off = int(sum(off_target_map.values())) if not filter_nv or filter_nv == "Tất cả ĐDKD" else int(sum([off_target_map.get(filter_nv, 0)]))
@@ -758,7 +741,7 @@ with tab_kpi:
             <b>NHẬN XÉT BÁO CÁO COMBO LŨY KẾ (MATRIX OFF/ON):</b><br>
             • <b>Kênh OFF:</b> Đạt <b>{total_off:,} / {target_off_total:,} CH ({pct_off_team}%)</b> | Phát sinh mới trong ngày: <b>+{ngay_off} CH</b>.<br>
             • <b>Kênh ON:</b> Đạt <b>{total_on:,} / {target_on_total:,} CH ({pct_on_team}%)</b> | Phát sinh mới trong ngày: <b>+{ngay_on} CH</b>.<br>
-            • Dữ liệu target lấy trực tiếp từ file master <i>Tân_Combo Kênh OFF.xlsx</i> và <i>Tân_Combo Kênh On.xlsx</i> phân bổ theo từng nhân viên.
+            • Đã sắp xếp danh sách theo <b>% MTD (OFF) từ thấp đến cao</b> để bro dễ dàng tracking các ĐDKD cần đôn đốc.
         </div>
         """, unsafe_allow_html=True)
 
