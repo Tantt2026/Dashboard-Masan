@@ -307,7 +307,7 @@ def process_cat_sales(df_rpt, df_cat):
     c_code = find_col(df_out, ['Outlet Code', 'Outlet_code', 'Mã CH'])
     c_cat = find_col(df_out, ['Danh sách full cat', 'Category', 'Cat'])
     col_val1 = find_col(df_out, ['Doanh số thực đạt của CAT', 'Doanh số thực đạt CAT'])
-    col_val2 = find_col(df_out, ['Doanh số thực đạt của CAT(Not Cancel/Pending)', 'Doanh số thực đạtของ CAT (Not Cancel/Pending)'])
+    col_val2 = find_col(df_out, ['Doanh số thực đạt của CAT(Not Cancel/Pending)', 'Doanh số thực đạt của CAT (Not Cancel/Pending)'])
     
     if not c_code or not c_cat: return df_out
     
@@ -362,7 +362,7 @@ def process_brand_sales(df_rpt, df_brand):
     c_code = find_col(df_out, ['Outlet Code', 'Outlet_code', 'Mã CH'])
     c_brand = find_col(df_out, ['Danh sách full brand', 'Brand', 'Brands'])
     col_val1 = find_col(df_out, ['Doanh số thực đạt của brand', 'Doanh số thực đạt brand'])
-    col_val2 = find_col(df_out, ['Doanh số thực đạtของ brand (Not Cancel/Pending)', 'Doanh số thực đạt của brand(Not Cancel/Pending)'])
+    col_val2 = find_col(df_out, ['Doanh số thực đạt của brand (Not Cancel/Pending)', 'Doanh số thực đạt của brand(Not Cancel/Pending)'])
     
     if not c_code or not c_brand: return df_out
     
@@ -660,6 +660,8 @@ def update_mcp_params():
     st.query_params["mcp_thu"] = st.session_state.mcp_thu_input
     st.query_params["mcp_ma"] = st.session_state.mcp_ma_input
     st.query_params["mcp_ten"] = st.session_state.mcp_ten_input
+    st.query_params["mcp_vip"] = ",".join(st.session_state.mcp_vip_input) if st.session_state.mcp_vip_input else ""
+    st.query_params["mcp_ds"] = ",".join(st.session_state.mcp_ds_input) if st.session_state.mcp_ds_input else ""
 
 def update_cat_params():
     st.query_params["cat_nv"] = st.session_state.cat_nv_input
@@ -683,12 +685,21 @@ with tab_mcp:
         col_ma = find_col(mcp, ['Outlet_code','Outlet Code','Mã CH','Mã khách hàng','Poscode'])
         col_ten = find_col(mcp, ['Outlet_name','Outlet Name','Tên CH','Tên khách hàng'])
         col_thu = find_col(mcp, ['Thứ','Frequency','Tần suất'])
+        col_vip = find_col(mcp, ['VIP MCH', 'VIP_MCH'])
+        col_ds = find_col(mcp, ['Doanh Số MTD', 'Doanh số MTD', 'Doanh_so_MTD'])
         
         saved_mcp_nv = st.query_params.get("mcp_nv", "Tất cả ĐDKD")
         saved_mcp_thu = st.query_params.get("mcp_thu", "Tất cả các thứ")
         saved_mcp_ma = st.query_params.get("mcp_ma", "")
         saved_mcp_ten = st.query_params.get("mcp_ten", "")
+        
+        saved_mcp_vip = st.query_params.get("mcp_vip", "")
+        default_vip_list = [x.strip() for x in saved_mcp_vip.split(",") if x.strip()] if saved_mcp_vip else []
+        
+        saved_mcp_ds = st.query_params.get("mcp_ds", "")
+        default_ds_list = [x.strip() for x in saved_mcp_ds.split(",") if x.strip()] if saved_mcp_ds else []
 
+        # Hàng 1: Nhân viên & Thứ
         c1, c2 = st.columns(2)
         with c1:
             st.markdown('<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD)</p>', unsafe_allow_html=True)
@@ -701,6 +712,7 @@ with tab_mcp:
             default_thu_idx = thu_opts.index(saved_mcp_thu) if saved_mcp_thu in thu_opts else 0
             f_thu = st.selectbox("", thu_opts, index=default_thu_idx, key="mcp_thu_input", on_change=update_mcp_params, label_visibility="collapsed")
             
+        # Hàng 2: Mã KH & Tên KH
         c3, c4 = st.columns(2)
         with c3:
             st.markdown('<p class="filter-label">🆔 Lọc Mã Khách Hàng</p>', unsafe_allow_html=True)
@@ -708,16 +720,47 @@ with tab_mcp:
         with c4:
             st.markdown('<p class="filter-label">🏪 Lọc Tên Khách Hàng</p>', unsafe_allow_html=True)
             f_ten = st.text_input("", value=saved_mcp_ten, key="mcp_ten_input", on_change=update_mcp_params, label_visibility="collapsed")
+
+        # Hàng 3: VIP MCH & Doanh Số MTD (chọn nhiều dữ liệu)
+        c5, c6 = st.columns(2)
+        with c5:
+            st.markdown('<p class="filter-label">⭐ Lọc VIP MCH (Chọn nhiều)</p>', unsafe_allow_html=True)
+            vip_opts = sorted(mcp[col_vip].dropna().astype(str).unique().tolist()) if col_vip else []
+            valid_default_vip = [v for v in default_vip_list if v in vip_opts]
+            f_vip = st.multiselect("", vip_opts, default=valid_default_vip, key="mcp_vip_input", on_change=update_mcp_params, label_visibility="collapsed")
+        with c6:
+            st.markdown('<p class="filter-label">💰 Lọc Doanh Số MTD (Chọn nhiều)</p>', unsafe_allow_html=True)
+            # Tạo các nhóm khoảng doanh số thực tế từ cột Doanh Số MTD
+            ds_ranges = ["0 (Chưa phát sinh)", "1 - 1.000.000", "1.000.001 - 5.000.000", "> 5.000.000"]
+            valid_default_ds = [d for d in default_ds_list if d in ds_ranges]
+            f_ds = st.multiselect("", ds_ranges, default=valid_default_ds, key="mcp_ds_input", on_change=update_mcp_params, label_visibility="collapsed")
             
         st.query_params["mcp_nv"] = st.session_state.mcp_nv_input
         st.query_params["mcp_thu"] = st.session_state.mcp_thu_input
         st.query_params["mcp_ma"] = st.session_state.mcp_ma_input
         st.query_params["mcp_ten"] = st.session_state.mcp_ten_input
+        st.query_params["mcp_vip"] = ",".join(st.session_state.mcp_vip_input) if st.session_state.mcp_vip_input else ""
+        st.query_params["mcp_ds"] = ",".join(st.session_state.mcp_ds_input) if st.session_state.mcp_ds_input else ""
 
         df_f = mcp.copy()
         if f_nv != "Tất cả ĐDKD" and col_nv: df_f = df_f[df_f[col_nv].astype(str)==f_nv]
         if f_ma and col_ma: df_f = df_f[df_f[col_ma].astype(str).str.contains(f_ma, case=False, na=False)]
         if f_ten and col_ten: df_f = df_f[df_f[col_ten].astype(str).str.contains(f_ten, case=False, na=False)]
+        if f_vip and col_vip: df_f = df_f[df_f[col_vip].astype(str).isin(f_vip)]
+        
+        if f_ds and col_ds:
+            num_ds = pd.to_numeric(df_f[col_ds], errors='coerce').fillna(0)
+            ds_mask = pd.Series(False, index=df_f.index)
+            if "0 (Chưa phát sinh)" in f_ds:
+                ds_mask = ds_mask | (num_ds == 0)
+            if "1 - 1.000.000" in f_ds:
+                ds_mask = ds_mask | ((num_ds >= 1) & (num_ds <= 1000000))
+            if "1.000.001 - 5.000.000" in f_ds:
+                ds_mask = ds_mask | ((num_ds > 1000000) & (num_ds <= 5000000))
+            if "> 5.000.000" in f_ds:
+                ds_mask = ds_mask | (num_ds > 5000000)
+            df_f = df_f[ds_mask]
+
         df_f = filter_by_thu(df_f, col_thu, f_thu)
         for col in df_f.columns:
             if any(x in col.lower().replace(" ","") for x in ["3msales","doanhsố","doanhso","sales","doanhsômtd"]):
