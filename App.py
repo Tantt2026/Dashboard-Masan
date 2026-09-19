@@ -703,24 +703,32 @@ with tab_mcp:
             st.markdown('<p class="filter-label">🏪 Lọc Tên Khách Hàng</p>', unsafe_allow_html=True)
             f_ten = st.text_input("", key="mcp_ten", label_visibility="collapsed")
 
-        # Hàng lọc 3: VIP MCH & Doanh Số MTD (Mới bổ sung theo yêu cầu)
+        # Hàng lọc 3: VIP MCH & Doanh Số MTD (Lọc theo danh sách doanh số thực tế có trong data)
         c5, c6 = st.columns(2)
         with c5:
             st.markdown('<p class="filter-label">⭐ VIP MCH</p>', unsafe_allow_html=True)
             vip_opts = ["Tất cả"] + (sorted(mcp[col_vip].dropna().astype(str).unique().tolist()) if col_vip else [])
             f_vip = st.selectbox("", vip_opts, key="mcp_vip", label_visibility="collapsed")
         with c6:
-            st.markdown('<p class="filter-label">💰 Doanh Số MTD (Lọc từ giá trị min)</p>', unsafe_allow_html=True)
-            f_sales_min = st.number_input("", value=0.0, step=100000.0, key="mcp_sales_min", label_visibility="collapsed")
+            st.markdown('<p class="filter-label">💰 Doanh Số MTD (Chọn giá trị thực tế)</p>', unsafe_allow_html=True)
+            sales_opts = ["Tất cả"]
+            if col_sales:
+                unique_sales = sorted(mcp[col_sales].dropna().unique())
+                sales_opts += [format_number_vn(s) for s in unique_sales]
+            f_sales_val = st.selectbox("", sales_opts, key="mcp_sales_val", label_visibility="collapsed")
 
         df_f = mcp.copy()
         if f_nv != "Tất cả ĐDKD" and col_nv: df_f = df_f[df_f[col_nv].astype(str)==f_nv]
         if f_ma and col_ma: df_f = df_f[df_f[col_ma].astype(str).str.contains(f_ma, case=False, na=False)]
         if f_ten and col_ten: df_f = df_f[df_f[col_ten].astype(str).str.contains(f_ten, case=False, na=False)]
         if f_vip != "Tất cả" and col_vip: df_f = df_f[df_f[col_vip].astype(str)==f_vip]
-        if col_sales and f_sales_min > 0:
-            df_f[col_sales] = pd.to_numeric(df_f[col_sales], errors='coerce').fillna(0)
-            df_f = df_f[df_f[col_sales] >= f_sales_min]
+        
+        if f_sales_val != "Tất cả" and col_sales:
+            try:
+                raw_sales_val = float(f_sales_val.replace(".", "").replace(",", "."))
+                df_f = df_f[df_f[col_sales] == raw_sales_val]
+            except:
+                pass
             
         df_f = filter_by_thu(df_f, col_thu, f_thu)
 
