@@ -96,7 +96,6 @@ st.markdown("""
         line-height: 1.5;
     }
     
-    /* Ép style cho nút popover (chọn cột hiển thị) thành MÀU ĐỎ và IN ĐẬM */
     [data-testid="stPopover"] button {
         color: #e53e3e !important;
         font-weight: 900 !important;
@@ -137,25 +136,25 @@ def render_metric_card(label, value):
     </div>
     """, unsafe_allow_html=True)
 
-# ====================== ĐƯỜNG DẪN ======================
-DATA_DIR = "."
+# ====================== ĐƯỜNG DẪN (ĐÃ TRỎ VÀO THƯ MỤC data/) ======================
+DATA_DIR = "data"
 RPT_PATH   = os.path.join(DATA_DIR, "RPT_061.xlsx")
 MCP_PATH   = os.path.join(DATA_DIR, "Data_MCP.xlsx")
 KPI_PATH   = os.path.join(DATA_DIR, "Target_KPI.xlsx")
 CAT_PATH   = os.path.join(DATA_DIR, "Data_Cat.xlsx")
 BRAND_PATH = os.path.join(DATA_DIR, "Data_Brand.xlsx")
 
-# Tìm đúng tên file Combo OFF và ON
+# Tìm đúng tên file Combo OFF và ON trong thư mục data/
 combo_off_files = [f for f in os.listdir(DATA_DIR) if "Combo" in f and "OFF" in f]
 combo_on_files  = [f for f in os.listdir(DATA_DIR) if "Combo" in f and "On" in f]
-COMBO_OFF_PATH = os.path.join(DATA_DIR, combo_off_files[0]) if combo_off_files else "Tân_Combo Kênh OFF.xlsx"
-COMBO_ON_PATH  = os.path.join(DATA_DIR, combo_on_files[0]) if combo_on_files else "Tân_Combo Kênh On.xlsx"
+COMBO_OFF_PATH = os.path.join(DATA_DIR, combo_off_files[0]) if combo_off_files else os.path.join(DATA_DIR, "Tân_Combo Kênh OFF.xlsx")
+COMBO_ON_PATH  = os.path.join(DATA_DIR, combo_on_files[0]) if combo_on_files else os.path.join(DATA_DIR, "Tân_Combo Kênh On.xlsx")
 
 # ====================== LOAD ======================
 @st.cache_data(ttl=600)
 def load_main_data():
     if not os.path.exists(RPT_PATH) or not os.path.exists(MCP_PATH):
-        st.error("Thiếu file RPT_061.xlsx hoặc Data_MCP.xlsx")
+        st.error(f"Thiếu file RPT_061.xlsx hoặc Data_MCP.xlsx trong thư mục '{DATA_DIR}'")
         st.stop()
     df = pd.read_excel(RPT_PATH)
     mcp = pd.read_excel(MCP_PATH)
@@ -278,7 +277,7 @@ def filter_by_thu_multi(df, col_thu, f_thu_list):
             mask = mask | (thu_s == f_thu)
     return df[mask]
 
-# ====================== HÀM XỬ LÝ DOANH SỐ MTD CHO MCP, CAT, BRAND ======================
+# ====================== HÀM XỬ LÝ DOANH SỐ MTD ======================
 def process_mcp_sales(df_rpt, df_mcp):
     if df_mcp.empty or df_rpt.empty: return df_mcp
     valid_df = df_rpt[df_rpt['Tình trạng đơn hàng'] != 'Đã hủy'].copy()
@@ -395,7 +394,7 @@ def process_brand_sales(df_rpt, df_brand):
     c_code = find_col(df_out, ['Outlet Code', 'Outlet_code', 'Mã CH'])
     c_brand = find_col(df_out, ['Danh sách full brand', 'Brand', 'Brands'])
     col_val1 = find_col(df_out, ['Doanh số thực đạt của brand', 'Doanh số thực đạt brand'])
-    col_val2 = find_col(df_out, ['Doanh số thực đạt của brand (Not Cancel/Pending)', 'Doanh số thực đạtของ brand(Not Cancel/Pending)'])
+    col_val2 = find_col(df_out, ['Doanh số thực đạt của brand (Not Cancel/Pending)', 'Doanh số thực đạt ของ brand(Not Cancel/Pending)'])
     
     if not c_code or not c_brand: return df_out
     
@@ -495,12 +494,10 @@ def build_combo_matrix(df, report_date, df_off_master, df_on_master, filter_nv=N
     if filter_nv and filter_nv != "Tất cả ĐDKD":
         df_mtd = df_mtd[df_mtd['Tên NVBH'] == filter_nv]
         
-    # Lấy danh sách NVBH từ master files nếu có
     nv_list = sorted(df['Tên NVBH'].dropna().unique().tolist())
     if not df_off_master.empty and 'Tên NV' in df_off_master.columns:
         nv_list = sorted(list(set(nv_list + df_off_master['Tên NV'].dropna().unique().tolist())))
 
-    # Target OFF và ON theo từng NVBH từ master files
     off_target_map = {}
     on_target_map = {}
     if not df_off_master.empty and 'Tên NV' in df_off_master.columns and 'outlet_code' in df_off_master.columns:
@@ -555,7 +552,6 @@ def build_combo_matrix(df, report_date, df_off_master, df_on_master, filter_nv=N
         n_on = int(on_ngay.get(nv, 0))
         pct_on = round(m_on / tgt_on * 100, 1) if tgt_on else 0
         
-        # Lấy Mã NVBH tương ứng nếu có
         sub_df = df[df['Tên NVBH'] == nv]
         ma_nv = sub_df['Mã NVBH'].iloc[0] if not sub_df.empty else ""
         
@@ -907,7 +903,7 @@ with tab_mcp:
 with tab_cat:
     st.subheader("🎯 TRACKING MBS - THEO NGÀNH HÀNG (CATEGORY)")
     if df_cat.empty:
-        st.error("❌ Không tìm thấy Data_Cat.xlsx")
+        st.error("❌ Không tìm thấy Data_Cat.xlsx trong thư mục 'data'")
     else:
         col_nv = find_col(df_cat, ['SM Name','SM name','Tên NVBH','Nhân viên'])
         col_ma = find_col(df_cat, ['Outlet Code','Outlet_code','Mã CH','Mã khách hàng'])
@@ -979,7 +975,7 @@ with tab_cat:
 with tab_brand:
     st.subheader("🏷️ TRACKING MBS - THEO THƯƠNG HIỆU (BRAND)")
     if df_brand.empty:
-        st.error("❌ Không tìm thấy Data_Brand.xlsx")
+        st.error("❌ Không tìm thấy Data_Brand.xlsx trong thư mục 'data'")
     else:
         col_nv = find_col(df_brand, ['SM Name','SM name','Tên NVBH','Nhân viên'])
         col_ma = find_col(df_brand, ['Outlet Code','Outlet_code','Mã CH','Mã khách hàng'])
@@ -1051,7 +1047,7 @@ with tab_brand:
 with tab_dskh_off:
     st.subheader("📋 DANH SÁCH KHÁCH HÀNG COMBO OFF (TÂN_COMBO KÊNH OFF)")
     if df_combo_off.empty:
-        st.warning("Chưa có dữ liệu Combo OFF")
+        st.warning("Chưa có dữ liệu Combo OFF trong thư mục 'data'")
     else:
         col_nv_off = find_col(df_combo_off, ['Tên NV', 'SM name', 'Nhân viên'])
         col_ma_off = find_col(df_combo_off, ['outlet_code', 'Outlet Code', 'Mã CH'])
@@ -1120,7 +1116,7 @@ with tab_dskh_off:
 with tab_dskh_on:
     st.subheader("📋 DANH SÁCH KHÁCH HÀNG COMBO ON (TÂN_COMBO KÊNH ON)")
     if df_combo_on.empty:
-        st.warning("Chưa có dữ liệu Combo ON")
+        st.warning("Chưa có dữ liệu Combo ON trong thư mục 'data'")
     else:
         col_nv_on = find_col(df_combo_on, ['Tên NV', 'SM name', 'Nhân viên'])
         col_ma_on = find_col(df_combo_on, ['outlet_code', 'Outlet Code', 'Mã CH'])
