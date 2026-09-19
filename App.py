@@ -583,7 +583,6 @@ def build_combo_matrix(df, report_date, df_off_master, df_on_master, filter_nv=N
 
 # ====================== HÀM TỔNG HỢP THEO NHÂN VIÊN CÓ LỌC THEO THỨ ======================
 def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, brand_df, filter_nv=None, f_thu_list=None):
-    # Lọc danh sách nhân viên gốc
     all_nvs = []
     if not mcp_df.empty:
         c_nv_mcp = find_col(mcp_df, ['SM Name', 'SM name', 'Tên NVBH', 'Nhân viên'])
@@ -605,8 +604,6 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
     if filter_nv and filter_nv != "Tất cả ĐDKD":
         nv_list = [filter_nv] if filter_nv in nv_list else [filter_nv]
 
-    # Chuẩn bị dữ liệu lọc theo thứ cho các bảng nếu có cột 'Thứ'
-    # 1. VIP MCH từ Data_MCP
     mcp_filtered = mcp_df.copy()
     if not mcp_filtered.empty and f_thu_list:
         c_thu_mcp = find_col(mcp_filtered, ['Thứ', 'Frequency', 'Tần suất'])
@@ -623,7 +620,6 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
             df_vip_sub['MA'] = df_vip_sub[c_ma_mcp].astype(str).str.strip()
             vip_map = df_vip_sub.groupby('NV')['MA'].nunique().to_dict()
 
-    # 2. KH Combo OFF
     off_filtered = df_combo_off_raw.copy()
     if not off_filtered.empty and f_thu_list:
         c_thu_off = find_col(off_filtered, ['Thứ', 'Frequency'])
@@ -639,7 +635,6 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
             df_off_sub['MA'] = df_off_sub[c_ma_off].astype(str).str.strip()
             off_map = df_off_sub.groupby('NV')['MA'].nunique().to_dict()
 
-    # 3. KH Combo ON
     on_filtered = df_combo_on_raw.copy()
     if not on_filtered.empty and f_thu_list:
         c_thu_on = find_col(on_filtered, ['Thứ', 'Frequency'])
@@ -655,7 +650,6 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
             df_on_sub['MA'] = df_on_sub[c_ma_on].astype(str).str.strip()
             on_map = df_on_sub.groupby('NV')['MA'].nunique().to_dict()
 
-    # 4. MBS Cat
     cat_filtered = cat_df.copy()
     if not cat_filtered.empty and f_thu_list:
         c_thu_cat = find_col(cat_filtered, ['Thứ'])
@@ -671,7 +665,6 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
             df_cat_sub['MA'] = df_cat_sub[c_ma_cat].astype(str).str.strip()
             cat_map = df_cat_sub.groupby('NV')['MA'].nunique().to_dict()
 
-    # 5. MBS Brand
     brand_filtered = brand_df.copy()
     if not brand_filtered.empty and f_thu_list:
         c_thu_brand = find_col(brand_filtered, ['Thứ'])
@@ -815,13 +808,25 @@ with f3:
     selected_name = st.selectbox("", list(kpi_map.keys()), key="kpi", label_visibility="collapsed")
     selected_kpi = kpi_map[selected_name]
 
-f4, f5 = st.columns([1, 1])
+f4, f5, f6 = st.columns([1, 1, 1])
 with f4:
     st.markdown('<p class="filter-label">SALE SUP</p>', unsafe_allow_html=True)
     st.selectbox("", ["Trương Thanh Tân Total"], key="sup", label_visibility="collapsed")
 with f5:
     st.markdown('<p class="filter-label">ĐDKD (Nhân viên)</p>', unsafe_allow_html=True)
     filter_nv = st.selectbox("", ["Tất cả ĐDKD"] + nv_list, key="ddkd", label_visibility="collapsed")
+with f6:
+    st.markdown('<p class="filter-label">📅 Lọc Theo Thứ (Chọn nhiều)</p>', unsafe_allow_html=True)
+    saved_sum_thu = st.query_params.get("sum_thu", "")
+    default_sum_thu_list = [x.strip() for x in saved_sum_thu.split(",") if x.strip()] if saved_sum_thu else []
+    
+    def update_sum_params():
+        st.query_params["sum_thu"] = ",".join(st.session_state.sum_thu_input) if st.session_state.sum_thu_input else ""
+
+    thu_opts = ["2","3","4","5","6","7","25","36","47"]
+    valid_sum_thu = [t for t in default_sum_thu_list if t in thu_opts]
+    f_thu_sum = st.multiselect("", thu_opts, default=valid_sum_thu, key="sum_thu_input", on_change=update_sum_params, label_visibility="collapsed")
+    st.query_params["sum_thu"] = ",".join(st.session_state.sum_thu_input) if st.session_state.sum_thu_input else ""
 
 st.markdown("---")
 
@@ -832,21 +837,6 @@ tab_kpi, tab_mcp, tab_cat, tab_brand, tab_dskh_off, tab_dskh_on = st.tabs([
 # ----- TAB KPI -----
 with tab_kpi:
     if selected_kpi == "SUMMARY":
-        # Bộ lọc Theo Thứ riêng cho Báo Cáo Tổng Hợp
-        saved_sum_thu = st.query_params.get("sum_thu", "")
-        default_sum_thu_list = [x.strip() for x in saved_sum_thu.split(",") if x.strip()] if saved_sum_thu else []
-        
-        def update_sum_params():
-            st.query_params["sum_thu"] = ",".join(st.session_state.sum_thu_input) if st.session_state.sum_thu_input else ""
-
-        col_f_thu, col_empty_sum = st.columns([1, 1])
-        with col_f_thu:
-            st.markdown('<p class="filter-label">📅 Lọc Theo Thứ (Chọn nhiều)</p>', unsafe_allow_html=True)
-            thu_opts = ["2","3","4","5","6","7","25","36","47"]
-            valid_sum_thu = [t for t in default_sum_thu_list if t in thu_opts]
-            f_thu_sum = st.multiselect("", thu_opts, default=valid_sum_thu, key="sum_thu_input", on_change=update_sum_params, label_visibility="collapsed")
-        st.query_params["sum_thu"] = ",".join(st.session_state.sum_thu_input) if st.session_state.sum_thu_input else ""
-
         df_summary = build_summary_report(mcp, df_combo_off, df_combo_on, df_cat, df_brand, filter_nv, f_thu_sum)
         tot_row_s = df_summary.iloc[-1]
         
@@ -866,7 +856,7 @@ with tab_kpi:
             • Tổng số lượng cửa hàng VIP (VIP3, VIP5, VIPSI) toàn đội: <b>{tot_row_s['VIP MCH']:,} cửa hàng</b>.<br>
             • Tổng số lượng KH tham gia Combo OFF: <b>{tot_row_s['KH Combo OFF']:,} CH</b> | Combo ON: <b>{tot_row_s['KH Combo ON']:,} CH</b>.<br>
             • Tổng MBS Category: <b>{tot_row_s['MBS Cat']:,} CH</b> | Tổng MBS Brand: <b>{tot_row_s['MBS Brand']:,} CH</b>.<br>
-            • Đã tích hợp bộ lọc theo <b>Thứ</b> giúp bro dễ dàng tracking tuyến bán hàng trong tuần.
+            • Đã tích hợp bộ lọc theo <b>Thứ</b> gọn gàng ngay trên thanh điều khiển chung.
         </div>
         """, unsafe_allow_html=True)
         
