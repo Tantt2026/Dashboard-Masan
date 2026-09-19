@@ -681,11 +681,8 @@ with tab_mcp:
         col_ma = find_col(mcp, ['Outlet_code','Outlet Code','Mã CH','Mã khách hàng','Poscode'])
         col_ten = find_col(mcp, ['Outlet_name','Outlet Name','Tên CH','Tên khách hàng'])
         col_thu = find_col(mcp, ['Thứ','Frequency','Tần suất'])
-        col_vip = find_col(mcp, ['VIP MCH', 'VIP_MCH', 'Vip Mch'])
-        col_sales = find_col(mcp, ['Doanh Số MTD', 'Doanh số MTD', 'Doanh_so_MTD'])
 
-        # Hàng lọc 1: Nhân viên & Thứ
-        c1, c2 = st.columns(2)
+        c1,c2 = st.columns(2)
         with c1:
             st.markdown('<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD)</p>', unsafe_allow_html=True)
             nv_opts = ["Tất cả ĐDKD"] + (sorted(mcp[col_nv].dropna().astype(str).unique().tolist()) if col_nv else [])
@@ -694,8 +691,7 @@ with tab_mcp:
             st.markdown('<p class="filter-label">📅 Lọc Theo Thứ</p>', unsafe_allow_html=True)
             f_thu = st.selectbox("", ["Tất cả các thứ","2","3","4","5","6","7","25","36","47"], key="mcp_thu", label_visibility="collapsed")
 
-        # Hàng lọc 2: Mã CH & Tên CH
-        c3, c4 = st.columns(2)
+        c3,c4 = st.columns(2)
         with c3:
             st.markdown('<p class="filter-label">🆔 Lọc Mã Khách Hàng</p>', unsafe_allow_html=True)
             f_ma = st.text_input("", key="mcp_ma", label_visibility="collapsed")
@@ -703,35 +699,10 @@ with tab_mcp:
             st.markdown('<p class="filter-label">🏪 Lọc Tên Khách Hàng</p>', unsafe_allow_html=True)
             f_ten = st.text_input("", key="mcp_ten", label_visibility="collapsed")
 
-        # Hàng lọc 3: VIP MCH & Doanh Số MTD (Dùng st.multiselect cho phép chọn nhiều giá trị cùng lúc)
-        c5, c6 = st.columns(2)
-        with c5:
-            st.markdown('<p class="filter-label">⭐ VIP MCH (Chọn nhiều)</p>', unsafe_allow_html=True)
-            vip_opts = sorted(mcp[col_vip].dropna().astype(str).unique().tolist()) if col_vip else []
-            f_vip = st.multiselect("", vip_opts, key="mcp_vip", label_visibility="collapsed")
-        with c6:
-            st.markdown('<p class="filter-label">💰 Doanh Số MTD (Chọn nhiều giá trị thực tế)</p>', unsafe_allow_html=True)
-            sales_opts = []
-            if col_sales:
-                unique_sales = sorted(mcp[col_sales].dropna().unique())
-                sales_opts = [format_number_vn(s) for s in unique_sales]
-            f_sales_val = st.multiselect("", sales_opts, key="mcp_sales_val", label_visibility="collapsed")
-
         df_f = mcp.copy()
         if f_nv != "Tất cả ĐDKD" and col_nv: df_f = df_f[df_f[col_nv].astype(str)==f_nv]
         if f_ma and col_ma: df_f = df_f[df_f[col_ma].astype(str).str.contains(f_ma, case=False, na=False)]
         if f_ten and col_ten: df_f = df_f[df_f[col_ten].astype(str).str.contains(f_ten, case=False, na=False)]
-        
-        if f_vip and col_vip: 
-            df_f = df_f[df_f[col_vip].astype(str).isin(f_vip)]
-        
-        if f_sales_val and col_sales:
-            try:
-                raw_sales_vals = [float(val.replace(".", "").replace(",", ".")) for val in f_sales_val]
-                df_f = df_f[df_f[col_sales].isin(raw_sales_vals)]
-            except:
-                pass
-            
         df_f = filter_by_thu(df_f, col_thu, f_thu)
 
         for col in df_f.columns:
