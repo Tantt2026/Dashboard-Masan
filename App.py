@@ -366,7 +366,7 @@ def process_brand_sales(df_rpt, df_brand):
     c_code = find_col(df_out, ['Outlet Code', 'Outlet_code', 'Mã CH'])
     c_brand = find_col(df_out, ['Danh sách full brand', 'Brand', 'Brands'])
     col_val1 = find_col(df_out, ['Doanh số thực đạt của brand', 'Doanh số thực đạt brand'])
-    col_val2 = find_col(df_out, ['Doanh số thực đạt của brand (Not Cancel/Pending)', 'Doanh số thực đạt của brand(Not Cancel/Pending)'])
+    col_val2 = find_col(df_out, ['Doanh số thực đạt của brand (Not Cancel/Pending)', 'Doanh số thực đạtของ brand(Not Cancel/Pending)'])
     
     if not c_code or not c_brand: return df_out
     
@@ -461,44 +461,64 @@ def build_report(df, report_date, targets, report_type, filter_nv=None):
     }])
     return pd.concat([df_out, total_row], ignore_index=True), team_tgt, title
 
-def build_combo(df, report_date, filter_nv=None):
+def build_combo_matrix(df, report_date, filter_nv=None):
     df_mtd = df[df['date'] >= date(report_date.year, report_date.month, 1)].copy()
     if filter_nv and filter_nv != "Tất cả ĐDKD":
         df_mtd = df_mtd[df_mtd['Tên NVBH'] == filter_nv]
     sm_names = df_mtd.groupby('Mã NVBH')['Tên NVBH'].first().to_dict()
     all_sms = sorted(sm_names.keys())
-    def is_combo(row):
+    
+    def is_combo_off(row):
+        sp = str(row.get('Tên SP lower',''))
         km = str(row.get('Hàng KM','N')).upper()=='Y'
         giatri = float(pd.to_numeric(row.get('Giá trị hàng KM',0), errors='coerce') or 0)
         ck = float(pd.to_numeric(row.get('Chiết khấu',0), errors='coerce') or 0)
-        ch = str(row.get('L1',''))
-        if ch=='Kênh Off Premise': return km or giatri>0 or ck>=10000
-        if ch=='Kênh On Premise': return km
-        return False
-    df_mtd = df_mtd.copy()
-    df_mtd['is_c'] = df_mtd.apply(is_combo, axis=1)
-    off_mtd = df_mtd[(df_mtd['is_c']) & (df_mtd['L1']=='Kênh Off Premise')].groupby('Mã NVBH')['Mã CH'].nunique()
-    on_mtd  = df_mtd[(df_mtd['is_c']) & (df_mtd['L1']=='Kênh On Premise')].groupby('Mã NVBH')['Mã CH'].nunique()
-    off_c = df_mtd[(df_mtd['is_c']) & (df_mtd['L1']=='Kênh Off Premise')]
+        is_olong_dao = ('ô long' in sp or 'olong' in sp) and ('đào' in sp or 'dao' in sp) and km
+        is_hpc_combo = ('chanté' in sp or 'chante' in sp or 'homey' in sp) and (km or giatri>0 or ck>=10000)
+        return is_olong_dao or is_hpc_combo
+
+    def is_combo_on(row):
+        sp = str(row.get('Tên SP lower',''))
+        km = str(row.get('Hàng KM','N')).upper()=='Y'
+        is_olong_dao = ('ô long' in sp or 'olong' in sp) and ('đào' in sp or 'dao' in sp) and km
+        is_denhi = ('đệ nhị' in sp or 'de nhi' in sp) and km
+        return is_olong_dao or is_denhi
+
+    df_off = df_mtd[df_mtd['L1'] == 'Kênh Off Premise'].copy()
+    df_off['is_combo'] = df_off.apply(is_combo_off, axis=1)
+    
+    df_on = df_mtd[df_mtd['L1'] == 'Kênh On Premise'].copy()
+    df_on['is_combo'] = df_on.apply(is_combo_on, axis=1)
+    
+    off_mtd = df_off[df_off['is_combo']].groupby('Mã NVBH')['Mã CH'].nunique()
+    off_c = df_off[df_off['is_combo']]
     first_off = off_c.groupby(['Mã NVBH','Mã CH'])['date'].min().reset_index()
     first_off.columns = ['Mã NVBH','Mã CH','first_date']
     off_ngay = first_off[first_off['first_date']==report_date].groupby('Mã NVBH')['Mã CH'].nunique()
-    on_c = df_mtd[(df_mtd['is_c']) & (df_mtd['L1']=='Kênh On Premise')]
+    
+    on_mtd = df_on[df_on['is_combo']].groupby('Mã NVBH')['Mã CH'].nunique()
+    on_c = df_on[df_on['is_combo']]
     first_on = on_c.groupby(['Mã NVBH','Mã CH'])['date'].min().reset_index()
     first_on.columns = ['Mã NVBH','Mã CH','first_date']
     on_ngay = first_on[first_on['first_date']==report_date].groupby('Mã NVBH')['Mã CH'].nunique()
+    
     rows = []
     for sm in all_sms:
+        m_off = int(off_mtd.get(sm, 0))
+        n_off = int(off_ngay.get(sm, 0))
+        m_on = int(on_mtd.get(sm, 0))
+        n_on = int(on_ngay.get(sm, 0))
         rows.append({
             'Mã NVBH': sm,
-            'Tên NVBH': sm_names.get(sm,''),
-            'Phát sinh Ngày (OFF)': int(off_ngay.get(sm,0)),
-            'MTD (OFF)': int(off_mtd.get(sm,0)),
-            'Phát sinh Ngày (ON)': int(on_ngay.get(sm,0)),
-            'MTD (ON)': int(on_mtd.get(sm,0))
+            'Tên NVBH': sm_names.get(sm, ''),
+            'Phát sinh Ngày (OFF)': n_off,
+            'MTD (OFF)': m_off,
+            'Phát sinh Ngày (ON)': n_on,
+            'MTD (ON)': m_on
         })
     df_out = pd.DataFrame(rows).sort_values('MTD (OFF)', ascending=False).reset_index(drop=True)
     df_out.insert(0, 'STT', range(1, len(df_out)+1))
+    
     total_row = pd.DataFrame([{
         'STT': '-',
         'Mã NVBH': 'TỔNG CỘNG',
@@ -643,20 +663,36 @@ with tab_kpi:
         </div>
         """, unsafe_allow_html=True)
     else:
-        df_combo = build_combo(df, report_date, filter_nv)
+        df_combo = build_combo_matrix(df, report_date, filter_nv)
         total_row = df_combo.iloc[-1]
         total_off = int(total_row['MTD (OFF)'])
         total_on = int(total_row['MTD (ON)'])
         ngay_off = int(total_row['Phát sinh Ngày (OFF)'])
         ngay_on = int(total_row['Phát sinh Ngày (ON)'])
-        st.subheader(f"6. BÁO CÁO ĐƠN HÀNG COMBO - THÁNG {report_date.strftime('%m/%Y')}")
+        
+        target_off_total = 1188
+        target_on_total = 1059
+        pct_off_team = round(total_off / target_off_total * 100, 1)
+        pct_on_team = round(total_on / target_on_total * 100, 1)
+
+        st.subheader(f"6. BÁO CÁO ĐƠN HÀNG COMBO LŨY KẾ (MATRIX OFF/ON) - THÁNG {report_date.strftime('%m/%Y')}")
+        st.caption(f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc: {filter_nv} | Target OFF: {target_off_total} CH | Target ON: {target_on_total} CH")
         
         c1, c2, c3, c4 = st.columns(4)
-        with c1: render_metric_card("MTD OFF", f"{total_off}")
-        with c2: render_metric_card("MTD ON", f"{total_on}")
-        with c3: render_metric_card("Ngày OFF", f"+{ngay_off}")
-        with c4: render_metric_card("Ngày ON", f"+{ngay_on}")
+        with c1: render_metric_card("MTD OFF / Target", f"{total_off:,} / {target_off_total:,} ({pct_off_team}%)")
+        with c2: render_metric_card("MTD ON / Target", f"{total_on:,} / {target_on_total:,} ({pct_on_team}%)")
+        with c3: render_metric_card("Phát sinh Ngày (OFF)", f"+{ngay_off}")
+        with c4: render_metric_card("Phát sinh Ngày (ON)", f"+{ngay_on}")
+        
         st.markdown(render_html_table(df_combo), unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="note-box">
+            <b>NHẬN XÉT BÁO CÁO COMBO LŨY KẾ (MATRIX OFF/ON):</b><br>
+            • <b>Kênh OFF:</b> Đạt <b>{total_off:,} / {target_off_total:,} CH ({pct_off_team}%)</b> | Phát sinh mới trong ngày: <b>+{ngay_off} CH</b>.<br>
+            • <b>Kênh ON:</b> Đạt <b>{total_on:,} / {target_on_total:,} CH ({pct_on_team}%)</b> | Phát sinh mới trong ngày: <b>+{ngay_on} CH</b>.<br>
+            • Rule tính toán áp dụng chính xác theo danh mục Combo Trà Olong Đào, Combo HPC (Chanté/Homey) kênh OFF và Nước Mắm Đệ Nhị kênh ON.
+        </div>
+        """, unsafe_allow_html=True)
 
 # Callbacks for instant query params sync
 def update_mcp_params():
@@ -707,7 +743,6 @@ with tab_mcp:
         saved_mcp_ds = st.query_params.get("mcp_ds", "")
         default_ds_list = [x.strip() for x in saved_mcp_ds.split(",") if x.strip()] if saved_mcp_ds else []
 
-        # Hàng 1: Nhân viên & Thứ (Chọn nhiều)
         c1, c2 = st.columns(2)
         with c1:
             st.markdown('<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD - Chọn nhiều)</p>', unsafe_allow_html=True)
@@ -720,7 +755,6 @@ with tab_mcp:
             valid_default_thu = [t for t in default_thu_list if t in thu_opts]
             f_thu = st.multiselect("", thu_opts, default=valid_default_thu, key="mcp_thu_input", on_change=update_mcp_params, label_visibility="collapsed")
             
-        # Hàng 2: Mã KH & Tên KH
         c3, c4 = st.columns(2)
         with c3:
             st.markdown('<p class="filter-label">🆔 Lọc Mã Khách Hàng</p>', unsafe_allow_html=True)
@@ -729,7 +763,6 @@ with tab_mcp:
             st.markdown('<p class="filter-label">🏪 Lọc Tên Khách Hàng</p>', unsafe_allow_html=True)
             f_ten = st.text_input("", value=saved_mcp_ten, key="mcp_ten_input", on_change=update_mcp_params, label_visibility="collapsed")
 
-        # Hàng 3: VIP MCH & Doanh Số MTD (Chọn nhiều)
         c5, c6 = st.columns(2)
         with c5:
             st.markdown('<p class="filter-label">⭐ Lọc VIP MCH (Chọn nhiều)</p>', unsafe_allow_html=True)
