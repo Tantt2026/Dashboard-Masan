@@ -146,8 +146,8 @@ BRAND_PATH = os.path.join(DATA_DIR, "Data_Brand.xlsx")
 
 combo_off_files = [f for f in os.listdir(DATA_DIR) if "Combo" in f and "OFF" in f]
 combo_on_files  = [f for f in os.listdir(DATA_DIR) if "Combo" in f and "On" in f]
-COMBO_OFF_PATH = os.path.join(DATA_DIR, combo_off_files[0]) if combo_off_files else os.path.join(DATA_DIR, "Tân_Combo Kênh OFF.xlsx")
-COMBO_ON_PATH  = os.path.join(DATA_DIR, combo_on_files[0]) if combo_on_files else os.path.join(DATA_DIR, "Tân_Combo Kênh On.xlsx")
+COMBO_OFF_PATH = os.path.join(DATA_DIR, combo_off_files[0]) if combo_off_files else os.path.join(DATA_DIR, "Tân_Combo Kênh OFF.xlsx")
+COMBO_ON_PATH  = os.path.join(DATA_DIR, combo_on_files[0]) if combo_on_files else os.path.join(DATA_DIR, "Tân_Combo Kênh On.xlsx")
 
 # ====================== LOAD ======================
 @st.cache_data(ttl=600)
@@ -581,9 +581,7 @@ def build_combo_matrix(df, report_date, df_off_master, df_on_master, filter_nv=N
     }])
     return pd.concat([df_out, total_row], ignore_index=True), tot_tgt_off, tot_tgt_on
 
-# ====================== HÀM TỔNG HỢP THEO NHÂN VIÊN CÓ LỌC THEO THỨ ======================
 def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, brand_df, filter_nv=None, f_thu_list=None):
-    # Lọc danh sách nhân viên gốc
     all_nvs = []
     if not mcp_df.empty:
         c_nv_mcp = find_col(mcp_df, ['SM Name', 'SM name', 'Tên NVBH', 'Nhân viên'])
@@ -605,8 +603,6 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
     if filter_nv and filter_nv != "Tất cả ĐDKD":
         nv_list = [filter_nv] if filter_nv in nv_list else [filter_nv]
 
-    # Chuẩn bị dữ liệu lọc theo thứ cho các bảng nếu có cột 'Thứ'
-    # 1. VIP MCH từ Data_MCP
     mcp_filtered = mcp_df.copy()
     if not mcp_filtered.empty and f_thu_list:
         c_thu_mcp = find_col(mcp_filtered, ['Thứ', 'Frequency', 'Tần suất'])
@@ -623,7 +619,6 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
             df_vip_sub['MA'] = df_vip_sub[c_ma_mcp].astype(str).str.strip()
             vip_map = df_vip_sub.groupby('NV')['MA'].nunique().to_dict()
 
-    # 2. KH Combo OFF
     off_filtered = df_combo_off_raw.copy()
     if not off_filtered.empty and f_thu_list:
         c_thu_off = find_col(off_filtered, ['Thứ', 'Frequency'])
@@ -639,7 +634,6 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
             df_off_sub['MA'] = df_off_sub[c_ma_off].astype(str).str.strip()
             off_map = df_off_sub.groupby('NV')['MA'].nunique().to_dict()
 
-    # 3. KH Combo ON
     on_filtered = df_combo_on_raw.copy()
     if not on_filtered.empty and f_thu_list:
         c_thu_on = find_col(on_filtered, ['Thứ', 'Frequency'])
@@ -655,7 +649,6 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
             df_on_sub['MA'] = df_on_sub[c_ma_on].astype(str).str.strip()
             on_map = df_on_sub.groupby('NV')['MA'].nunique().to_dict()
 
-    # 4. MBS Cat
     cat_filtered = cat_df.copy()
     if not cat_filtered.empty and f_thu_list:
         c_thu_cat = find_col(cat_filtered, ['Thứ'])
@@ -671,7 +664,6 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
             df_cat_sub['MA'] = df_cat_sub[c_ma_cat].astype(str).str.strip()
             cat_map = df_cat_sub.groupby('NV')['MA'].nunique().to_dict()
 
-    # 5. MBS Brand
     brand_filtered = brand_df.copy()
     if not brand_filtered.empty and f_thu_list:
         c_thu_brand = find_col(brand_filtered, ['Thứ'])
@@ -832,7 +824,6 @@ tab_kpi, tab_mcp, tab_cat, tab_brand, tab_dskh_off, tab_dskh_on = st.tabs([
 # ----- TAB KPI -----
 with tab_kpi:
     if selected_kpi == "SUMMARY":
-        # Bộ lọc Theo Thứ riêng cho Báo Cáo Tổng Hợp
         saved_sum_thu = st.query_params.get("sum_thu", "")
         default_sum_thu_list = [x.strip() for x in saved_sum_thu.split(",") if x.strip()] if saved_sum_thu else []
         
@@ -850,7 +841,7 @@ with tab_kpi:
         df_summary = build_summary_report(mcp, df_combo_off, df_combo_on, df_cat, df_brand, filter_nv, f_thu_sum)
         tot_row_s = df_summary.iloc[-1]
         
-        st.subheader(f"7. BÁO CÁO TỔNG HỢP THEO NHÂN VIÊN - THÁNG {report_date.strftime('%m/%Y')}")
+        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;">7. BÁO CÁO TỔNG HỢP THEO NHÂN VIÊN - THÁNG {report_date.strftime("%m/%Y")}</h3>', unsafe_allow_html=True)
         st.caption(f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc NV: {filter_nv} | Lọc Thứ: {f_thu_sum if f_thu_sum else 'Tất cả'} | Nguyên tắc: Count Distinct Mã KH (VIP3, VIP5, VIPSI)")
         
         c1, c2, c3, c4 = st.columns(4)
@@ -876,7 +867,7 @@ with tab_kpi:
         total_mtd = int(total_row['MTD'])
         total_ngay = int(total_row['Thực Hiện Ngày'])
         pct_team = total_row['% MTD']
-        st.subheader(f"{title} - THÁNG {report_date.strftime('%m/%Y')}")
+        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;">{title} - THÁNG {report_date.strftime("%m/%Y")}</h3>', unsafe_allow_html=True)
         st.caption(f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc: {filter_nv}")
         c1, c2, c3, c4 = st.columns(4)
         with c1: render_metric_card("🎯 Target", f"{team_tgt:,}")
@@ -912,7 +903,7 @@ with tab_kpi:
         pct_off_team = round(total_off / target_off_total * 100, 1) if target_off_total else 0
         pct_on_team = round(total_on / target_on_total * 100, 1) if target_on_total else 0
 
-        st.subheader(f"6. BÁO CÁO ĐƠN HÀNG COMBO LŨY KẾ (MATRIX OFF/ON) - THÁNG {report_date.strftime('%m/%Y')}")
+        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;">6. BÁO CÁO ĐƠN HÀNG COMBO LŨY KẾ (MATRIX OFF/ON) - THÁNG {report_date.strftime("%m/%Y")}</h3>', unsafe_allow_html=True)
         st.caption(f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc: {filter_nv} | Target OFF: {target_off_total} CH | Target ON: {target_on_total} CH")
         
         c1, c2, c3, c4 = st.columns(4)
@@ -966,7 +957,7 @@ def update_on_params():
 
 # ----- TAB MCP -----
 with tab_mcp:
-    st.subheader("🗺️ MCP VISIT & MAPPING DOANH SỐ BÁN HÀNG")
+    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;">🗺️ MCP VISIT & MAPPING DOANH SỐ BÁN HÀNG</h3>', unsafe_allow_html=True)
     if mcp.empty:
         st.warning("Chưa có dữ liệu MCP")
     else:
@@ -1070,7 +1061,7 @@ with tab_mcp:
 
 # ----- TAB CAT -----
 with tab_cat:
-    st.subheader("🎯 TRACKING MBS - THEO NGÀNH HÀNG (CATEGORY)")
+    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;">🎯 TRACKING MBS - THEO NGÀNH HÀNG (CATEGORY)</h3>', unsafe_allow_html=True)
     if df_cat.empty:
         st.error("❌ Không tìm thấy Data_Cat.xlsx trong thư mục 'data'")
     else:
@@ -1142,7 +1133,7 @@ with tab_cat:
 
 # ----- TAB BRAND -----
 with tab_brand:
-    st.subheader("🏷️ TRACKING MBS - THEO THƯƠNG HIỆU (BRAND)")
+    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;">🏷️ TRACKING MBS - THEO THƯƠNG HIỆU (BRAND)</h3>', unsafe_allow_html=True)
     if df_brand.empty:
         st.error("❌ Không tìm thấy Data_Brand.xlsx trong thư mục 'data'")
     else:
@@ -1214,7 +1205,7 @@ with tab_brand:
 
 # ----- TAB DSKH_Combo OFF -----
 with tab_dskh_off:
-    st.subheader("📋 DANH SÁCH KHÁCH HÀNG COMBO OFF (TÂN_COMBO KÊNH OFF)")
+    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;">📋 DANH SÁCH KHÁCH HÀNG COMBO OFF (TÂN_COMBO KÊNH OFF)</h3>', unsafe_allow_html=True)
     if df_combo_off.empty:
         st.warning("Chưa có dữ liệu Combo OFF trong thư mục 'data'")
     else:
@@ -1283,7 +1274,7 @@ with tab_dskh_off:
 
 # ----- TAB DSKH_Combo ON -----
 with tab_dskh_on:
-    st.subheader("📋 DANH SÁCH KHÁCH HÀNG COMBO ON (TÂN_COMBO KÊNH ON)")
+    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;">📋 DANH SÁCH KHÁCH HÀNG COMBO ON (TÂN_COMBO KÊNH ON)</h3>', unsafe_allow_html=True)
     if df_combo_on.empty:
         st.warning("Chưa có dữ liệu Combo ON trong thư mục 'data'")
     else:
