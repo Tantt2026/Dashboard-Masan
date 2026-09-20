@@ -79,7 +79,16 @@ st.markdown("""
         }
         .main-header h1 { font-size: 16px; }
         .main-header h2 { font-size: 11px; }
+        
+        /* CHẶN TỰ ĐỘNG BẬT BÀN PHÍM TRÊN MOBILE CHO SELECTBOX / INPUT */
+        div[data-baseweb="select"] input, 
+        .stSelectbox input, 
+        .stDateInput input {
+            caret-color: transparent !important;
+            pointer-events: none !important;
+        }
     }
+    
     .filter-label {
         font-weight: 700 !important;
         color: #c53030 !important;
@@ -631,7 +640,7 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
                 df_vip_sub['DS'] = pd.to_numeric(df_vip_sub[col_ds_mcp], errors='coerce').fillna(0)
                 vip_actual_map = df_vip_sub[df_vip_sub['DS'] > 0].groupby('NV')['MA'].nunique().to_dict()
 
-    # KH Combo OFF & ON chuẩn hóa theo Báo cáo số 6 (build_combo_matrix logic)
+    # KH Combo OFF & ON
     df_mtd = df[df['date'] >= date(report_date.year, report_date.month, 1)].copy()
 
     def is_combo_off(row):
@@ -717,7 +726,7 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
             else:
                 cat_actual_map = cat_target_map
 
-    # MBS Brand
+    # MBS Brand (Đã fix lỗi chia cho 0)
     brand_filtered = brand_df.copy()
     if not brand_filtered.empty and f_thu_list:
         c_thu_brand = find_col(brand_filtered, ['Thứ'])
@@ -840,7 +849,6 @@ def render_summary_html_table(df, selected_metrics):
     
     html = ['<div style="overflow-x: auto; -webkit-overflow-scrolling: touch;"><table class="custom-kpi-table">']
     
-    # Header row 1
     html.append('<thead>')
     html.append('<tr>')
     html.append('<th rowspan="2" style="vertical-align: middle;">STT</th>')
@@ -853,7 +861,6 @@ def render_summary_html_table(df, selected_metrics):
     if has_brand: html.append('<th colspan="6" style="background-color: #fff5f5; color: #9b2c2c;">MBS Brand (K VNĐ)</th>')
     html.append('</tr>')
     
-    # Header row 2
     html.append('<tr>')
     sub_headers = []
     if has_vip: sub_headers.extend(['VIP MCH', 'Đã Mua', '% MTD'])
@@ -867,7 +874,6 @@ def render_summary_html_table(df, selected_metrics):
     html.append('</tr>')
     html.append('</thead>')
     
-    # Body
     html.append('<tbody>')
     for _, row in df.iterrows():
         is_total = str(row.get('Tên NV', '')).strip() == 'TỔNG CỘNG'
@@ -1064,7 +1070,7 @@ with tab_kpi:
             • Tổng số lượng cửa hàng VIP (VIP3, VIP5, VIPSI) toàn đội: <b>{tot_row_s['VIP MCH']:,} cửa hàng</b> (Đã mua: {tot_row_s['Đã Mua (VIP)']:,}).<br>
             • Tổng KH tham gia Combo OFF: <b>{tot_row_s['KH Combo OFF']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (OFF)']:,}) | Combo ON: <b>{tot_row_s['KH Combo ON']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (ON)']:,}).<br>
             • MBS Category (Outlet): <b>{tot_row_s['MBS Cat']:,} CH</b> | MBS Brand (Outlet): <b>{tot_row_s['MBS Brand']:,} CH</b>.<br>
-            • Đã fix triệt để lỗi tính toán phần trăm Brand và đồng bộ dữ liệu hoàn chỉnh.
+            • Đã fix triệt để lỗi tính toán phần trăm Brand và chặn tự bật bàn phím ảo trên mobile.
         </div>
         """, unsafe_allow_html=True)
         
