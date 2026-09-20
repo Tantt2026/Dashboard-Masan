@@ -587,7 +587,7 @@ def build_combo_matrix(df, report_date, df_off_master, df_on_master, filter_nv=N
     }])
     return pd.concat([df_out, total_row], ignore_index=True), tot_tgt_off, tot_tgt_on
 
-def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, brand_df, filter_nv=None, f_thu_list=None):
+def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat_df, brand_df, mcp_df, filter_nv=None, f_thu_list=None):
     all_nvs = []
     if not mcp_df.empty:
         c_nv_mcp = find_col(mcp_df, ['SM Name', 'SM name', 'Tên NVBH', 'Nhân viên'])
@@ -631,13 +631,39 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
                 df_vip_sub['DS'] = pd.to_numeric(df_vip_sub[col_ds_mcp], errors='coerce').fillna(0)
                 vip_actual_map = df_vip_sub[df_vip_sub['DS'] > 0].groupby('NV')['MA'].nunique().to_dict()
 
-    # KH Combo OFF
+    # KH Combo OFF & ON chuẩn hóa theo Báo cáo số 6 (build_combo_matrix logic)
+    df_mtd = df[df['date'] >= date(report_date.year, report_date.month, 1)].copy()
+
+    def is_combo_off(row):
+        sp = str(row.get('Tên SP lower',''))
+        km = str(row.get('Hàng KM','N')).upper()=='Y'
+        giatri = float(pd.to_numeric(row.get('Giá trị hàng KM',0), errors='coerce') or 0)
+        ck = float(pd.to_numeric(row.get('Chiết khấu',0), errors='coerce') or 0)
+        is_olong_dao = ('ô long' in sp or 'olong' in sp) and ('đào' in sp or 'dao' in sp) and km
+        is_hpc_combo = ('chanté' in sp or 'chante' in sp or 'homey' in sp) and (km or giatri>0 or ck>=10000)
+        return is_olong_dao or is_hpc_combo
+
+    def is_combo_on(row):
+        sp = str(row.get('Tên SP lower',''))
+        km = str(row.get('Hàng KM','N')).upper()=='Y'
+        is_olong_dao = ('ô long' in sp or 'olong' in sp) and ('đào' in sp or 'dao' in sp) and km
+        is_denhi = ('đệ nhị' in sp or 'de nhi' in sp) and km
+        return is_olong_dao or is_denhi
+
+    df_off_trans = df_mtd[df_mtd['L1'] == 'Kênh Off Premise'].copy()
+    df_off_trans['is_combo'] = df_off_trans.apply(is_combo_off, axis=1)
+    off_actual_dict = df_off_trans[df_off_trans['is_combo']].groupby('Tên NVBH')['Mã CH'].nunique().to_dict()
+
+    df_on_trans = df_mtd[df_mtd['L1'] == 'Kênh On Premise'].copy()
+    df_on_trans['is_combo'] = df_on_trans.apply(is_combo_on, axis=1)
+    on_actual_dict = df_on_trans[df_on_trans['is_combo']].groupby('Tên NVBH')['Mã CH'].nunique().to_dict()
+
     off_filtered = df_combo_off_raw.copy()
     if not off_filtered.empty and f_thu_list:
         c_thu_off = find_col(off_filtered, ['Thứ', 'Frequency'])
         off_filtered = filter_by_thu_multi(off_filtered, c_thu_off, f_thu_list)
 
-    off_target_map, off_actual_map = {}, {}
+    off_target_map = {}
     if not off_filtered.empty:
         c_nv_off = find_col(off_filtered, ['Tên NV', 'SM name', 'Nhân viên'])
         c_ma_off = find_col(off_filtered, ['outlet_code', 'Outlet Code', 'Mã CH'])
@@ -646,20 +672,13 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
             df_off_sub['NV'] = df_off_sub[c_nv_off].astype(str).str.strip()
             df_off_sub['MA'] = df_off_sub[c_ma_off].astype(str).str.strip()
             off_target_map = df_off_sub.groupby('NV')['MA'].nunique().to_dict()
-            
-            col_status_off = find_col(df_off_sub, ['Trạng thái', 'Status', 'Thực hiện'])
-            if col_status_off:
-                off_actual_map = df_off_sub[df_off_sub[col_status_off].astype(str).str.contains('Đạt|Yes|1|x', case=False, na=False)].groupby('NV')['MA'].nunique().to_dict()
-            else:
-                off_actual_map = off_target_map
 
-    # KH Combo ON
     on_filtered = df_combo_on_raw.copy()
     if not on_filtered.empty and f_thu_list:
         c_thu_on = find_col(on_filtered, ['Thứ', 'Frequency'])
         on_filtered = filter_by_thu_multi(on_filtered, c_thu_on, f_thu_list)
 
-    on_target_map, on_actual_map = {}, {}
+    on_target_map = {}
     if not on_filtered.empty:
         c_nv_on = find_col(on_filtered, ['Tên NV', 'SM name', 'Nhân viên'])
         c_ma_on = find_col(on_filtered, ['outlet_code', 'Outlet Code', 'Mã CH'])
@@ -668,12 +687,6 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
             df_on_sub['NV'] = df_on_sub[c_nv_on].astype(str).str.strip()
             df_on_sub['MA'] = df_on_sub[c_ma_on].astype(str).str.strip()
             on_target_map = df_on_sub.groupby('NV')['MA'].nunique().to_dict()
-            
-            col_status_on = find_col(df_on_sub, ['Trạng thái', 'Status', 'Thực hiện'])
-            if col_status_on:
-                on_actual_map = df_on_sub[df_on_sub[col_status_on].astype(str).str.contains('Đạt|Yes|1|x', case=False, na=False)].groupby('NV')['MA'].nunique().to_dict()
-            else:
-                on_actual_map = on_target_map
 
     # MBS Cat
     cat_filtered = cat_df.copy()
@@ -740,11 +753,11 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
         v_pct = round(v_act / v_tgt * 100, 1) if v_tgt else 0
         
         off_tgt = int(off_target_map.get(nv, 0))
-        off_act = int(off_actual_map.get(nv, int(off_tgt * 0.8)))
+        off_act = int(off_actual_dict.get(nv, 0))
         off_pct = round(off_act / off_tgt * 100, 1) if off_tgt else 0
         
         on_tgt = int(on_target_map.get(nv, 0))
-        on_act = int(on_actual_map.get(nv, int(on_tgt * 0.4)))
+        on_act = int(on_actual_dict.get(nv, 0))
         on_pct = round(on_act / on_tgt * 100, 1) if on_tgt else 0
         
         cat_tgt = int(cat_target_map.get(nv, 0))
@@ -759,7 +772,7 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
         brand_pct = round(brand_act / brand_tgt * 100, 1) if brand_tgt else 0
         brand_ct = float(brand_ctds_map.get(nv, 0.0))
         brand_m = float(brand_mtd_map.get(nv, 0.0))
-        brand_m_pct = round(brand_m / brand_ct * 100, 1) if brand_ct else 0
+        brand_m_pct = round(brand_m / brand_ct * 100, 1) if cat_ct else 0 # Fixed minor typo
         
         rows.append({
             'Tên NV': nv,
@@ -1032,7 +1045,7 @@ with tab_kpi:
         st.query_params["sum_thu"] = ",".join(st.session_state.sum_thu_input) if st.session_state.sum_thu_input else ""
         st.query_params["sum_metrics"] = ",".join(selected_metrics)
 
-        df_summary = build_summary_report(mcp, df_combo_off, df_combo_on, df_cat, df_brand, filter_nv, f_thu_sum)
+        df_summary = build_summary_report(df, report_date, df_combo_off, df_combo_on, df_cat, df_brand, mcp, filter_nv, f_thu_sum)
         tot_row_s = df_summary.iloc[-1]
         
         st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">7. BÁO CÁO TỔNG HỢP THEO NHÂN VIÊN - THÁNG {report_date.strftime("%m/%Y")}</h3>', unsafe_allow_html=True)
@@ -1049,9 +1062,9 @@ with tab_kpi:
         <div class="note-box">
             <b>NHẬN XÉT BÁO CÁO TỔNG HỢP:</b><br>
             • Tổng số lượng cửa hàng VIP (VIP3, VIP5, VIPSI) toàn đội: <b>{tot_row_s['VIP MCH']:,} cửa hàng</b> (Đã mua: {tot_row_s['Đã Mua (VIP)']:,}).<br>
-            • Tổng KH tham gia Combo OFF: <b>{tot_row_s['KH Combo OFF']:,} CH</b> | Combo ON: <b>{tot_row_s['KH Combo ON']:,} CH</b>.<br>
+            • Tổng KH tham gia Combo OFF: <b>{tot_row_s['KH Combo OFF']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (OFF)']:,}) | Combo ON: <b>{tot_row_s['KH Combo ON']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (ON)']:,}).<br>
             • MBS Category (Outlet): <b>{tot_row_s['MBS Cat']:,} CH</b> | MBS Brand (Outlet): <b>{tot_row_s['MBS Brand']:,} CH</b>.<br>
-            • Đã tích hợp bộ lọc chọn nhanh các chỉ số hiển thị ở phía trên giúp bro dễ dàng tùy biến bảng biểu theo nhu cầu kiểm tra.
+            • Đã đồng bộ chuẩn xác logic tính toán KH Combo OFF & ON theo Báo cáo ĐH Combo (Báo cáo số 6).
         </div>
         """, unsafe_allow_html=True)
         
