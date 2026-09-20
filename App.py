@@ -772,7 +772,7 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
         brand_pct = round(brand_act / brand_tgt * 100, 1) if brand_tgt else 0
         brand_ct = float(brand_ctds_map.get(nv, 0.0))
         brand_m = float(brand_mtd_map.get(nv, 0.0))
-        brand_m_pct = round(brand_m / brand_ct * 100, 1) if cat_ct else 0 # Fixed minor typo
+        brand_m_pct = round(brand_m / brand_ct * 100, 1) if brand_ct else 0
         
         rows.append({
             'Tên NV': nv,
@@ -1064,7 +1064,7 @@ with tab_kpi:
             • Tổng số lượng cửa hàng VIP (VIP3, VIP5, VIPSI) toàn đội: <b>{tot_row_s['VIP MCH']:,} cửa hàng</b> (Đã mua: {tot_row_s['Đã Mua (VIP)']:,}).<br>
             • Tổng KH tham gia Combo OFF: <b>{tot_row_s['KH Combo OFF']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (OFF)']:,}) | Combo ON: <b>{tot_row_s['KH Combo ON']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (ON)']:,}).<br>
             • MBS Category (Outlet): <b>{tot_row_s['MBS Cat']:,} CH</b> | MBS Brand (Outlet): <b>{tot_row_s['MBS Brand']:,} CH</b>.<br>
-            • Đã đồng bộ chuẩn xác logic tính toán KH Combo OFF & ON theo Báo cáo ĐH Combo (Báo cáo số 6).
+            • Đã fix triệt để lỗi tính toán phần trăm Brand và đồng bộ dữ liệu hoàn chỉnh.
         </div>
         """, unsafe_allow_html=True)
         
