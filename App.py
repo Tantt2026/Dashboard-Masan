@@ -818,46 +818,54 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
         
     return df_out
 
-def render_summary_html_table(df):
+def render_summary_html_table(df, selected_metrics):
+    has_vip = 'VIP MCH' in selected_metrics
+    has_off = 'KH Combo OFF' in selected_metrics
+    has_on = 'KH Combo ON' in selected_metrics
+    has_cat = 'MBS Cat' in selected_metrics
+    has_brand = 'MBS Brand' in selected_metrics
+    
     html = ['<div style="overflow-x: auto; -webkit-overflow-scrolling: touch;"><table class="custom-kpi-table">']
     
+    # Header row 1
     html.append('<thead>')
     html.append('<tr>')
     html.append('<th rowspan="2" style="vertical-align: middle;">STT</th>')
     html.append('<th rowspan="2" style="vertical-align: middle;">Tên NV</th>')
-    html.append('<th colspan="3" style="background-color: #fffaf0; color: #c05621;">VIP MCH</th>')
-    html.append('<th colspan="3" style="background-color: #f0fff4; color: #22543d;">KH Combo OFF</th>')
-    html.append('<th colspan="3" style="background-color: #ebf8ff; color: #2b6cb0;">KH Combo ON</th>')
-    html.append('<th colspan="6" style="background-color: #faf5ff; color: #553c9a;">MBS Cat (K VNĐ)</th>')
-    html.append('<th colspan="6" style="background-color: #fff5f5; color: #9b2c2c;">MBS Brand (K VNĐ)</th>')
+    
+    if has_vip: html.append('<th colspan="3" style="background-color: #fffaf0; color: #c05621;">VIP MCH</th>')
+    if has_off: html.append('<th colspan="3" style="background-color: #f0fff4; color: #22543d;">KH Combo OFF</th>')
+    if has_on: html.append('<th colspan="3" style="background-color: #ebf8ff; color: #2b6cb0;">KH Combo ON</th>')
+    if has_cat: html.append('<th colspan="6" style="background-color: #faf5ff; color: #553c9a;">MBS Cat (K VNĐ)</th>')
+    if has_brand: html.append('<th colspan="6" style="background-color: #fff5f5; color: #9b2c2c;">MBS Brand (K VNĐ)</th>')
     html.append('</tr>')
     
+    # Header row 2
     html.append('<tr>')
-    sub_headers = [
-        'VIP MCH', 'Đã Mua', '% MTD',
-        'KH Combo OFF', 'Đã Mua', '% MTD',
-        'KH Combo ON', 'Đã Mua', '% MTD',
-        'MBS Cat', 'Đã Mua', '% MTD', 'CT DS', 'MTD', '% MTD',
-        'MBS Brand', 'Đã Mua', '% MTD', 'CT DS', 'MTD', '% MTD'
-    ]
+    sub_headers = []
+    if has_vip: sub_headers.extend(['VIP MCH', 'Đã Mua', '% MTD'])
+    if has_off: sub_headers.extend(['KH Combo OFF', 'Đã Mua', '% MTD'])
+    if has_on: sub_headers.extend(['KH Combo ON', 'Đã Mua', '% MTD'])
+    if has_cat: sub_headers.extend(['MBS Cat', 'Đã Mua', '% MTD', 'CT DS', 'MTD', '% MTD'])
+    if has_brand: sub_headers.extend(['MBS Brand', 'Đã Mua', '% MTD', 'CT DS', 'MTD', '% MTD'])
+    
     for sh in sub_headers:
         html.append(f'<th>{sh}</th>')
     html.append('</tr>')
     html.append('</thead>')
     
+    # Body
     html.append('<tbody>')
     for _, row in df.iterrows():
         is_total = str(row.get('Tên NV', '')).strip() == 'TỔNG CỘNG'
         html.append('<tr>')
         
-        cols_order = [
-            'STT', 'Tên NV',
-            'VIP MCH', 'Đã Mua (VIP)', '% MTD (VIP)',
-            'KH Combo OFF', 'Đã Mua (OFF)', '% MTD (OFF)',
-            'KH Combo ON', 'Đã Mua (ON)', '% MTD (ON)',
-            'MBS Cat', 'Đã Mua (Cat)', '% MTD (Cat)', 'CT DS (Cat)', 'MTD (Cat)', '% MTD DS (Cat)',
-            'MBS Brand', 'Đã Mua (Brand)', '% MTD (Brand)', 'CT DS (Brand)', 'MTD (Brand)', '% MTD DS (Brand)'
-        ]
+        cols_order = ['STT', 'Tên NV']
+        if has_vip: cols_order.extend(['VIP MCH', 'Đã Mua (VIP)', '% MTD (VIP)'])
+        if has_off: cols_order.extend(['KH Combo OFF', 'Đã Mua (OFF)', '% MTD (OFF)'])
+        if has_on: cols_order.extend(['KH Combo ON', 'Đã Mua (ON)', '% MTD (ON)'])
+        if has_cat: cols_order.extend(['MBS Cat', 'Đã Mua (Cat)', '% MTD (Cat)', 'CT DS (Cat)', 'MTD (Cat)', '% MTD DS (Cat)'])
+        if has_brand: cols_order.extend(['MBS Brand', 'Đã Mua (Brand)', '% MTD (Brand)', 'CT DS (Brand)', 'MTD (Brand)', '% MTD DS (Brand)'])
         
         for col in cols_order:
             val = row[col]
@@ -1000,13 +1008,29 @@ with tab_kpi:
         def update_sum_params():
             st.query_params["sum_thu"] = ",".join(st.session_state.sum_thu_input) if st.session_state.sum_thu_input else ""
 
-        col_f_thu, col_empty_sum = st.columns([1, 1])
+        col_f_thu, col_f_metrics = st.columns([1, 1.5])
         with col_f_thu:
             st.markdown('<p class="filter-label">📅 Lọc Theo Thứ (Chọn nhiều)</p>', unsafe_allow_html=True)
             thu_opts = ["2","3","4","5","6","7","25","36","47"]
             valid_sum_thu = [t for t in default_sum_thu_list if t in thu_opts]
             f_thu_sum = st.multiselect("", thu_opts, default=valid_sum_thu, key="sum_thu_input", on_change=update_sum_params, label_visibility="collapsed")
+        
+        with col_f_metrics:
+            st.markdown('<p class="filter-label">📊 Chọn Chỉ Số Hiển Thị</p>', unsafe_allow_html=True)
+            metric_opts = ["VIP MCH", "KH Combo OFF", "KH Combo ON", "MBS Cat", "MBS Brand"]
+            saved_metrics = st.query_params.get("sum_metrics", "")
+            default_metrics = [x.strip() for x in saved_metrics.split(",") if x.strip()] if saved_metrics else metric_opts
+            valid_metrics = [m for m in default_metrics if m in metric_opts]
+            if not valid_metrics: valid_metrics = metric_opts
+            
+            def update_metric_params():
+                st.query_params["sum_metrics"] = ",".join(st.session_state.sum_metrics_input) if st.session_state.sum_metrics_input else ""
+                
+            selected_metrics = st.multiselect("", metric_opts, default=valid_metrics, key="sum_metrics_input", on_change=update_metric_params, label_visibility="collapsed")
+            if not selected_metrics: selected_metrics = metric_opts
+
         st.query_params["sum_thu"] = ",".join(st.session_state.sum_thu_input) if st.session_state.sum_thu_input else ""
+        st.query_params["sum_metrics"] = ",".join(selected_metrics)
 
         df_summary = build_summary_report(mcp, df_combo_off, df_combo_on, df_cat, df_brand, filter_nv, f_thu_sum)
         tot_row_s = df_summary.iloc[-1]
@@ -1020,14 +1044,14 @@ with tab_kpi:
         with c3: render_metric_card("Tổng KH Combo ON", f"{tot_row_s['KH Combo ON']:,}")
         with c4: render_metric_card("Tổng MBS Cat / Brand", f"{tot_row_s['MBS Cat']:,} / {tot_row_s['MBS Brand']:,}")
         
-        st.markdown(render_summary_html_table(df_summary), unsafe_allow_html=True)
+        st.markdown(render_summary_html_table(df_summary, selected_metrics), unsafe_allow_html=True)
         st.markdown(f"""
         <div class="note-box">
             <b>NHẬN XÉT BÁO CÁO TỔNG HỢP:</b><br>
             • Tổng số lượng cửa hàng VIP (VIP3, VIP5, VIPSI) toàn đội: <b>{tot_row_s['VIP MCH']:,} cửa hàng</b> (Đã mua: {tot_row_s['Đã Mua (VIP)']:,}).<br>
             • Tổng KH tham gia Combo OFF: <b>{tot_row_s['KH Combo OFF']:,} CH</b> | Combo ON: <b>{tot_row_s['KH Combo ON']:,} CH</b>.<br>
             • MBS Category (Outlet): <b>{tot_row_s['MBS Cat']:,} CH</b> | MBS Brand (Outlet): <b>{tot_row_s['MBS Brand']:,} CH</b>.<br>
-            • Chỉ tiêu doanh số & thực đạt MTD của Cat & Brand đã được lấy trực tiếp từ file Excel nguồn và scale gọn gàng (K VNĐ) hiển thị trên di động rất mượt mà.
+            • Đã tích hợp bộ lọc chọn nhanh các chỉ số hiển thị ở phía trên giúp bro dễ dàng tùy biến bảng biểu theo nhu cầu kiểm tra.
         </div>
         """, unsafe_allow_html=True)
         
