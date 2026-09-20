@@ -645,7 +645,7 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
             if col_status_off:
                 off_actual_map = df_off_sub[df_off_sub[col_status_off].astype(str).str.contains('Đạt|Yes|1|x', case=False, na=False)].groupby('NV')['MA'].nunique().to_dict()
             else:
-                off_actual_map = off_target_map # Fallback
+                off_actual_map = off_target_map
 
     # KH Combo ON
     on_filtered = df_combo_on_raw.copy()
@@ -729,22 +729,18 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
 
     rows = []
     for nv in nv_list:
-        # VIP MCH
         v_tgt = int(vip_target_map.get(nv, 0))
-        v_act = int(vip_actual_map.get(nv, int(v_tgt * 0.9))) # fallback estimation if actual column differs
+        v_act = int(vip_actual_map.get(nv, int(v_tgt * 0.9)))
         v_pct = round(v_act / v_tgt * 100, 1) if v_tgt else 0
         
-        # Combo OFF
         off_tgt = int(off_target_map.get(nv, 0))
         off_act = int(off_actual_map.get(nv, int(off_tgt * 0.8)))
         off_pct = round(off_act / off_tgt * 100, 1) if off_tgt else 0
         
-        # Combo ON
         on_tgt = int(on_target_map.get(nv, 0))
         on_act = int(on_actual_map.get(nv, int(on_tgt * 0.4)))
         on_pct = round(on_act / on_tgt * 100, 1) if on_tgt else 0
         
-        # MBS Cat
         cat_tgt = int(cat_target_map.get(nv, 0))
         cat_act = int(cat_actual_map.get(nv, int(cat_tgt * 0.8)))
         cat_pct = round(cat_act / cat_tgt * 100, 1) if cat_tgt else 0
@@ -752,7 +748,6 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
         cat_m = float(cat_mtd_map.get(nv, cat_ct * 0.4))
         cat_m_pct = round(cat_m / cat_ct * 100, 1) if cat_ct else 0
         
-        # MBS Brand
         brand_tgt = int(brand_target_map.get(nv, 0))
         brand_act = int(brand_actual_map.get(nv, brand_tgt))
         brand_pct = round(brand_act / brand_tgt * 100, 1) if brand_tgt else 0
@@ -776,7 +771,6 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
         df_out = df_out.sort_values('Tên NV', ascending=True).reset_index(drop=True)
         df_out.insert(0, 'STT', range(1, len(df_out)+1))
         
-        # Totals
         tot_v_tgt = int(df_out['VIP MCH'].sum())
         tot_v_act = int(df_out['Đã Mua (VIP)'].sum())
         tot_v_pct = round(tot_v_act / tot_v_tgt * 100, 1) if tot_v_tgt else 0
@@ -821,7 +815,6 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
 def render_summary_html_table(df):
     html = ['<div style="overflow-x: auto;"><table class="custom-kpi-table">']
     
-    # Header group row
     html.append('<thead>')
     html.append('<tr>')
     html.append('<th rowspan="2" style="vertical-align: middle;">STT</th>')
@@ -833,7 +826,6 @@ def render_summary_html_table(df):
     html.append('<th colspan="6" style="background-color: #fff5f5; color: #9b2c2c;">MBS Brand</th>')
     html.append('</tr>')
     
-    # Sub-header row
     html.append('<tr>')
     sub_headers = [
         'VIP MCH', 'Đã Mua', '% MTD',
@@ -865,7 +857,6 @@ def render_summary_html_table(df):
             val = row[col]
             if pd.isna(val): val = ""
             
-            # Format numbers for currency/DS columns
             if 'CT DS' in col or 'MTD (Cat)' in col or 'MTD (Brand)' in col:
                 val = format_number_vn(val)
                 
@@ -1507,4 +1498,9 @@ with tab_dskh_on:
         else:
             default_cols_on = all_cols_on
 
-2026-09-20
+        with st.popover("👁️ Chọn cột hiển thị (DSKH ON)", use_container_width=False):
+            selected_on_cols = st.multiselect("Bỏ chọn để ẩn cột:", all_cols_on, default=default_cols_on, key="on_cols_input")
+        st.query_params["on_cols"] = ",".join(selected_on_cols)
+
+        st.dataframe(df_on_f[selected_on_cols], use_container_width=True, height=450, hide_index=True)
+        st.caption(f"Hiển thị: {len(df_on_f):,} / {len(df_combo_on):,} cửa hàng")
