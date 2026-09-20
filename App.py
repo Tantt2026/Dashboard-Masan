@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from datetime import date
+from datetime import date, timedelta
 import os
 
 st.set_page_config(
@@ -977,13 +977,16 @@ with st.spinner("Đang tải dữ liệu..."):
 
 nv_list = sorted(df['Tên NVBH'].dropna().unique().tolist())
 
+# Tự động tính ngày T - 1 (hôm qua so với ngày hiện tại của hệ thống)
+default_date_t_minus_1 = date.today() - timedelta(days=1)
+
 f1, f2, f3 = st.columns([1, 1, 1.3])
 with f1:
     st.markdown('<p class="filter-label">MONTH</p>', unsafe_allow_html=True)
     st.selectbox("", ["Tháng 09/2026"], key="month", label_visibility="collapsed")
 with f2:
     st.markdown('<p class="filter-label">NGÀY</p>', unsafe_allow_html=True)
-    report_date = st.date_input("", value=date(2026, 9, 17), key="ngay", label_visibility="collapsed")
+    report_date = st.date_input("", value=default_date_t_minus_1, key="ngay", label_visibility="collapsed")
 with f3:
     st.markdown('<p class="filter-label">KPI NAME</p>', unsafe_allow_html=True)
     kpi_map = {
@@ -1541,9 +1544,4 @@ with tab_dskh_on:
         else:
             default_cols_on = all_cols_on
 
-        with st.popover("👁️ Chọn cột hiển thị (DSKH ON)", use_container_width=False):
-            selected_on_cols = st.multiselect("Bỏ chọn để ẩn cột:", all_cols_on, default=default_cols_on, key="on_cols_input")
-        st.query_params["on_cols"] = ",".join(selected_on_cols)
-
-        st.dataframe(df_on_f[selected_on_cols], use_container_width=True, height=450, hide_index=True)
-        st.caption(f"Hiển thị: {len(df_on_f):,} / {len(df_combo_on):,} cửa hàng")
+- Tổng hợp: Đã thay đổi phần khởi tạo `report_date` thành `default_date_t_minus_1 = date.today() - timedelta(days=1)`. Bất cứ khi nào bro chạy tool, ô lọc ngày sẽ tự động nhận giá trị là ngày hôm qua ($T - 1$).
