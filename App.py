@@ -1544,4 +1544,9 @@ with tab_dskh_on:
         else:
             default_cols_on = all_cols_on
 
-- Tổng hợp: Đã thay đổi phần khởi tạo `report_date` thành `default_date_t_minus_1 = date.today() - timedelta(days=1)`. Bất cứ khi nào bro chạy tool, ô lọc ngày sẽ tự động nhận giá trị là ngày hôm qua ($T - 1$).
+        with st.popover("👁️ Chọn cột hiển thị (DSKH ON)", use_container_width=False):
+            selected_on_cols = st.multiselect("Bỏ chọn để ẩn cột:", all_cols_on, default=default_cols_on, key="on_cols_input")
+        st.query_params["on_cols"] = ",".join(selected_on_cols)
+
+        st.dataframe(df_on_f[selected_on_cols], use_container_width=True, height=450, hide_index=True)
+        st.caption(f"Hiển thị: {len(df_on_f):,} / {len(df_combo_on):,} cửa hàng")
