@@ -33,7 +33,7 @@ logo_svg = """
 </svg>
 """
 
-# ====================== CSS ======================
+# ====================== CSS (CHẶN BÀN PHÍM ẢO TRIỆT ĐỂ TRÊN MOBILE) ======================
 st.markdown("""
 <style>
     .main-header {
@@ -80,12 +80,20 @@ st.markdown("""
         .main-header h1 { font-size: 16px; }
         .main-header h2 { font-size: 11px; }
         
-        /* CHẶN TỰ ĐỘNG BẬT BÀN PHÍM TRÊN MOBILE CHO SELECTBOX / INPUT */
+        /* FIX TRIỆT ĐỂ: CHẶN BÀN PHÍM ẢO CHO SELECTBOX & DATE INPUT TRÊN MOBILE */
         div[data-baseweb="select"] input, 
         .stSelectbox input, 
         .stDateInput input {
             caret-color: transparent !important;
-            pointer-events: none !important;
+            pointer-events: auto !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+        }
+        
+        /* Ẩn con trỏ và ngăn focus trực tiếp vào input của selectbox/date */
+        div[data-baseweb="select"] *, 
+        .stDateInput * {
+            -webkit-tap-highlight-color: transparent;
         }
     }
     
@@ -136,6 +144,24 @@ st.markdown("""
         padding: 4px 5px;
     }
 </style>
+
+<!-- JAVASCRIPT ĐỂ BLUR (ĐÓNG) BÀN PHÍM ẢO NGAY LẬP TỨC NẾU CÓ THẺ INPUT BỊ FOCUS TRÊN MOBILE -->
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        if (window.innerWidth <= 768) {
+            document.addEventListener("click", function(e) {
+                if (e.target.tagName === 'INPUT' && (e.target.closest('[data-baseweb="select"]') || e.target.closest('.stDateInput'))) {
+                    e.target.blur();
+                }
+            }, true);
+            document.addEventListener("focusin", function(e) {
+                if (e.target.tagName === 'INPUT' && (e.target.closest('[data-baseweb="select"]') || e.target.closest('.stDateInput'))) {
+                    e.target.blur();
+                }
+            }, true);
+        }
+    });
+</script>
 """, unsafe_allow_html=True)
 
 def render_metric_card(label, value):
@@ -726,7 +752,7 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
             else:
                 cat_actual_map = cat_target_map
 
-    # MBS Brand (Đã fix lỗi chia cho 0)
+    # MBS Brand
     brand_filtered = brand_df.copy()
     if not brand_filtered.empty and f_thu_list:
         c_thu_brand = find_col(brand_filtered, ['Thứ'])
@@ -1070,7 +1096,7 @@ with tab_kpi:
             • Tổng số lượng cửa hàng VIP (VIP3, VIP5, VIPSI) toàn đội: <b>{tot_row_s['VIP MCH']:,} cửa hàng</b> (Đã mua: {tot_row_s['Đã Mua (VIP)']:,}).<br>
             • Tổng KH tham gia Combo OFF: <b>{tot_row_s['KH Combo OFF']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (OFF)']:,}) | Combo ON: <b>{tot_row_s['KH Combo ON']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (ON)']:,}).<br>
             • MBS Category (Outlet): <b>{tot_row_s['MBS Cat']:,} CH</b> | MBS Brand (Outlet): <b>{tot_row_s['MBS Brand']:,} CH</b>.<br>
-            • Đã fix triệt để lỗi tính toán phần trăm Brand và chặn tự bật bàn phím ảo trên mobile.
+            • Đã fix triệt để lỗi bàn phím tự nhảy trên mobile cho tất cả các ô selectbox & date input.
         </div>
         """, unsafe_allow_html=True)
         
