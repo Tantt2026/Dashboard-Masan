@@ -33,7 +33,7 @@ logo_svg = """
 </svg>
 """
 
-# ====================== CSS & JS (CHẶN BÀN PHÍM ẢO TRIỆT ĐỂ BẰNG DOM OBSERVER) ======================
+# ====================== CSS ======================
 st.markdown("""
 <style>
     .main-header {
@@ -79,16 +79,7 @@ st.markdown("""
         }
         .main-header h1 { font-size: 16px; }
         .main-header h2 { font-size: 11px; }
-        
-        /* CHẶN TƯƠNG TÁC KEYBOARD TRÊN TẤT CẢ INPUT CỦA SELECTBOX & DATE INPUT */
-        div[data-baseweb="select"] input, 
-        .stSelectbox input, 
-        .stDateInput input {
-            caret-color: transparent !important;
-            pointer-events: none !important;
-        }
     }
-    
     .filter-label {
         font-weight: 700 !important;
         color: #c53030 !important;
@@ -136,31 +127,6 @@ st.markdown("""
         padding: 4px 5px;
     }
 </style>
-
-<!-- SCRIPT CHẶN BÀN PHÍM ẢO BẰNG MUTATION OBSERVER & READONLY -->
-<script>
-    function disableMobileKeyboard() {
-        if (window.innerWidth <= 768) {
-            const inputs = document.querySelectorAll('div[data-baseweb="select"] input, .stSelectbox input, .stDateInput input');
-            inputs.forEach(input => {
-                input.setAttribute('readonly', 'true');
-                input.setAttribute('inputmode', 'none');
-                input.blur();
-            });
-        }
-    }
-
-    const observer = new MutationObserver((mutations) => {
-        disableMobileKeyboard();
-    });
-
-    document.addEventListener("DOMContentLoaded", function() {
-        observer.observe(document.body, { childList: true, subtree: true });
-        document.addEventListener("click", disableMobileKeyboard, true);
-        document.addEventListener("focusin", disableMobileKeyboard, true);
-        setTimeout(disableMobileKeyboard, 500);
-    });
-</script>
 """, unsafe_allow_html=True)
 
 def render_metric_card(label, value):
@@ -665,7 +631,7 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
                 df_vip_sub['DS'] = pd.to_numeric(df_vip_sub[col_ds_mcp], errors='coerce').fillna(0)
                 vip_actual_map = df_vip_sub[df_vip_sub['DS'] > 0].groupby('NV')['MA'].nunique().to_dict()
 
-    # KH Combo OFF & ON
+    # KH Combo OFF & ON chuẩn hóa theo Báo cáo số 6 (build_combo_matrix logic)
     df_mtd = df[df['date'] >= date(report_date.year, report_date.month, 1)].copy()
 
     def is_combo_off(row):
@@ -874,6 +840,7 @@ def render_summary_html_table(df, selected_metrics):
     
     html = ['<div style="overflow-x: auto; -webkit-overflow-scrolling: touch;"><table class="custom-kpi-table">']
     
+    # Header row 1
     html.append('<thead>')
     html.append('<tr>')
     html.append('<th rowspan="2" style="vertical-align: middle;">STT</th>')
@@ -886,6 +853,7 @@ def render_summary_html_table(df, selected_metrics):
     if has_brand: html.append('<th colspan="6" style="background-color: #fff5f5; color: #9b2c2c;">MBS Brand (K VNĐ)</th>')
     html.append('</tr>')
     
+    # Header row 2
     html.append('<tr>')
     sub_headers = []
     if has_vip: sub_headers.extend(['VIP MCH', 'Đã Mua', '% MTD'])
@@ -899,6 +867,7 @@ def render_summary_html_table(df, selected_metrics):
     html.append('</tr>')
     html.append('</thead>')
     
+    # Body
     html.append('<tbody>')
     for _, row in df.iterrows():
         is_total = str(row.get('Tên NV', '')).strip() == 'TỔNG CỘNG'
@@ -1095,7 +1064,7 @@ with tab_kpi:
             • Tổng số lượng cửa hàng VIP (VIP3, VIP5, VIPSI) toàn đội: <b>{tot_row_s['VIP MCH']:,} cửa hàng</b> (Đã mua: {tot_row_s['Đã Mua (VIP)']:,}).<br>
             • Tổng KH tham gia Combo OFF: <b>{tot_row_s['KH Combo OFF']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (OFF)']:,}) | Combo ON: <b>{tot_row_s['KH Combo ON']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (ON)']:,}).<br>
             • MBS Category (Outlet): <b>{tot_row_s['MBS Cat']:,} CH</b> | MBS Brand (Outlet): <b>{tot_row_s['MBS Brand']:,} CH</b>.<br>
-            • Đã fix triệt để hoàn toàn bàn phím ảo bằng MutationObserver trên mobile.
+            • Đã fix triệt để lỗi tính toán phần trăm Brand và đồng bộ dữ liệu hoàn chỉnh.
         </div>
         """, unsafe_allow_html=True)
         
