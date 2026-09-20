@@ -142,8 +142,8 @@ DATA_DIR = "data"
 RPT_PATH   = os.path.join(DATA_DIR, "RPT_061.xlsx")
 MCP_PATH   = os.path.join(DATA_DIR, "Data_MCP.xlsx")
 KPI_PATH   = os.path.join(DATA_DIR, "Target_KPI.xlsx")
-CAT_PATH   = os.path.join(DATA_DIR, "Data_Cat.xlsx")
-BRAND_PATH = os.path.join(DATA_DIR, "Data_Brand.xlsx")
+CAT_PATH   = "Data_Cat.xlsx"
+BRAND_PATH = "Data_Brand.xlsx"
 
 combo_off_files = [f for f in os.listdir(DATA_DIR) if "Combo" in f and "OFF" in f]
 combo_on_files  = [f for f in os.listdir(DATA_DIR) if "Combo" in f and "On" in f]
@@ -193,8 +193,7 @@ def load_combo_data():
 
 @st.cache_data(ttl=600)
 def load_cat_data():
-    for name in ["Data_Cat.xlsx", "data_cat.xlsx"]:
-        path = os.path.join(DATA_DIR, name) if os.path.exists(os.path.join(DATA_DIR, name)) else name
+    for path in [CAT_PATH, os.path.join(DATA_DIR, "Data_Cat.xlsx")]:
         if os.path.exists(path):
             try: return pd.read_excel(path)
             except: pass
@@ -202,8 +201,7 @@ def load_cat_data():
 
 @st.cache_data(ttl=600)
 def load_brand_data():
-    for name in ["Data_Brand.xlsx", "data_brand.xlsx"]:
-        path = os.path.join(DATA_DIR, name) if os.path.exists(os.path.join(DATA_DIR, name)) else name
+    for path in [BRAND_PATH, os.path.join(DATA_DIR, "Data_Brand.xlsx")]:
         if os.path.exists(path):
             try: return pd.read_excel(path)
             except: pass
@@ -687,22 +685,22 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
     if not cat_filtered.empty:
         c_nv_cat = find_col(cat_filtered, ['SM Name', 'SM name', 'Tên NVBH', 'Nhân viên'])
         c_ma_cat = find_col(cat_filtered, ['Outlet Code', 'Outlet_code', 'Mã CH'])
-        c_ct_cat = find_col(cat_filtered, ['Chỉ tiêu của CAT', 'Chỉ tiêu CAT', 'Target'])
+        c_ct_cat = find_col(cat_filtered, ['Doanh số nền tảng của OUTLET', 'Chỉ tiêu của CAT', 'Chỉ tiêu CAT', 'Target'])
         c_mtd_cat = find_col(cat_filtered, ['Doanh số thực đạt của CAT', 'Doanh số thực đạt CAT'])
         
         if c_nv_cat and c_ma_cat:
             df_cat_sub = cat_filtered.copy()
             df_cat_sub['NV'] = df_cat_sub[c_nv_cat].astype(str).str.strip()
             df_cat_sub['MA'] = df_cat_sub[c_ma_cat].astype(str).str.strip()
-            cat_target_map = df_cat_sub.groupby('NV')['MA'].nunique().to_dict()
+            cat_target_map = df_cat_sub.drop_duplicates(subset=['NV', 'MA']).groupby('NV')['MA'].nunique().to_dict()
             
             if c_ct_cat:
                 df_cat_sub['CT'] = pd.to_numeric(df_cat_sub[c_ct_cat], errors='coerce').fillna(0)
-                cat_ctds_map = df_cat_sub.groupby('NV')['CT'].sum().to_dict()
+                cat_ctds_map = df_cat_sub.drop_duplicates(subset=['NV', 'MA']).groupby('NV')['CT'].sum().to_dict()
             if c_mtd_cat:
                 df_cat_sub['MTD'] = pd.to_numeric(df_cat_sub[c_mtd_cat], errors='coerce').fillna(0)
                 cat_mtd_map = df_cat_sub.groupby('NV')['MTD'].sum().to_dict()
-                cat_actual_map = df_cat_sub[df_cat_sub['MTD'] > 0].groupby('NV')['MA'].nunique().to_dict()
+                cat_actual_map = df_cat_sub[df_cat_sub['MTD'] > 0].drop_duplicates(subset=['NV', 'MA']).groupby('NV')['MA'].nunique().to_dict()
             else:
                 cat_actual_map = cat_target_map
 
@@ -716,22 +714,22 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
     if not brand_filtered.empty:
         c_nv_brand = find_col(brand_filtered, ['SM Name', 'SM name', 'Tên NVBH', 'Nhân viên'])
         c_ma_brand = find_col(brand_filtered, ['Outlet Code', 'Outlet_code', 'Mã CH'])
-        c_ct_brand = find_col(brand_filtered, ['Chỉ tiêu của brand', 'Chỉ tiêu brand', 'Target'])
+        c_ct_brand = find_col(brand_filtered, ['Doanh số nền tảng của OUTLET', 'Chỉ tiêu của brand', 'Chỉ tiêu brand', 'Target'])
         c_mtd_brand = find_col(brand_filtered, ['Doanh số thực đạt của brand', 'Doanh số thực đạt brand'])
         
         if c_nv_brand and c_ma_brand:
             df_brand_sub = brand_filtered.copy()
             df_brand_sub['NV'] = df_brand_sub[c_nv_brand].astype(str).str.strip()
             df_brand_sub['MA'] = df_brand_sub[c_ma_brand].astype(str).str.strip()
-            brand_target_map = df_brand_sub.groupby('NV')['MA'].nunique().to_dict()
+            brand_target_map = df_brand_sub.drop_duplicates(subset=['NV', 'MA']).groupby('NV')['MA'].nunique().to_dict()
             
             if c_ct_brand:
                 df_brand_sub['CT'] = pd.to_numeric(df_brand_sub[c_ct_brand], errors='coerce').fillna(0)
-                brand_ctds_map = df_brand_sub.groupby('NV')['CT'].sum().to_dict()
+                brand_ctds_map = df_brand_sub.drop_duplicates(subset=['NV', 'MA']).groupby('NV')['CT'].sum().to_dict()
             if c_mtd_brand:
                 df_brand_sub['MTD'] = pd.to_numeric(df_brand_sub[c_mtd_brand], errors='coerce').fillna(0)
                 brand_mtd_map = df_brand_sub.groupby('NV')['MTD'].sum().to_dict()
-                brand_actual_map = df_brand_sub[df_brand_sub['MTD'] > 0].groupby('NV')['MA'].nunique().to_dict()
+                brand_actual_map = df_brand_sub[df_brand_sub['MTD'] > 0].drop_duplicates(subset=['NV', 'MA']).groupby('NV')['MA'].nunique().to_dict()
             else:
                 brand_actual_map = brand_target_map
 
@@ -752,15 +750,15 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
         cat_tgt = int(cat_target_map.get(nv, 0))
         cat_act = int(cat_actual_map.get(nv, int(cat_tgt * 0.8)))
         cat_pct = round(cat_act / cat_tgt * 100, 1) if cat_tgt else 0
-        cat_ct = float(cat_ctds_map.get(nv, 50000000.0))
-        cat_m = float(cat_mtd_map.get(nv, cat_ct * 0.4))
+        cat_ct = float(cat_ctds_map.get(nv, 0.0))
+        cat_m = float(cat_mtd_map.get(nv, 0.0))
         cat_m_pct = round(cat_m / cat_ct * 100, 1) if cat_ct else 0
         
         brand_tgt = int(brand_target_map.get(nv, 0))
         brand_act = int(brand_actual_map.get(nv, brand_tgt))
         brand_pct = round(brand_act / brand_tgt * 100, 1) if brand_tgt else 0
-        brand_ct = float(brand_ctds_map.get(nv, 100000000.0))
-        brand_m = float(brand_mtd_map.get(nv, brand_ct * 0.3))
+        brand_ct = float(brand_ctds_map.get(nv, 0.0))
+        brand_m = float(brand_mtd_map.get(nv, 0.0))
         brand_m_pct = round(brand_m / brand_ct * 100, 1) if brand_ct else 0
         
         rows.append({
@@ -1029,7 +1027,7 @@ with tab_kpi:
             • Tổng số lượng cửa hàng VIP (VIP3, VIP5, VIPSI) toàn đội: <b>{tot_row_s['VIP MCH']:,} cửa hàng</b> (Đã mua: {tot_row_s['Đã Mua (VIP)']:,}).<br>
             • Tổng KH tham gia Combo OFF: <b>{tot_row_s['KH Combo OFF']:,} CH</b> | Combo ON: <b>{tot_row_s['KH Combo ON']:,} CH</b>.<br>
             • MBS Category (Outlet): <b>{tot_row_s['MBS Cat']:,} CH</b> | MBS Brand (Outlet): <b>{tot_row_s['MBS Brand']:,} CH</b>.<br>
-            • Doanh số Category & Brand đã được scale thu gọn (ngàn đồng) giúp xem trên di động cực kỳ thoáng mắt.
+            • Chỉ tiêu doanh số & thực đạt MTD của Cat & Brand đã được lấy trực tiếp từ file Excel nguồn và scale gọn gàng (K VNĐ) hiển thị trên di động rất mượt mà.
         </div>
         """, unsafe_allow_html=True)
         
