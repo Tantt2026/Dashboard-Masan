@@ -33,7 +33,7 @@ logo_svg = """
 </svg>
 """
 
-# ====================== CSS (CHẶN BÀN PHÍM ẢO TRIỆT ĐỂ TRÊN MOBILE) ======================
+# ====================== CSS & JS (CHẶN BÀN PHÍM ẢO TRIỆT ĐỂ BẰNG DOM OBSERVER) ======================
 st.markdown("""
 <style>
     .main-header {
@@ -80,20 +80,12 @@ st.markdown("""
         .main-header h1 { font-size: 16px; }
         .main-header h2 { font-size: 11px; }
         
-        /* FIX TRIỆT ĐỂ: CHẶN BÀN PHÍM ẢO CHO SELECTBOX & DATE INPUT TRÊN MOBILE */
+        /* CHẶN TƯƠNG TÁC KEYBOARD TRÊN TẤT CẢ INPUT CỦA SELECTBOX & DATE INPUT */
         div[data-baseweb="select"] input, 
         .stSelectbox input, 
         .stDateInput input {
             caret-color: transparent !important;
-            pointer-events: auto !important;
-            user-select: none !important;
-            -webkit-user-select: none !important;
-        }
-        
-        /* Ẩn con trỏ và ngăn focus trực tiếp vào input của selectbox/date */
-        div[data-baseweb="select"] *, 
-        .stDateInput * {
-            -webkit-tap-highlight-color: transparent;
+            pointer-events: none !important;
         }
     }
     
@@ -145,21 +137,28 @@ st.markdown("""
     }
 </style>
 
-<!-- JAVASCRIPT ĐỂ BLUR (ĐÓNG) BÀN PHÍM ẢO NGAY LẬP TỨC NẾU CÓ THẺ INPUT BỊ FOCUS TRÊN MOBILE -->
+<!-- SCRIPT CHẶN BÀN PHÍM ẢO BẰNG MUTATION OBSERVER & READONLY -->
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
+    function disableMobileKeyboard() {
         if (window.innerWidth <= 768) {
-            document.addEventListener("click", function(e) {
-                if (e.target.tagName === 'INPUT' && (e.target.closest('[data-baseweb="select"]') || e.target.closest('.stDateInput'))) {
-                    e.target.blur();
-                }
-            }, true);
-            document.addEventListener("focusin", function(e) {
-                if (e.target.tagName === 'INPUT' && (e.target.closest('[data-baseweb="select"]') || e.target.closest('.stDateInput'))) {
-                    e.target.blur();
-                }
-            }, true);
+            const inputs = document.querySelectorAll('div[data-baseweb="select"] input, .stSelectbox input, .stDateInput input');
+            inputs.forEach(input => {
+                input.setAttribute('readonly', 'true');
+                input.setAttribute('inputmode', 'none');
+                input.blur();
+            });
         }
+    }
+
+    const observer = new MutationObserver((mutations) => {
+        disableMobileKeyboard();
+    });
+
+    document.addEventListener("DOMContentLoaded", function() {
+        observer.observe(document.body, { childList: true, subtree: true });
+        document.addEventListener("click", disableMobileKeyboard, true);
+        document.addEventListener("focusin", disableMobileKeyboard, true);
+        setTimeout(disableMobileKeyboard, 500);
     });
 </script>
 """, unsafe_allow_html=True)
@@ -1096,7 +1095,7 @@ with tab_kpi:
             • Tổng số lượng cửa hàng VIP (VIP3, VIP5, VIPSI) toàn đội: <b>{tot_row_s['VIP MCH']:,} cửa hàng</b> (Đã mua: {tot_row_s['Đã Mua (VIP)']:,}).<br>
             • Tổng KH tham gia Combo OFF: <b>{tot_row_s['KH Combo OFF']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (OFF)']:,}) | Combo ON: <b>{tot_row_s['KH Combo ON']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (ON)']:,}).<br>
             • MBS Category (Outlet): <b>{tot_row_s['MBS Cat']:,} CH</b> | MBS Brand (Outlet): <b>{tot_row_s['MBS Brand']:,} CH</b>.<br>
-            • Đã fix triệt để lỗi bàn phím tự nhảy trên mobile cho tất cả các ô selectbox & date input.
+            • Đã fix triệt để hoàn toàn bàn phím ảo bằng MutationObserver trên mobile.
         </div>
         """, unsafe_allow_html=True)
         
