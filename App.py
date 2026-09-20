@@ -39,33 +39,33 @@ st.markdown("""
     .main-header {
         background: linear-gradient(90deg, #1a365d 0%, #2b6cb0 100%);
         color: white;
-        padding: 8px 12px;
-        border-radius: 8px;
-        margin-bottom: 10px;
+        padding: 10px 16px;
+        border-radius: 10px;
+        margin-bottom: 12px;
         box-shadow: 0 3px 10px rgba(0,0,0,0.12);
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
     }
     .main-header .logo {
         flex-shrink: 0;
         background: white;
         border-radius: 6px;
-        padding: 4px 6px;
+        padding: 4px 8px;
         display: flex;
         align-items: center;
     }
     .main-header .title-block { flex: 1; text-align: center; }
     .main-header h1 {
         margin: 0;
-        font-size: 18px;
+        font-size: 22px;
         font-weight: 800;
         letter-spacing: 0.5px;
         line-height: 1.2;
     }
     .main-header h2 {
-        margin: 2px 0 0 0;
-        font-size: 12px;
+        margin: 4px 0 0 0;
+        font-size: 14px;
         font-weight: 600;
         color: #fefcbf;
         letter-spacing: 0.3px;
@@ -75,31 +75,31 @@ st.markdown("""
         .main-header {
             flex-direction: column;
             text-align: center;
-            padding: 8px;
+            padding: 10px;
         }
-        .main-header h1 { font-size: 16px; }
-        .main-header h2 { font-size: 11px; }
+        .main-header h1 { font-size: 18px; }
+        .main-header h2 { font-size: 12px; }
     }
     .filter-label {
         font-weight: 700 !important;
         color: #c53030 !important;
-        font-size: 11px !important;
+        font-size: 12px !important;
         margin-bottom: 2px;
     }
     .note-box {
         background: #ebf8ff;
         border-left: 4px solid #3182ce;
-        padding: 8px 12px;
+        padding: 10px 14px;
         border-radius: 0 6px 6px 0;
-        margin-top: 10px;
-        font-size: 12px;
-        line-height: 1.4;
+        margin-top: 12px;
+        font-size: 13px;
+        line-height: 1.5;
     }
     
     [data-testid="stPopover"] button {
         color: #e53e3e !important;
         font-weight: 900 !important;
-        font-size: 13px !important;
+        font-size: 14px !important;
     }
     
     footer {visibility: hidden;}
@@ -110,7 +110,7 @@ st.markdown("""
         border-collapse: collapse;
         border: 1px solid #e2e8f0 !important;
         font-family: sans-serif;
-        font-size: 11px;
+        font-size: 12px;
         background-color: #ffffff;
     }
     .custom-kpi-table th {
@@ -119,21 +119,20 @@ st.markdown("""
         font-weight: bold !important;
         text-align: center !important;
         border: 1px solid #e2e8f0 !important;
-        padding: 5px 4px;
-        white-space: nowrap;
+        padding: 6px;
     }
     .custom-kpi-table td {
         border: 1px solid #e2e8f0 !important;
-        padding: 4px 5px;
+        padding: 5px 6px;
     }
 </style>
 """, unsafe_allow_html=True)
 
 def render_metric_card(label, value):
     st.markdown(f"""
-    <div style="background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 6px; padding: 8px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.04); margin-bottom: 6px;">
-        <div style="color: #c53030; font-weight: 800; font-size: 0.95rem; margin-bottom: 2px;">{label}</div>
-        <div style="color: #c53030; font-weight: 800; font-size: 1.5rem;">{value}</div>
+    <div style="background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 8px; padding: 10px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.04); margin-bottom: 8px;">
+        <div style="color: #c53030; font-weight: 800; font-size: 1.1rem; margin-bottom: 4px;">{label}</div>
+        <div style="color: #c53030; font-weight: 800; font-size: 2rem;">{value}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -249,13 +248,6 @@ def format_number_vn(x):
     try:
         if pd.isnull(x) or str(x).lower() in ["none","nan",""]: return ""
         return f"{float(x):,.0f}".replace(",", ".")
-    except: return x
-
-def format_scaled_thousand(x):
-    try:
-        if pd.isnull(x) or str(x).lower() in ["none","nan",""]: return ""
-        val = float(x) / 1000.0
-        return f"{val:,.0f}".replace(",", ".")
     except: return x
 
 def find_col(df, candidates):
@@ -821,7 +813,7 @@ def build_summary_report(mcp_df, df_combo_off_raw, df_combo_on_raw, cat_df, bran
     return df_out
 
 def render_summary_html_table(df):
-    html = ['<div style="overflow-x: auto; -webkit-overflow-scrolling: touch;"><table class="custom-kpi-table">']
+    html = ['<div style="overflow-x: auto;"><table class="custom-kpi-table">']
     
     html.append('<thead>')
     html.append('<tr>')
@@ -830,8 +822,8 @@ def render_summary_html_table(df):
     html.append('<th colspan="3" style="background-color: #fffaf0; color: #c05621;">VIP MCH</th>')
     html.append('<th colspan="3" style="background-color: #f0fff4; color: #22543d;">KH Combo OFF</th>')
     html.append('<th colspan="3" style="background-color: #ebf8ff; color: #2b6cb0;">KH Combo ON</th>')
-    html.append('<th colspan="6" style="background-color: #faf5ff; color: #553c9a;">MBS Cat (K VNĐ)</th>')
-    html.append('<th colspan="6" style="background-color: #fff5f5; color: #9b2c2c;">MBS Brand (K VNĐ)</th>')
+    html.append('<th colspan="6" style="background-color: #faf5ff; color: #553c9a;">MBS Cat</th>')
+    html.append('<th colspan="6" style="background-color: #fff5f5; color: #9b2c2c;">MBS Brand</th>')
     html.append('</tr>')
     
     html.append('<tr>')
@@ -866,7 +858,7 @@ def render_summary_html_table(df):
             if pd.isna(val): val = ""
             
             if 'CT DS' in col or 'MTD (Cat)' in col or 'MTD (Brand)' in col:
-                val = format_scaled_thousand(val)
+                val = format_number_vn(val)
                 
             is_pct = '%' in col
             style_bg = color_pct_bg(val) if is_pct and not is_total else ''
@@ -893,7 +885,7 @@ def render_summary_html_table(df):
     return "".join(html)
 
 def render_html_table(df):
-    html = ['<div style="overflow-x: auto; -webkit-overflow-scrolling: touch;"><table class="custom-kpi-table">']
+    html = ['<div style="overflow-x: auto;"><table class="custom-kpi-table">']
     html.append('<thead><tr>')
     for col in df.columns:
         html.append(f'<th>{col}</th>')
@@ -1013,7 +1005,7 @@ with tab_kpi:
         df_summary = build_summary_report(mcp, df_combo_off, df_combo_on, df_cat, df_brand, filter_nv, f_thu_sum)
         tot_row_s = df_summary.iloc[-1]
         
-        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">7. BÁO CÁO TỔNG HỢP THEO NHÂN VIÊN - THÁNG {report_date.strftime("%m/%Y")}</h3>', unsafe_allow_html=True)
+        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;">7. BÁO CÁO TỔNG HỢP THEO NHÂN VIÊN - THÁNG {report_date.strftime("%m/%Y")}</h3>', unsafe_allow_html=True)
         st.caption(f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc NV: {filter_nv} | Lọc Thứ: {f_thu_sum if f_thu_sum else 'Tất cả'}")
         
         c1, c2, c3, c4 = st.columns(4)
@@ -1029,7 +1021,7 @@ with tab_kpi:
             • Tổng số lượng cửa hàng VIP (VIP3, VIP5, VIPSI) toàn đội: <b>{tot_row_s['VIP MCH']:,} cửa hàng</b> (Đã mua: {tot_row_s['Đã Mua (VIP)']:,}).<br>
             • Tổng KH tham gia Combo OFF: <b>{tot_row_s['KH Combo OFF']:,} CH</b> | Combo ON: <b>{tot_row_s['KH Combo ON']:,} CH</b>.<br>
             • MBS Category (Outlet): <b>{tot_row_s['MBS Cat']:,} CH</b> | MBS Brand (Outlet): <b>{tot_row_s['MBS Brand']:,} CH</b>.<br>
-            • Doanh số Category & Brand đã được scale thu gọn (ngàn đồng) giúp xem trên di động cực kỳ thoáng mắt.
+            • Đã tích hợp đầy đủ chỉ tiêu doanh số và thực đạt MTD cho Category & Brand y hệt bảng Excel mẫu.
         </div>
         """, unsafe_allow_html=True)
         
@@ -1039,7 +1031,7 @@ with tab_kpi:
         total_mtd = int(total_row['MTD'])
         total_ngay = int(total_row['Thực Hiện Ngày'])
         pct_team = total_row['% MTD']
-        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">{title} - THÁNG {report_date.strftime("%m/%Y")}</h3>', unsafe_allow_html=True)
+        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;">{title} - THÁNG {report_date.strftime("%m/%Y")}</h3>', unsafe_allow_html=True)
         st.caption(f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc: {filter_nv}")
         c1, c2, c3, c4 = st.columns(4)
         with c1: render_metric_card("🎯 Target", f"{team_tgt:,}")
@@ -1075,7 +1067,7 @@ with tab_kpi:
         pct_off_team = round(total_off / target_off_total * 100, 1) if target_off_total else 0
         pct_on_team = round(total_on / target_on_total * 100, 1) if target_on_total else 0
 
-        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">6. BÁO CÁO ĐƠN HÀNG COMBO LŨY KẾ (MATRIX OFF/ON) - THÁNG {report_date.strftime("%m/%Y")}</h3>', unsafe_allow_html=True)
+        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;">6. BÁO CÁO ĐƠN HÀNG COMBO LŨY KẾ (MATRIX OFF/ON) - THÁNG {report_date.strftime("%m/%Y")}</h3>', unsafe_allow_html=True)
         st.caption(f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc: {filter_nv} | Target OFF: {target_off_total} CH | Target ON: {target_on_total} CH")
         
         c1, c2, c3, c4 = st.columns(4)
@@ -1129,7 +1121,7 @@ def update_on_params():
 
 # ----- TAB MCP -----
 with tab_mcp:
-    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">🗺️ MCP VISIT & MAPPING DOANH SỐ BÁN HÀNG</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;">🗺️ MCP VISIT & MAPPING DOANH SỐ BÁN HÀNG</h3>', unsafe_allow_html=True)
     if mcp.empty:
         st.warning("Chưa có dữ liệu MCP")
     else:
@@ -1233,7 +1225,7 @@ with tab_mcp:
 
 # ----- TAB CAT -----
 with tab_cat:
-    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">🎯 TRACKING MBS - THEO NGÀNH HÀNG (CATEGORY)</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;">🎯 TRACKING MBS - THEO NGÀNH HÀNG (CATEGORY)</h3>', unsafe_allow_html=True)
     if df_cat.empty:
         st.error("❌ Không tìm thấy Data_Cat.xlsx trong thư mục 'data'")
     else:
@@ -1305,7 +1297,7 @@ with tab_cat:
 
 # ----- TAB BRAND -----
 with tab_brand:
-    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">🏷️ TRACKING MBS - THEO THƯƠNG HIỆU (BRAND)</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;">🏷️ TRACKING MBS - THEO THƯƠNG HIỆU (BRAND)</h3>', unsafe_allow_html=True)
     if df_brand.empty:
         st.error("❌ Không tìm thấy Data_Brand.xlsx trong thư mục 'data'")
     else:
@@ -1377,7 +1369,7 @@ with tab_brand:
 
 # ----- TAB DSKH_Combo OFF -----
 with tab_dskh_off:
-    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">📋 DANH SÁCH KHÁCH HÀNG COMBO OFF (TÂN_COMBO KÊNH OFF)</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;">📋 DANH SÁCH KHÁCH HÀNG COMBO OFF (TÂN_COMBO KÊNH OFF)</h3>', unsafe_allow_html=True)
     if df_combo_off.empty:
         st.warning("Chưa có dữ liệu Combo OFF trong thư mục 'data'")
     else:
@@ -1446,7 +1438,7 @@ with tab_dskh_off:
 
 # ----- TAB DSKH_Combo ON -----
 with tab_dskh_on:
-    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">📋 DANH SÁCH KHÁCH HÀNG COMBO ON (TÂN_COMBO KÊNH ON)</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;">📋 DANH SÁCH KHÁCH HÀNG COMBO ON (TÂN_COMBO KÊNH ON)</h3>', unsafe_allow_html=True)
     if df_combo_on.empty:
         st.warning("Chưa có dữ liệu Combo ON trong thư mục 'data'")
     else:
