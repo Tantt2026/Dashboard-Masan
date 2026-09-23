@@ -124,7 +124,7 @@ st.markdown("""
 def render_metric_card(label, value):
     st.markdown(f"""
     <div style="background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 6px; padding: 8px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.04); margin-bottom: 6px;">
-        <div style="color: #c53030; font-weight: 800; font-size: 0.9rem; margin-bottom: 2px;">{label}</div>
+        <div style="color: #c53030; font-weight: 800; font-size: 0.95rem; margin-bottom: 2px;">{label}</div>
         <div style="color: #c53030; font-weight: 800; font-size: 1.3rem;">{value}</div>
     </div>
     """, unsafe_allow_html=True)
@@ -1360,11 +1360,11 @@ with tab_kpi:
         st.markdown(f'<p style="text-align: center; font-size: 12px; color: #4a5568; margin-bottom: 12px;">Dữ liệu cập nhật {wname} ngày {report_date.strftime("%d/%m/%Y")} | Tuần ISO {iso_week} | Kèm tỷ lệ % Active (Đã mua / Tổng KH)</p>', unsafe_allow_html=True)
         
         c1, c2, c3, c4, c5 = st.columns(5)
-        with c1: render_metric_card("VIP 3 (Đã Mua / Tổng)", f"{v3_mua:,} / {v3_kh:,} ({v3_pct}%)")
-        with c2: render_metric_card("VIP 5 (Đã Mua / Tổng)", f"{v5_mua:,} / {v5_kh:,} ({v5_pct}%)")
-        with c3: render_metric_card("VIPSI (Đã Mua / Tổng)", f"{vsi_mua:,} / {vsi_kh:,} ({vsi_pct}%)")
-        with c4: render_metric_card("LẺ (Đã Mua / Tổng)", f"{le_mua:,} / {le_kh:,} ({le_pct}%)")
-        with c5: render_metric_card("ON (Đã Mua / Tổng)", f"{on_mua:,} / {on_kh:,} ({on_pct}%)")
+        with c1: render_metric_card("VIP 3", f"{v3_mua:,} / {v3_kh:,} ({v3_pct}%)")
+        with c2: render_metric_card("VIP 5", f"{v5_mua:,} / {v5_kh:,} ({v5_pct}%)")
+        with c3: render_metric_card("VIPSI", f"{vsi_mua:,} / {vsi_kh:,} ({vsi_pct}%)")
+        with c4: render_metric_card("LẺ", f"{le_mua:,} / {le_kh:,} ({le_pct}%)")
+        with c5: render_metric_card("ON", f"{on_mua:,} / {on_kh:,} ({on_pct}%)")
         
         st.markdown(render_visit_html_table(df_visit), unsafe_allow_html=True)
         
