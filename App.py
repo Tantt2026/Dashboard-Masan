@@ -124,8 +124,8 @@ st.markdown("""
 def render_metric_card(label, value):
     st.markdown(f"""
     <div style="background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 6px; padding: 8px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.04); margin-bottom: 6px;">
-        <div style="color: #c53030; font-weight: 800; font-size: 0.95rem; margin-bottom: 2px;">{label}</div>
-        <div style="color: #c53030; font-weight: 800; font-size: 1.5rem;">{value}</div>
+        <div style="color: #c53030; font-weight: 800; font-size: 0.9rem; margin-bottom: 2px;">{label}</div>
+        <div style="color: #c53030; font-weight: 800; font-size: 1.3rem;">{value}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1330,10 +1330,26 @@ with tab_kpi:
 
         df_visit, title_v = build_visit_report(mcp, df, report_date, filter_nv, f_thu_visit)
         tot_row_v = df_visit.iloc[-1] if not df_visit.empty else None
-        tot_vt_kh = tot_row_v['Lịch VT - Tổng KH'] if tot_row_v is not None else 0
-        tot_vt_mua = tot_row_v['Lịch VT - Đã Mua'] if tot_row_v is not None else 0
-        tot_v3_kh = tot_row_v['VIP 3 - Tổng KH'] if tot_row_v is not None else 0
-        tot_on_kh = tot_row_v['Kênh ON - Tổng KH'] if tot_row_v is not None else 0
+        
+        v3_mua = tot_row_v['VIP 3 - Đã Mua'] if tot_row_v is not None else 0
+        v3_kh = tot_row_v['VIP 3 - Tổng KH'] if tot_row_v is not None else 0
+        v3_pct = round(v3_mua / v3_kh * 100, 1) if v3_kh else 0
+
+        v5_mua = tot_row_v['VIP 5 - Đã Mua'] if tot_row_v is not None else 0
+        v5_kh = tot_row_v['VIP 5 - Tổng KH'] if tot_row_v is not None else 0
+        v5_pct = round(v5_mua / v5_kh * 100, 1) if v5_kh else 0
+
+        vsi_mua = tot_row_v['VIPSI - Đã Mua'] if tot_row_v is not None else 0
+        vsi_kh = tot_row_v['VIPSI - Tổng KH'] if tot_row_v is not None else 0
+        vsi_pct = round(vsi_mua / vsi_kh * 100, 1) if vsi_kh else 0
+
+        le_mua = tot_row_v['Lẻ - Đã Mua'] if tot_row_v is not None else 0
+        le_kh = tot_row_v['Lẻ - Tổng KH'] if tot_row_v is not None else 0
+        le_pct = round(le_mua / le_kh * 100, 1) if le_kh else 0
+
+        on_mua = tot_row_v['Kênh ON - Đã Mua'] if tot_row_v is not None else 0
+        on_kh = tot_row_v['Kênh ON - Tổng KH'] if tot_row_v is not None else 0
+        on_pct = round(on_mua / on_kh * 100, 1) if on_kh else 0
         
         weekday_map = {0: "THỨ HAI", 1: "THỨ BA", 2: "THỨ TƯ", 3: "THỨ NĂM", 4: "THỨ SÁU", 5: "THỨ BẢY", 6: "CHỦ NHẬT"}
         wname = weekday_map.get(report_date.weekday(), "")
@@ -1343,20 +1359,21 @@ with tab_kpi:
         st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px; font-size: 16px; text-align: center;">BÁO CÁO LỊCH VIẾNG THĂM & % ACTIVE {wname} - {report_date.strftime("%d/%m/%Y")} (TUẦN ISO {iso_week} - {week_type_str})</h3>', unsafe_allow_html=True)
         st.markdown(f'<p style="text-align: center; font-size: 12px; color: #4a5568; margin-bottom: 12px;">Dữ liệu cập nhật {wname} ngày {report_date.strftime("%d/%m/%Y")} | Tuần ISO {iso_week} | Kèm tỷ lệ % Active (Đã mua / Tổng KH)</p>', unsafe_allow_html=True)
         
-        c1, c2, c3, c4 = st.columns(4)
-        with c1: render_metric_card("Tổng Lịch VT KH", f"{tot_vt_kh:,}")
-        with c2: render_metric_card("Tổng CH Đã Mua", f"{tot_vt_mua:,}")
-        with c3: render_metric_card("Tổng KH VIP3", f"{tot_v3_kh:,}")
-        with c4: render_metric_card("Tổng KH Kênh ON", f"{tot_on_kh:,}")
+        c1, c2, c3, c4, c5 = st.columns(5)
+        with c1: render_metric_card("VIP 3 (Đã Mua / Tổng)", f"{v3_mua:,} / {v3_kh:,} ({v3_pct}%)")
+        with c2: render_metric_card("VIP 5 (Đã Mua / Tổng)", f"{v5_mua:,} / {v5_kh:,} ({v5_pct}%)")
+        with c3: render_metric_card("VIPSI (Đã Mua / Tổng)", f"{vsi_mua:,} / {vsi_kh:,} ({vsi_pct}%)")
+        with c4: render_metric_card("LẺ (Đã Mua / Tổng)", f"{le_mua:,} / {le_kh:,} ({le_pct}%)")
+        with c5: render_metric_card("ON (Đã Mua / Tổng)", f"{on_mua:,} / {on_kh:,} ({on_pct}%)")
         
         st.markdown(render_visit_html_table(df_visit), unsafe_allow_html=True)
         
         st.markdown(f"""
         <div class="note-box">
             <b>NHẬN XÉT & ĐÁNH GIÁ LỊCH VIẾNG THĂM {wname} - NGÀY {report_date.strftime('%d/%m/%Y')} (TUẦN ISO {iso_week} - {week_type_str}):</b><br>
-            • <b>Tổng Lịch Viếng Thăm:</b> Toàn team có tổng cộng <b>{tot_vt_kh:,} cửa hàng</b> theo lịch tuyến, với <b>{tot_vt_mua:,} cửa hàng</b> đã phát sinh đơn hàng MTD.<br>
-            • <b>Theo Dõi Chi Tiết Nhóm Khách Hàng:</b> Chia rõ theo các nhóm <i>Lịch VT, VIP 3, VIP 5, VIPSI, Lẻ, Kênh ON</i> giúp kiểm soát chính xác <b>Tổng KH, Đã Mua và % Active</b>.<br>
-            • <b>Định Hướng Vận Hành:</b> Tập trung đốc thúc ĐDKD rà soát các cửa hàng chưa Active trong tuyến để tối ưu độ phủ trong tháng.
+            • <b>Phân Bổ Tuyến Viếng Thăm:</b> Kiểm soát chặt chẽ số lượng thực hiện so với tổng tuyến theo từng phân khúc <b>VIP 3, VIP 5, VIPSI, LẺ và ON</b>.<br>
+            • <b>Độ Phủ Active:</b> Theo dõi sát sao tỷ lệ % Active để thúc đẩy chỉ tiêu MTD toàn tuyến.<br>
+            • <b>Định Hướng Vận Hành:</b> Đôn đốc ĐDKD tập trung các điểm bán trọng điểm chưa mua hàng trong lịch tuyến ngày hôm nay.
         </div>
         """, unsafe_allow_html=True)
 
