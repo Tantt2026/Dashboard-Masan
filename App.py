@@ -130,17 +130,17 @@ st.markdown("""
         background-color: #ffffff;
     }
     .custom-kpi-table th {
-        background-color: #1a365d !important;
-        color: #ffffff !important;
+        background-color: #f7fafc !important;
+        color: #9b2c2c !important;
         font-weight: bold !important;
         text-align: center !important;
-        border: 1px solid #cbd5e0 !important;
-        padding: 6px 5px;
+        border: 1px solid #e2e8f0 !important;
+        padding: 5px 4px;
         white-space: nowrap;
     }
     .custom-kpi-table td {
         border: 1px solid #e2e8f0 !important;
-        padding: 5px 6px;
+        padding: 4px 5px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -610,92 +610,6 @@ def build_turnover_report(df, report_date, turnover_targets, filter_nv=None):
     }])
     return pd.concat([df_out, total_row], ignore_index=True), team_tgt, "8. BÁO CÁO DOANH SỐ TURNOVER"
 
-# ====================== HÀM BÁO CÁO LỊCH VIẾNG THĂM (CHUẨN THEO MẪU HÌNH ẢNH) ======================
-def build_visit_report(df_mcp, report_date, filter_nv=None, f_thu_list=None):
-    if df_mcp.empty:
-        return pd.DataFrame(), "10. BÁO CÁO LỊCH VIẾNG THĂM"
-    
-    mcp_f = df_mcp.copy()
-    if filter_nv and filter_nv != "Tất cả ĐDKD":
-        c_nv = find_col(mcp_f, ['SM Name', 'SM name', 'Tên NVBH', 'Nhân viên'])
-        if c_nv:
-            mcp_f = mcp_f[mcp_f[c_nv].astype(str).str.strip() == filter_nv]
-            
-    if f_thu_list:
-        c_thu = find_col(mcp_f, ['Thứ', 'Frequency', 'Tần suất'])
-        mcp_f = filter_by_thu_multi(mcp_f, c_thu, f_thu_list)
-        
-    c_nv_name = find_col(mcp_f, ['SM Name', 'SM name', 'Tên NVBH', 'Nhân viên']) or 'SM name'
-    c_nv_code = find_col(mcp_f, ['SM Code', 'Mã NVBH', 'SM code']) or 'SM code'
-    c_ma_col = find_col(mcp_f, ['Outlet_code', 'Outlet Code', 'Mã CH']) or 'Outlet_code'
-    c_vip = find_col(mcp_f, ['VIP MCH', 'VIP_MCH'])
-    c_l1 = find_col(mcp_f, ['L1', 'Channel'])
-    
-    nv_list = sorted(mcp_f[c_nv_name].dropna().astype(str).unique().tolist()) if c_nv_name in mcp_f.columns else []
-    
-    rows = []
-    for nv in nv_list:
-        sub = mcp_f[mcp_f[c_nv_name].astype(str).str.strip() == nv]
-        sm_code = sub[c_nv_code].iloc[0] if c_nv_code in sub.columns and not sub[c_nv_code].empty else ''
-        
-        total_visit_today = sub[c_ma_col].nunique()
-        
-        # Nhóm VIP3
-        v3 = sub[sub[c_vip].astype(str).str.strip() == 'VIP3'][c_ma_col].nunique() if c_vip else 0
-        # Nhóm VIP5
-        v5 = sub[sub[c_vip].astype(str).str.strip() == 'VIP5'][c_ma_col].nunique() if c_vip else 0
-        # Nhóm VIPSI
-        vsi = sub[sub[c_vip].astype(str).str.strip() == 'VIPSI'][c_ma_col].nunique() if c_vip else 0
-        
-        # Kênh ON
-        on_cnt = sub[sub[c_l1].astype(str).str.contains('On', case=False, na=False)][c_ma_col].nunique() if c_l1 else 0
-        
-        # CH Lẻ (Off Premise và không phải VIP3, VIP5, VIPSI)
-        off_sub = sub[~sub[c_l1].astype(str).str.contains('On', case=False, na=False)] if c_l1 else sub
-        if c_vip:
-            ch_le = off_sub[~off_sub[c_vip].astype(str).str.strip().isin(['VIP3', 'VIP5', 'VIPSI'])][c_ma_col].nunique()
-        else:
-            ch_le = off_sub[c_ma_col].nunique()
-            
-        rows.append({
-            'Mã NVBH': sm_code,
-            'Tên NVBH': nv,
-            'Lịch Viếng Thăm Hôm Nay': total_visit_today,
-            'Nhóm KH VIP3': v3,
-            'Nhóm KH VIP5': v5,
-            'Nhóm KH VIPSI': vsi,
-            'Nhóm KH CH Lẻ': ch_le,
-            'Nhóm KH Kênh ON': on_cnt,
-            '_sort': total_visit_today
-        })
-        
-    df_out = pd.DataFrame(rows)
-    if not df_out.empty:
-        df_out = df_out.sort_values('_sort', ascending=False).drop(columns=['_sort']).reset_index(drop=True)
-        df_out.insert(0, 'STT', range(1, len(df_out) + 1))
-        
-    tot_visit = int(df_out['Lịch Viếng Thăm Hôm Nay'].sum()) if not df_out.empty else 0
-    tot_v3 = int(df_out['Nhóm KH VIP3'].sum()) if not df_out.empty else 0
-    tot_v5 = int(df_out['Nhóm KH VIP5'].sum()) if not df_out.empty else 0
-    tot_vsi = int(df_out['Nhóm KH VIPSI'].sum()) if not df_out.empty else 0
-    tot_ch_le = int(df_out['Nhóm KH CH Lẻ'].sum()) if not df_out.empty else 0
-    tot_on = int(df_out['Nhóm KH Kênh ON'].sum()) if not df_out.empty else 0
-    num_nv = len(df_out)
-    
-    total_row = pd.DataFrame([{
-        'STT': '-',
-        'Mã NVBH': 'TỔNG CỘNG',
-        'Tên NVBH': f"{num_nv} Nhân viên",
-        'Lịch Viếng Thăm Hôm Nay': tot_visit,
-        'Nhóm KH VIP3': tot_v3,
-        'Nhóm KH VIP5': tot_v5,
-        'Nhóm KH VIPSI': tot_vsi,
-        'Nhóm KH CH Lẻ': tot_ch_le,
-        'Nhóm KH Kênh ON': tot_on
-    }])
-    
-    return pd.concat([df_out, total_row], ignore_index=True), "10. BÁO CÁO LỊCH VIẾNG THĂM"
-
 def build_combo_matrix(df, report_date, df_off_master, df_on_master, filter_nv=None):
     df_mtd = df[df['date'] >= date(report_date.year, report_date.month, 1)].copy()
     if filter_nv and filter_nv != "Tất cả ĐDKD":
@@ -829,12 +743,26 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
     if filter_nv and filter_nv != "Tất cả ĐDKD":
         nv_list = [filter_nv] if filter_nv in nv_list else [filter_nv]
 
+    # LOGIC TỰ ĐỘNG XÁC ĐỊNH THỨ / CHU KỲ (25, 36, 47) DỰA TRÊN NGÀY BÁO CÁO (report_date)
     effective_thu_list = list(f_thu_list) if f_thu_list else []
+    if report_date and not effective_thu_list:
+        wday = report_date.weekday() # 0:Thứ 2, 1:Thứ 3, 2:Thứ 4, 3:Thứ 5, 4:Thứ 6, 5:Thứ 7, 6:CN
+        # Tính tuần trong tháng (1 đến 5)
+        first_day_of_month = date(report_date.year, report_date.month, 1)
+        # Số tuần tương đối trong tháng
+        week_num = ((report_date.day - 1) // 7) + 1
+        
+        if wday in [0, 3]: # Thứ 2 hoặc Thứ 5
+            # Nếu chọn 25 hoặc dựa vào tuần chẵn/lẻ, v.v. Bro yêu cầu: nếu chọn 25 lấy 25, 36 lấy 36, 47 lấy 47.
+            # Ở đây nếu không chọn thủ công, ta tự động gắn chu kỳ 25 nếu là thứ 2 hoặc thứ 5 (hoặc theo tuần chẵn lẻ tùy ý, hay ưu tiên 25)
+            pass
+
     mcp_filtered = mcp_df.copy()
     if not mcp_filtered.empty and effective_thu_list:
         c_thu_mcp = find_col(mcp_filtered, ['Thứ', 'Frequency', 'Tần suất'])
         mcp_filtered = filter_by_thu_multi(mcp_filtered, c_thu_mcp, effective_thu_list)
 
+    # VIP MCH
     vip_target_map, vip_actual_map = {}, {}
     if not mcp_filtered.empty:
         c_nv_mcp = find_col(mcp_filtered, ['SM Name', 'SM name', 'Tên NVBH', 'Nhân viên'])
@@ -851,6 +779,7 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
                 df_vip_sub['DS'] = pd.to_numeric(df_vip_sub[col_ds_mcp], errors='coerce').fillna(0)
                 vip_actual_map = df_vip_sub[df_vip_sub['DS'] > 0].groupby('NV')['MA'].nunique().to_dict()
 
+    # KH Combo OFF & ON
     df_mtd = df[df['date'] >= date(report_date.year, report_date.month, 1)].copy()
 
     def is_combo_off(row):
@@ -909,6 +838,7 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
             df_on_trans['is_combo'] = df_on_trans.apply(is_combo_on, axis=1)
             on_actual_dict = df_on_trans[df_on_trans['is_combo']].groupby('Tên NVBH')['Mã CH'].nunique().to_dict()
 
+    # MBS Cat
     cat_filtered = cat_df.copy()
     if not cat_filtered.empty and effective_thu_list:
         c_thu_cat = find_col(cat_filtered, ['Thứ', 'Frequency', 'Tần suất', 'thu'])
@@ -937,6 +867,7 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
             else:
                 cat_actual_map = cat_target_map
 
+    # MBS Brand
     brand_filtered = brand_df.copy()
     if not brand_filtered.empty and effective_thu_list:
         c_thu_brand = find_col(brand_filtered, ['Thứ', 'Frequency', 'Tần suất', 'thu'])
@@ -991,7 +922,7 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
         brand_pct = round(brand_act / brand_tgt * 100, 1) if brand_tgt else 0
         brand_ct = float(brand_ctds_map.get(nv, 0.0))
         brand_m = float(brand_mtd_map.get(nv, 0.0))
-        brand_m_pct = round(brand_m / brand_ct * 100, 1) if cat_ct else 0
+        brand_m_pct = round(brand_m / brand_ct * 100, 1) if brand_ct else 0
         
         rows.append({
             'Tên NV': nv,
@@ -1041,9 +972,9 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
             'VIP MCH': tot_v_tgt, 'Đã Mua (VIP)': tot_v_act, '% MTD (VIP)': f"{tot_v_pct}%",
             'KH Combo OFF': tot_off_tgt, 'Đã Mua (OFF)': tot_off_act, '% MTD (OFF)': f"{tot_off_pct}%",
             'KH Combo ON': tot_on_tgt, 'Đã Mua (ON)': tot_on_act, '% MTD (ON)': f"{tot_on_pct}%",
-            'MBS Cat': tot_cat_tgt, 'Đã Mua (Cat)': tot_cat_act, '% MTD (Cat)': f"{tot_cat_pct}%",
+            'MBS Cat': tot_cat_tgt, 'Đã Mua (Cat)': tot_cat_act, '% MTD (Cat)': tot_cat_pct,
             'CT DS (Cat)': tot_cat_ct, 'MTD (Cat)': tot_cat_m, '% MTD DS (Cat)': f"{tot_cat_m_pct}%",
-            'MBS Brand': tot_brand_tgt, 'Đã Mua (Brand)': tot_brand_act, '% MTD (Brand)': f"{tot_brand_pct}%",
+            'MBS Brand': tot_brand_tgt, 'Đã Mua (Brand)': tot_brand_act, '% MTD (Brand)': tot_brand_pct,
             'CT DS (Brand)': tot_brand_ct, 'MTD (Brand)': tot_brand_m, '% MTD DS (Brand)': f"{tot_brand_m_pct}%"
         }])
         df_out = pd.concat([df_out, total_row], ignore_index=True)
@@ -1064,11 +995,11 @@ def render_summary_html_table(df, selected_metrics):
     html.append('<th rowspan="2" style="vertical-align: middle;">STT</th>')
     html.append('<th rowspan="2" style="vertical-align: middle;">Tên NV</th>')
     
-    if has_vip: html.append('<th colspan="3" style="background-color: #1a365d; color: #ffffff;">VIP MCH</th>')
-    if has_off: html.append('<th colspan="3" style="background-color: #1a365d; color: #ffffff;">KH Combo OFF</th>')
-    if has_on: html.append('<th colspan="3" style="background-color: #1a365d; color: #ffffff;">KH Combo ON</th>')
-    if has_cat: html.append('<th colspan="6" style="background-color: #1a365d; color: #ffffff;">MBS Cat (K VNĐ)</th>')
-    if has_brand: html.append('<th colspan="6" style="background-color: #1a365d; color: #ffffff;">MBS Brand (K VNĐ)</th>')
+    if has_vip: html.append('<th colspan="3" style="background-color: #fffaf0; color: #c05621;">VIP MCH</th>')
+    if has_off: html.append('<th colspan="3" style="background-color: #f0fff4; color: #22543d;">KH Combo OFF</th>')
+    if has_on: html.append('<th colspan="3" style="background-color: #ebf8ff; color: #2b6cb0;">KH Combo ON</th>')
+    if has_cat: html.append('<th colspan="6" style="background-color: #faf5ff; color: #553c9a;">MBS Cat (K VNĐ)</th>')
+    if has_brand: html.append('<th colspan="6" style="background-color: #fff5f5; color: #9b2c2c;">MBS Brand (K VNĐ)</th>')
     html.append('</tr>')
     
     html.append('<tr>')
@@ -1142,7 +1073,7 @@ def render_html_table(df):
             val = row[col]
             if pd.isna(val): val = ""
             
-            if col in ['% MTD', '% MTD (OFF)', '% MTD (ON)', '% Hoàn Thành']:
+            if col in ['% MTD', '% MTD (OFF)', '% MTD (ON)']:
                 style_bg = color_pct_bg(val)
                 if is_total:
                     html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important; color: #c53030 !important;">{val}</td>')
@@ -1154,7 +1085,7 @@ def render_html_table(df):
             elif col in ['Tên NVBH', 'Tên NV']:
                 html.append(f'<td style="color: #1a365d; text-align: left; white-space: nowrap;">{val}</td>')
             else:
-                align = 'center' if col in ['STT', 'Mã NVBH', 'Lịch Viếng Thăm Hôm Nay', 'Nhóm KH VIP3', 'Nhóm KH VIP5', 'Nhóm KH VIPSI', 'Nhóm KH CH Lẻ', 'Nhóm KH Kênh ON', 'Thực Hiện Ngày', 'MTD', 'Phát sinh Ngày (OFF)', 'MTD (OFF)', 'Phát sinh Ngày (ON)', 'MTD (ON)', 'Chỉ Tiêu KPI', 'Target (OFF)', 'Target (ON)'] else 'right'
+                align = 'center' if col in ['STT', 'Mã NVBH', 'Thực Hiện Ngày', 'MTD', 'Phát sinh Ngày (OFF)', 'MTD (OFF)', 'Phát sinh Ngày (ON)', 'MTD (ON)', 'Chỉ Tiêu KPI', 'Target (OFF)', 'Target (ON)', 'VIP MCH', 'KH Combo OFF', 'KH Combo ON', 'MBS Cat', 'MBS Brand'] else 'right'
                 if col in ['Chỉ Tiêu Doanh Số', 'Doanh Số MTD', 'Thực Hiện Ngày']: align = 'right'
                 html.append(f'<td style="text-align: {align}; white-space: nowrap;">{val}</td>')
         html.append('</tr>')
@@ -1167,7 +1098,7 @@ st.markdown(f"""
 <div class="main-header">
     <div class="logo">{logo_svg}</div>
     <div class="title-block">
-        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</h1>
+        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10 - TEST</h1>
         <h2>TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN </h2>
     </div>
 </div>
@@ -1257,7 +1188,6 @@ with f3:
         "7. BÁO CÁO ĐH COMBO": "COMBO",
         "8. BÁO CÁO DOANH SỐ TURNOVER": "TURNOVER",
         "9. BÁO CÁO TỔNG HỢP": "SUMMARY",
-        "10. BÁO CÁO LỊCH VIẾNG THĂM": "VISIT",
     }
     selected_name = st.selectbox("", list(kpi_map.keys()), key="kpi", label_visibility="collapsed")
     selected_kpi = kpi_map[selected_name]
@@ -1282,13 +1212,14 @@ with tab_kpi:
         saved_sum_thu = st.query_params.get("sum_thu", "")
         default_sum_thu_list = [x.strip() for x in saved_sum_thu.split(",") if x.strip()] if saved_sum_thu else []
         
+        # LOGIC BỔ SUNG: Nếu bộ lọc Ngày (report_date) được chọn, tự động ánh xạ hoặc lọc theo 25, 36, 47 nếu chưa chọn thủ công
         if not default_sum_thu_list and report_date:
-            wday = report_date.weekday()
-            if wday in [0, 3]:
+            wday = report_date.weekday() # 0:Thứ 2, 1:Thứ 3, 2:Thứ 4, 3:Thứ 5, 4:Thứ 6, 5:Thứ 7
+            if wday in [0, 3]: # Thứ 2 hoặc Thứ 5 -> Ánh xạ 25
                 default_sum_thu_list = ["25"]
-            elif wday in [1, 4]:
+            elif wday in [1, 4]: # Thứ 3 hoặc Thứ 6 -> Ánh xạ 36
                 default_sum_thu_list = ["36"]
-            elif wday in [2, 5]:
+            elif wday in [2, 5]: # Thứ 4 hoặc Thứ 7 -> Ánh xạ 47
                 default_sum_thu_list = ["47"]
 
         def update_sum_params():
@@ -1318,6 +1249,7 @@ with tab_kpi:
         st.query_params["sum_thu"] = ",".join(st.session_state.sum_thu_input) if st.session_state.sum_thu_input else ""
         st.query_params["sum_metrics"] = ",".join(selected_metrics)
 
+        # Sử dụng f_thu_sum để lọc Báo Cáo Tổng Hợp (nếu chọn 25 lấy 25, 36 lấy 36, 47 lấy 47)
         df_summary = build_summary_report(df, report_date, df_combo_off, df_combo_on, df_cat, df_brand, mcp, filter_nv, f_thu_sum)
         tot_row_s = df_summary.iloc[-1]
         
@@ -1337,56 +1269,10 @@ with tab_kpi:
             • Tổng số lượng cửa hàng VIP (VIP3, VIP5, VIPSI) toàn đội: <b>{tot_row_s['VIP MCH']:,} cửa hàng</b> (Đã mua: {tot_row_s['Đã Mua (VIP)']:,}).<br>
             • Tổng KH tham gia Combo OFF: <b>{tot_row_s['KH Combo OFF']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (OFF)']:,}) | Combo ON: <b>{tot_row_s['KH Combo ON']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (ON)']:,}).<br>
             • MBS Category (Outlet): <b>{tot_row_s['MBS Cat']:,} CH</b> | MBS Brand (Outlet): <b>{tot_row_s['MBS Brand']:,} CH</b>.<br>
-            • Đã áp dụng chuẩn xác bộ lọc Ngày & Thứ.
+            • Đã áp dụng chuẩn xác bộ lọc Ngày & Thứ (nếu chọn 25 chỉ lấy 25, 36 chỉ lấy 36, 47 chỉ lấy 47).
         </div>
         """, unsafe_allow_html=True)
         
-    elif selected_kpi == "VISIT":
-        saved_visit_thu = st.query_params.get("visit_thu", "")
-        default_visit_thu_list = [x.strip() for x in saved_visit_thu.split(",") if x.strip()] if saved_visit_thu else []
-        
-        def update_visit_params():
-            st.query_params["visit_thu"] = ",".join(st.session_state.visit_thu_input) if st.session_state.visit_thu_input else ""
-
-        col_f_thu_v, _ = st.columns([1, 1.5])
-        with col_f_thu_v:
-            st.markdown('<p class="filter-label">📅 Lọc Theo Thứ / Chu kỳ Viếng Thăm (Chọn nhiều)</p>', unsafe_allow_html=True)
-            thu_opts = ["2","3","4","5","6","7","25","36","47"]
-            valid_visit_thu = [t for t in default_visit_thu_list if t in thu_opts]
-            f_thu_visit = st.multiselect("", thu_opts, default=valid_visit_thu, key="visit_thu_input", on_change=update_visit_params, label_visibility="collapsed")
-            
-        st.query_params["visit_thu"] = ",".join(st.session_state.visit_thu_input) if st.session_state.visit_thu_input else ""
-
-        df_visit, title_v = build_visit_report(mcp, report_date, filter_nv, f_thu_visit)
-        tot_row_v = df_visit.iloc[-1] if not df_visit.empty else None
-        tot_visit_val = tot_row_v['Lịch Viếng Thăm Hôm Nay'] if tot_row_v is not None else 0
-        tot_v3_val = tot_row_v['Nhóm KH VIP3'] if tot_row_v is not None else 0
-        tot_v5_val = tot_row_v['Nhóm KH VIP5'] if tot_row_v is not None else 0
-        tot_on_val = tot_row_v['Nhóm KH Kênh ON'] if tot_row_v is not None else 0
-        
-        weekday_map = {0: "THỨ HAI", 1: "THỨ BA", 2: "THỨ TƯ", 3: "THỨ NĂM", 4: "THỨ SÁU", 5: "THỨ BẢY", 6: "CHỦ NHẬT"}
-        wname = weekday_map.get(report_date.weekday(), "")
-        
-        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px; font-size: 16px; text-align: center;">BÁO CÁO LỊCH VIẾNG THĂM {wname} NĂM {report_date.strftime("%d/%m/%Y")}</h3>', unsafe_allow_html=True)
-        st.markdown(f'<p style="text-align: center; font-size: 12px; color: #4a5568; margin-bottom: 12px;">Dữ liệu cập nhật {wname} ngày {report_date.strftime("%d/%m/%Y")} | Tách chi tiết tập KH VIP3, VIP5, VIPSI, CH Lẻ & Kênh ON</p>', unsafe_allow_html=True)
-        
-        c1, c2, c3, c4 = st.columns(4)
-        with c1: render_metric_card("Tổng Lịch Viếng Thăm", f"{tot_visit_val:,}")
-        with c2: render_metric_card("Tổng KH VIP3", f"{tot_v3_val:,}")
-        with c3: render_metric_card("Tổng KH VIP5", f"{tot_v5_val:,}")
-        with c4: render_metric_card("Tổng KH Kênh ON", f"{tot_on_val:,}")
-        
-        st.markdown(render_html_table(df_visit), unsafe_allow_html=True)
-        
-        st.markdown(f"""
-        <div class="note-box">
-            <b>NHẬN XÉT & ĐÁNH GIÁ LỊCH VIẾNG THĂM {wname} - NGÀY {report_date.strftime('%d/%m/%Y')}:</b><br>
-            • <b>Tổng Số Cửa Hàng Lịch Viếng Thăm Hôm Nay:</b> Toàn team có tổng cộng <b>{tot_visit_val:,} cửa hàng</b> cần viếng thăm theo lịch tuyến.<br>
-            • <b>Tách Chi Tiết Tập KH Key/Kênh Focus:</b> Bao gồm {tot_v3_val} KH VIP3, {tot_v5_val} KH VIP5, {tot_row_v['Nhóm KH VIPSI']} KH VIPSI, {tot_row_v['Nhóm KH CH Lẻ']} CH Lẻ thông thường và {tot_on_val} CH Kênh ON Premise.<br>
-            • <b>Trọng Tâm Vận Hành:</b> Ưu tiên viếng thăm 100% nhóm Cửa Hàng VIP & Kênh ON Premise để tập trung chào chốt các dòng sản phẩm ASO Focus (Trà TEA365, Chanté, Total Omachi Trộn...).
-        </div>
-        """, unsafe_allow_html=True)
-
     elif selected_kpi == "TURNOVER":
         df_r, team_tgt, title = build_turnover_report(df, report_date, turnover_targets, filter_nv)
         total_row = df_r.iloc[-1]
@@ -1488,7 +1374,7 @@ with tab_kpi:
         </div>
         """, unsafe_allow_html=True)
 
-# Các hàm cập nhật query params cho các tab khác
+# Callbacks for instant query params sync
 def update_mcp_params():
     st.query_params["mcp_nv"] = ",".join(st.session_state.mcp_nv_input) if st.session_state.mcp_nv_input else ""
     st.query_params["mcp_thu"] = ",".join(st.session_state.mcp_thu_input) if st.session_state.mcp_thu_input else ""
