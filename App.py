@@ -6,7 +6,7 @@ import os
 import datetime as dt
 
 st.set_page_config(
-    page_title="TRACKING KPI ĐDKD - SS Trương Thanh Tân",
+    page_title="TRACKING KPI ĐDKD - SS Trương Thanh Tân - Test",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed"
