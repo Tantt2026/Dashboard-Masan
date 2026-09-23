@@ -583,7 +583,6 @@ def build_turnover_report(df, report_date, turnover_targets, filter_nv=None):
     }])
     return pd.concat([df_out, total_row], ignore_index=True), team_tgt, "8. BÁO CÁO DOANH SỐ TURNOVER"
 
-# ====================== BÁO CÁO LỊCH VIẾNG THĂM (BỔ SUNG SỐ CH ĐÃ MUA HÀNG) ======================
 def build_visit_report(df_mcp, report_date, filter_nv=None, f_thu_list=None):
     if df_mcp.empty:
         return pd.DataFrame(), "10. BÁO CÁO LỊCH VIẾNG THĂM"
