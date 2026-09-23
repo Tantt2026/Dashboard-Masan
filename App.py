@@ -6,7 +6,7 @@ import os
 import datetime as dt
 
 st.set_page_config(
-    page_title="TRACKING KPI ĐDKD - SS Trương Thanh Tân - Test",
+    page_title="TRACKING KPI ĐDKD - SS Trương Thanh Tân ",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -1086,7 +1086,7 @@ st.markdown(f"""
     <div class="logo">{logo_svg}</div>
     <div class="title-block">
         <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</h1>
-        <h2>TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN</h2>
+        <h2>TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN - TEST</h2>
     </div>
 </div>
 """, unsafe_allow_html=True)
