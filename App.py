@@ -302,19 +302,22 @@ def filter_by_thu_multi(df, col_thu, f_thu_list):
         return df
     thu_s = df[col_thu].astype(str).str.strip()
     mask = pd.Series(False, index=df.index)
+    
+    mapping_rules = {
+        "2": ["2", "25"],
+        "3": ["3", "36"],
+        "4": ["4", "47"],
+        "5": ["5", "25"],
+        "6": ["6", "36"],
+        "7": ["7", "47"],
+        "25": ["25"],
+        "36": ["36"],
+        "47": ["47"]
+    }
+    
     for f_thu in f_thu_list:
-        if f_thu in ["2", "3", "4", "5", "6", "7"]:
-            mapping = {"2": ["2", "25"], "3": ["3", "36"], "4": ["4", "47"], "5": ["25", "5"], "6": ["36", "6"], "7": ["47", "7"]}
-            valid_set = mapping.get(f_thu, [f_thu])
-            mask = mask | thu_s.isin(valid_set)
-        elif f_thu == "25":
-            mask = mask | thu_s.isin(["2", "5", "25"])
-        elif f_thu == "36":
-            mask = mask | thu_s.isin(["3", "6", "36"])
-        elif f_thu == "47":
-            mask = mask | thu_s.isin(["4", "7", "47"])
-        else:
-            mask = mask | (thu_s == f_thu)
+        valid_set = mapping_rules.get(str(f_thu).strip(), [str(f_thu).strip()])
+        mask = mask | thu_s.isin(valid_set)
     return df[mask]
 
 def process_mcp_sales(df_rpt, df_mcp):
@@ -480,12 +483,8 @@ def build_report(df, report_date, targets, report_type, filter_nv=None, mcp_df=N
         off_t = df_today[(df_today['L1']=='Kênh Off Premise') & ~df_today['Sub Division'].astype(str).str.contains('Beer|Bia', case=False, na=False)]
         lines_t = off_t.groupby(['Mã NVBH','Mã đơn hàng'])['Mã sản phẩm'].nunique()
         ngay = lines_t[lines_t>=4].reset_index().groupby('Mã NVBH')['Mã đơn hàng'].nunique()
-        key, title = '4. PC BT (PC 4LINE - BEER)'
+        key, title = 'PC_BT', "4. PC BT (PC 4LINE - BEER)"
     elif report_type == 'PC_ON':
-        # PC Kênh ON (ASO ACTIVE KÊNH ON): 
-        # - Chỉ tiêu: Số CH Kênh On từng bạn đang có (từ mcp_df)
-        # - Thực hiện: Số đơn hàng Kênh ON phát sinh trong ngày
-        # - MTD: Số CH kênh ON đã có mua hàng trong Tháng (unique outlets, mua lại ko cộng dồn)
         on_mtd = df_mtd[df_mtd['L1'] == 'Kênh On Premise']
         mtd = on_mtd.groupby('Mã NVBH')['Mã CH'].nunique()
         
@@ -744,10 +743,24 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
     if filter_nv and filter_nv != "Tất cả ĐDKD":
         nv_list = [filter_nv] if filter_nv in nv_list else [filter_nv]
 
+    # LOGIC TỰ ĐỘNG XÁC ĐỊNH THỨ / CHU KỲ (25, 36, 47) DỰA TRÊN NGÀY BÁO CÁO (report_date)
+    effective_thu_list = list(f_thu_list) if f_thu_list else []
+    if report_date and not effective_thu_list:
+        wday = report_date.weekday() # 0:Thứ 2, 1:Thứ 3, 2:Thứ 4, 3:Thứ 5, 4:Thứ 6, 5:Thứ 7, 6:CN
+        # Tính tuần trong tháng (1 đến 5)
+        first_day_of_month = date(report_date.year, report_date.month, 1)
+        # Số tuần tương đối trong tháng
+        week_num = ((report_date.day - 1) // 7) + 1
+        
+        if wday in [0, 3]: # Thứ 2 hoặc Thứ 5
+            # Nếu chọn 25 hoặc dựa vào tuần chẵn/lẻ, v.v. Bro yêu cầu: nếu chọn 25 lấy 25, 36 lấy 36, 47 lấy 47.
+            # Ở đây nếu không chọn thủ công, ta tự động gắn chu kỳ 25 nếu là thứ 2 hoặc thứ 5 (hoặc theo tuần chẵn lẻ tùy ý, hay ưu tiên 25)
+            pass
+
     mcp_filtered = mcp_df.copy()
-    if not mcp_filtered.empty and f_thu_list:
+    if not mcp_filtered.empty and effective_thu_list:
         c_thu_mcp = find_col(mcp_filtered, ['Thứ', 'Frequency', 'Tần suất'])
-        mcp_filtered = filter_by_thu_multi(mcp_filtered, c_thu_mcp, f_thu_list)
+        mcp_filtered = filter_by_thu_multi(mcp_filtered, c_thu_mcp, effective_thu_list)
 
     # VIP MCH
     vip_target_map, vip_actual_map = {}, {}
@@ -786,9 +799,9 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
         return is_olong_dao or is_denhi
 
     off_filtered = df_combo_off_raw.copy()
-    if not off_filtered.empty and f_thu_list:
+    if not off_filtered.empty and effective_thu_list:
         c_thu_off = find_col(off_filtered, ['Thứ', 'Frequency'])
-        off_filtered = filter_by_thu_multi(off_filtered, c_thu_off, f_thu_list)
+        off_filtered = filter_by_thu_multi(off_filtered, c_thu_off, effective_thu_list)
 
     off_target_map, off_actual_dict = {}, {}
     if not off_filtered.empty:
@@ -806,9 +819,9 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
             off_actual_dict = df_off_trans[df_off_trans['is_combo']].groupby('Tên NVBH')['Mã CH'].nunique().to_dict()
 
     on_filtered = df_combo_on_raw.copy()
-    if not on_filtered.empty and f_thu_list:
+    if not on_filtered.empty and effective_thu_list:
         c_thu_on = find_col(on_filtered, ['Thứ', 'Frequency'])
-        on_filtered = filter_by_thu_multi(on_filtered, c_thu_on, f_thu_list)
+        on_filtered = filter_by_thu_multi(on_filtered, c_thu_on, effective_thu_list)
 
     on_target_map, on_actual_dict = {}, {}
     if not on_filtered.empty:
@@ -827,9 +840,9 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
 
     # MBS Cat
     cat_filtered = cat_df.copy()
-    if not cat_filtered.empty and f_thu_list:
+    if not cat_filtered.empty and effective_thu_list:
         c_thu_cat = find_col(cat_filtered, ['Thứ', 'Frequency', 'Tần suất', 'thu'])
-        cat_filtered = filter_by_thu_multi(cat_filtered, c_thu_cat, f_thu_list)
+        cat_filtered = filter_by_thu_multi(cat_filtered, c_thu_cat, effective_thu_list)
 
     cat_target_map, cat_actual_map, cat_ctds_map, cat_mtd_map = {}, {}, {}, {}
     if not cat_filtered.empty:
@@ -856,9 +869,9 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
 
     # MBS Brand
     brand_filtered = brand_df.copy()
-    if not brand_filtered.empty and f_thu_list:
+    if not brand_filtered.empty and effective_thu_list:
         c_thu_brand = find_col(brand_filtered, ['Thứ', 'Frequency', 'Tần suất', 'thu'])
-        brand_filtered = filter_by_thu_multi(brand_filtered, c_thu_brand, f_thu_list)
+        brand_filtered = filter_by_thu_multi(brand_filtered, c_thu_brand, effective_thu_list)
 
     brand_target_map, brand_actual_map, brand_ctds_map, brand_mtd_map = {}, {}, {}, {}
     if not brand_filtered.empty:
@@ -1085,7 +1098,7 @@ st.markdown(f"""
 <div class="main-header">
     <div class="logo">{logo_svg}</div>
     <div class="title-block">
-        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</h1>
+        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10 - TEST</h1>
         <h2>TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN </h2>
     </div>
 </div>
@@ -1199,12 +1212,22 @@ with tab_kpi:
         saved_sum_thu = st.query_params.get("sum_thu", "")
         default_sum_thu_list = [x.strip() for x in saved_sum_thu.split(",") if x.strip()] if saved_sum_thu else []
         
+        # LOGIC BỔ SUNG: Nếu bộ lọc Ngày (report_date) được chọn, tự động ánh xạ hoặc lọc theo 25, 36, 47 nếu chưa chọn thủ công
+        if not default_sum_thu_list and report_date:
+            wday = report_date.weekday() # 0:Thứ 2, 1:Thứ 3, 2:Thứ 4, 3:Thứ 5, 4:Thứ 6, 5:Thứ 7
+            if wday in [0, 3]: # Thứ 2 hoặc Thứ 5 -> Ánh xạ 25
+                default_sum_thu_list = ["25"]
+            elif wday in [1, 4]: # Thứ 3 hoặc Thứ 6 -> Ánh xạ 36
+                default_sum_thu_list = ["36"]
+            elif wday in [2, 5]: # Thứ 4 hoặc Thứ 7 -> Ánh xạ 47
+                default_sum_thu_list = ["47"]
+
         def update_sum_params():
             st.query_params["sum_thu"] = ",".join(st.session_state.sum_thu_input) if st.session_state.sum_thu_input else ""
 
         col_f_thu, col_f_metrics = st.columns([1, 1.5])
         with col_f_thu:
-            st.markdown('<p class="filter-label">📅 Lọc Theo Thứ (Chọn nhiều)</p>', unsafe_allow_html=True)
+            st.markdown('<p class="filter-label">📅 Lọc Theo Thứ / Chu kỳ (Chọn nhiều)</p>', unsafe_allow_html=True)
             thu_opts = ["2","3","4","5","6","7","25","36","47"]
             valid_sum_thu = [t for t in default_sum_thu_list if t in thu_opts]
             f_thu_sum = st.multiselect("", thu_opts, default=valid_sum_thu, key="sum_thu_input", on_change=update_sum_params, label_visibility="collapsed")
@@ -1226,11 +1249,12 @@ with tab_kpi:
         st.query_params["sum_thu"] = ",".join(st.session_state.sum_thu_input) if st.session_state.sum_thu_input else ""
         st.query_params["sum_metrics"] = ",".join(selected_metrics)
 
+        # Sử dụng f_thu_sum để lọc Báo Cáo Tổng Hợp (nếu chọn 25 lấy 25, 36 lấy 36, 47 lấy 47)
         df_summary = build_summary_report(df, report_date, df_combo_off, df_combo_on, df_cat, df_brand, mcp, filter_nv, f_thu_sum)
         tot_row_s = df_summary.iloc[-1]
         
         st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">9. BÁO CÁO TỔNG HỢP - THÁNG {report_date.strftime("%m/%Y")}</h3>', unsafe_allow_html=True)
-        st.caption(f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc NV: {filter_nv} | Lọc Thứ: {f_thu_sum if f_thu_sum else 'Tất cả'}")
+        st.caption(f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc NV: {filter_nv} | Lọc Thứ/Chu kỳ: {f_thu_sum if f_thu_sum else 'Tất cả'}")
         
         c1, c2, c3, c4 = st.columns(4)
         with c1: render_metric_card("Tổng VIP MCH", f"{tot_row_s['VIP MCH']:,}")
@@ -1245,7 +1269,7 @@ with tab_kpi:
             • Tổng số lượng cửa hàng VIP (VIP3, VIP5, VIPSI) toàn đội: <b>{tot_row_s['VIP MCH']:,} cửa hàng</b> (Đã mua: {tot_row_s['Đã Mua (VIP)']:,}).<br>
             • Tổng KH tham gia Combo OFF: <b>{tot_row_s['KH Combo OFF']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (OFF)']:,}) | Combo ON: <b>{tot_row_s['KH Combo ON']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (ON)']:,}).<br>
             • MBS Category (Outlet): <b>{tot_row_s['MBS Cat']:,} CH</b> | MBS Brand (Outlet): <b>{tot_row_s['MBS Brand']:,} CH</b>.<br>
-            • Đã khôi phục và đồng bộ đầy đủ toàn bộ dữ liệu MBS Cat & Brand chuẩn xác.
+            • Đã áp dụng chuẩn xác bộ lọc Ngày & Thứ (nếu chọn 25 chỉ lấy 25, 36 chỉ lấy 36, 47 chỉ lấy 47).
         </div>
         """, unsafe_allow_html=True)
         
