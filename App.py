@@ -583,18 +583,15 @@ def build_turnover_report(df, report_date, turnover_targets, filter_nv=None):
     }])
     return pd.concat([df_out, total_row], ignore_index=True), team_tgt, "8. BÁO CÁO DOANH SỐ TURNOVER"
 
-# ====================== BÁO CÁO LỊCH VIẾNG THĂM (CHUẨN ISO TUẦN CHẮN/LẺ) ======================
+# ====================== BÁO CÁO LỊCH VIẾNG THĂM ======================
 def build_visit_report(df_mcp, report_date, filter_nv=None, f_thu_list=None):
     if df_mcp.empty:
         return pd.DataFrame(), "10. BÁO CÁO LỊCH VIẾNG THĂM"
     
     mcp_f = df_mcp.copy()
-    
-    # Xác định Tuần ISO chẵn hay lẻ từ report_date theo năm dương lịch
     iso_year, iso_week, iso_day = report_date.isocalendar()
     is_odd_iso_week = (iso_week % 2 == 1)
     
-    # Lọc theo ODD_WEEK trong Data_MCP
     c_odd = find_col(mcp_f, ['ODD_WEEK', 'Odd_Week', 'Odd Week'])
     if c_odd:
         if is_odd_iso_week:
@@ -1040,13 +1037,13 @@ def render_summary_html_table(df, selected_metrics):
             if 'CT DS' in col or 'MTD (Cat)' in col or 'MTD (Brand)' in col:
                 val = format_scaled_thousand(val)
             is_pct = '%' in col
-            style_bg = color_pct_bg(val) if is_pct and not is_total else ''
+            style_bg = color_pct_bg(val) if is_pct else ''  # Áp dụng cho cả dòng tổng cộng
             
             if is_total:
                 if col in ['CT DS (Cat)', 'MTD (Cat)', 'CT DS (Brand)', 'MTD (Brand)']:
                     html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: right; white-space: nowrap;">{val}</td>')
                 elif is_pct:
-                    html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important; color: #c53030 !important;">{val}</td>')
+                    html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important;">{val}</td>')
                 else:
                     align = 'left' if col == 'Tên NV' else 'center'
                     html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: {align}; white-space: nowrap;">{val}</td>')
@@ -1078,7 +1075,7 @@ def render_html_table(df):
             if col in ['% MTD', '% MTD (OFF)', '% MTD (ON)', '% Hoàn Thành']:
                 style_bg = color_pct_bg(val)
                 if is_total:
-                    html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important; color: #c53030 !important;">{val}</td>')
+                    html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important;">{val}</td>')
                 else:
                     html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
             elif is_total:
@@ -1099,7 +1096,7 @@ st.markdown(f"""
 <div class="main-header">
     <div class="logo">{logo_svg}</div>
     <div class="title-block">
-        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</h1>
+        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10 - TEST</h1>
         <h2>TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN</h2>
     </div>
 </div>
@@ -1334,7 +1331,6 @@ with tab_kpi:
         with c4: render_metric_card("Phát sinh Ngày (ON)", f"+{ngay_on}")
         st.markdown(render_html_table(df_combo), unsafe_allow_html=True)
 
-# Các hàm cập nhật query params cho các tab khác
 def update_mcp_params():
     st.query_params["mcp_nv"] = ",".join(st.session_state.mcp_nv_input) if st.session_state.mcp_nv_input else ""
     st.query_params["mcp_thu"] = ",".join(st.session_state.mcp_thu_input) if st.session_state.mcp_thu_input else ""
