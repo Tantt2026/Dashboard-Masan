@@ -395,7 +395,6 @@ def process_mcp_sales(df_rpt, df_mcp):
         sales_agg, left_on='_key', right_on='Outlet_code_key', how='left'
     )
     target_sales_col = sales_col if sales_col else 'Doanh Số MTD'
-    # Quy đổi về Triệu VNĐ (chia 1.000.000)
     df_out[target_sales_col] = df_out['Total_Sales'].fillna(0.0) / 1000000.0
     drop_cols = [
         c for c in ['_key', 'Outlet_code_key', 'Total_Sales'] if c in df_out.columns
@@ -486,7 +485,6 @@ def process_cat_sales(df_rpt, df_cat):
     if 'Outlet_key' in df_out.columns:
         df_out = df_out.drop(columns=['Outlet_key', 'Cat_Key'])
 
-    # Quy đổi về Triệu VNĐ (chia 1.000.000)
     if col_val1:
         df_out[col_val1] = df_out['Val1'].fillna(0.0) / 1000000.0
     if col_val2:
@@ -606,7 +604,6 @@ def process_brand_sales(df_rpt, df_brand):
     if 'Outlet_key' in df_out.columns:
         df_out = df_out.drop(columns=['Outlet_key', 'Brand_Key'])
 
-    # Quy đổi về Triệu VNĐ (chia 1.000.000)
     if col_val1:
         df_out[col_val1] = df_out['Val1'].fillna(0.0) / 1000000.0
     if col_val2:
@@ -636,16 +633,16 @@ def build_turnover_report(df, report_date, turnover_targets, filter_nv=None):
     today_sales = df_today.groupby('Mã NVBH')[val_col].sum().to_dict()
     results = []
     for sm in all_sms:
-        tgt = turnover_targets.get(sm, 0.0)
-        m = float(mtd_sales.get(sm, 0.0))
-        t_val = float(today_sales.get(sm, 0.0))
+        tgt = turnover_targets.get(sm, 0.0) / 1000000.0  # Quy đổi triệu
+        m = float(mtd_sales.get(sm, 0.0)) / 1000000.0
+        t_val = float(today_sales.get(sm, 0.0)) / 1000000.0
         pct = round(m / tgt * 100, 1) if tgt else 0.0
         results.append({
             'Mã NVBH': sm,
             'Tên NVBH': sm_names.get(sm, ''),
-            'Chỉ Tiêu Doanh Số': tgt,
-            'Thực Hiện Ngày': t_val,
-            'Doanh Số MTD': m,
+            'Chỉ Tiêu Doanh Số': round(tgt, 2),
+            'Thực Hiện Ngày': round(t_val, 2),
+            'Doanh Số MTD': round(m, 2),
             '% MTD': f'{pct}%',
             '_ratio': (m / tgt if tgt else 0),
         })
@@ -672,9 +669,9 @@ def build_turnover_report(df, report_date, turnover_targets, filter_nv=None):
             if filter_nv == 'Tất cả ĐDKD'
             else filter_nv
         ),
-        'Chỉ Tiêu Doanh Số': team_tgt,
-        'Thực Hiện Ngày': total_today,
-        'Doanh Số MTD': total_mtd,
+        'Chỉ Tiêu Doanh Số': round(team_tgt, 2),
+        'Thực Hiện Ngày': round(total_today, 2),
+        'Doanh Số MTD': round(total_mtd, 2),
         '% MTD': f'{total_pct}%',
     }])
     return (
@@ -682,6 +679,83 @@ def build_turnover_report(df, report_date, turnover_targets, filter_nv=None):
         team_tgt,
         '8. BÁO CÁO DOANH SỐ TURNOVER',
     )
+
+
+def build_generic_kpi_report(
+    df, report_date, targets, kpi_key, title, filter_nv=None
+):
+    df_mtd = df[
+        df['date'] >= date(report_date.year, report_date.month, 1)
+    ].copy()
+    df_today = df[df['date'] == report_date].copy()
+    if filter_nv and filter_nv != 'Tất cả ĐDKD':
+        df_mtd = df_mtd[df_mtd['Tên NVBH'] == filter_nv]
+        df_today = df_today[df_today['Tên NVBH'] == filter_nv]
+
+    # Lọc theo từng loại KPI tương ứng
+    if kpi_key == 'CHANTE':
+        df_mtd = df_mtd[df_mtd['Tên SP lower'].str.contains('chanté|chante', na=False)]
+        df_today = df_today[df_today['Tên SP lower'].str.contains('chanté|chante', na=False)]
+    elif kpi_key == 'OMACHI':
+        df_mtd = df_mtd[df_mtd['Tên SP lower'].str.contains('omachi', na=False)]
+        df_today = df_today[df_today['Tên SP lower'].str.contains('omachi', na=False)]
+    elif kpi_key == 'ASO_TEA':
+        df_mtd = df_mtd[df_mtd['Tên SP lower'].str.contains('tea|trà', na=False)]
+        df_today = df_today[df_today['Tên SP lower'].str.contains('tea|trà', na=False)]
+    elif kpi_key == 'PC_BT':
+        df_mtd = df_mtd[df_mtd['Tên SP lower'].str.contains('beer|bia', na=False)]
+        df_today = df_today[df_today['Tên SP lower'].str.contains('beer|bia', na=False)]
+    elif kpi_key == 'PC_ON':
+        df_mtd = df_mtd[df_mtd['L1'].astype(str).str.lower().str.contains('on', na=False)]
+        df_today = df_today[df_today['L1'].astype(str).str.lower().str.contains('on', na=False)]
+
+    sm_names = df_mtd.groupby('Mã NVBH')['Tên NVBH'].first().to_dict()
+    all_sms = sorted(sm_names.keys())
+    val_col = find_col(df_mtd, ['Thành tiền trước CK', 'Tổng tiền']) or 'Thành tiền trước CK'
+    mtd_sales = df_mtd.groupby('Mã NVBH')[val_col].sum().to_dict()
+    today_sales = df_today.groupby('Mã NVBH')[val_col].sum().to_dict()
+
+    results = []
+    for sm in all_sms:
+        sm_dict = targets.get(sm, {})
+        tgt = sm_dict.get(kpi_key, 0.0)
+        m = float(mtd_sales.get(sm, 0.0)) / 1000000.0
+        t_val = float(today_sales.get(sm, 0.0)) / 1000000.0
+        pct = round(m / tgt * 100, 1) if tgt else 0.0
+        results.append({
+            'Mã NVBH': sm,
+            'Tên NVBH': sm_names.get(sm, ''),
+            'Chỉ Tiêu': tgt,
+            'Thực Hiện Ngày': round(t_val, 2),
+            'Thực Hiện MTD': round(m, 2),
+            '% MTD': f'{pct}%',
+            '_ratio': (m / tgt if tgt else 0),
+        })
+    df_out = (
+        pd.DataFrame(results)
+        .sort_values('_ratio', ascending=True)
+        .drop(columns=['_ratio'])
+        .reset_index(drop=True)
+    )
+    df_out.insert(0, 'STT', range(1, len(df_out) + 1))
+    total_mtd = float(df_out['Thực Hiện MTD'].sum()) if not df_out.empty else 0.0
+    total_today = float(df_out['Thực Hiện Ngày'].sum()) if not df_out.empty else 0.0
+    team_tgt = float(df_out['Chỉ Tiêu'].sum()) if not df_out.empty else 0.0
+    total_pct = round(total_mtd / team_tgt * 100, 1) if team_tgt else 0.0
+    total_row = pd.DataFrame([{
+        'STT': '-',
+        'Mã NVBH': 'TỔNG CỘNG',
+        'Tên NVBH': (
+            'SS Trương Thanh Tân Total'
+            if filter_nv == 'Tất cả ĐDKD'
+            else filter_nv
+        ),
+        'Chỉ Tiêu': team_tgt,
+        'Thực Hiện Ngày': round(total_today, 2),
+        'Thực Hiện MTD': round(total_mtd, 2),
+        '% MTD': f'{total_pct}%',
+    }])
+    return pd.concat([df_out, total_row], ignore_index=True), title
 
 
 def render_html_table(df):
@@ -810,6 +884,23 @@ with tab_kpi:
     if selected_kpi == 'TURNOVER':
         df_r, team_tgt, title = build_turnover_report(
             df, report_date, turnover_targets, filter_nv
+        )
+        st.markdown(
+            f'<h3 style="color: #034ea2; font-weight: 800; font-size: 15px;">{title}</h3>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(render_html_table(df_r), unsafe_allow_html=True)
+    elif selected_kpi in ['CHANTE', 'OMACHI', 'ASO_TEA', 'PC_BT', 'ASO_ALL', 'PC_ON']:
+        titles = {
+            'CHANTE': '1. ASO FOCUS CHANTÉ',
+            'OMACHI': '2. ASO FOCUS OMC TRỘN',
+            'ASO_TEA': '3. ASO TEA KÊNH ON',
+            'PC_BT': '4. PC BT (PC 4LINE - BEER)',
+            'ASO_ALL': '5. ASO ALL',
+            'PC_ON': '6. ASO ACTIVE KÊNH ON',
+        }
+        df_r, title = build_generic_kpi_report(
+            df, report_date, targets, selected_kpi, titles[selected_kpi], filter_nv
         )
         st.markdown(
             f'<h3 style="color: #034ea2; font-weight: 800; font-size: 15px;">{title}</h3>',
