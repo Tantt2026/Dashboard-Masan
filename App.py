@@ -130,38 +130,32 @@ def render_metric_card(label, value):
     """, unsafe_allow_html=True)
 
 # ====================== HÀM TẠO NHẬN XÉT TOP 3 / BOTTOM 3 ======================
-def generate_top_bottom_analysis(df_source, name_col, pct_col):
+def generate_top_bottom_analysis(df_source, name_col, pct_col, total_mtd, total_tgt):
     if df_source is None or df_source.empty:
-        return "<br>• Không có dữ liệu để tổng hợp Top/Bottom."
+        return ""
     
-    # Lọc bỏ dòng tổng cộng nếu có
     df_clean = df_source[~df_source[name_col].astype(str).str.contains('TỔNG CỘNG|Tổng cộng', case=False, na=False)].copy()
     if df_clean.empty:
-        return "<br>• Không đủ dữ liệu chi tiết nhân sự."
+        return ""
         
-    # Chuẩn hóa cột % thành dạng số để sort
     df_clean['__sort_val'] = df_clean[pct_col].astype(str).str.replace('%','').str.strip()
     df_clean['__sort_val'] = pd.to_numeric(df_clean['__sort_val'], errors='coerce').fillna(0)
     
     df_sorted = df_clean.sort_values(by='__sort_val', ascending=False)
     
-    # Lấy Top 3 (cao nhất)
     top3 = df_sorted.head(3)
-    # Lấy Bottom 3 (thấp nhất, lấy ngược từ cuối lên)
     bottom3 = df_sorted.tail(3).sort_values(by='__sort_val', ascending=True)
     
     top_str = ", ".join([f"<b>{r[name_col]}</b> ({r[pct_col]})" for _, r in top3.iterrows()])
     bottom_str = ", ".join([f"<b>{r[name_col]}</b> ({r[pct_col]})" for _, r in bottom3.iterrows()])
     
+    team_pct = round(total_mtd / total_tgt * 100, 1) if total_tgt else 0
+    
     html_out = f"""
-    <br>• <b>Top 3 ĐDKD Dẫn Đầu:</b> {top_str}.<br>
+    • <b>Kết Quả Thực Hiện:</b> Đạt {total_mtd:,} / {total_tgt:,} ({team_pct}% MTD).<br>
+    • <b>Top 3 ĐDKD Dẫn Đầu:</b> {top_str}.<br>
     • <b>Bottom 3 ĐDKD Cần Cải Thiện:</b> {bottom_str}.<br>
-    • <b>Đề Xuất Hành Động Cho 3 Bạn Bottom:</b>
-        <div style="margin-left: 15px; margin-top: 4px;">
-            1. <b>Rà soát lại lịch tuyến & danh sách cửa hàng chưa mua:</b> Lên danh sách cụ thể các điểm bán trọng điểm chưa phát sinh đơn hàng trong tuần/tháng để đi thị trường trực tiếp.<br>
-            2. <b>Đẩy mạnh sản phẩm trọng tâm / Combo kích cầu:</b> Tập trung tư vấn các chương trình khuyến mãi, gói combo quà tặng hoặc trưng bày đủ SKU để tăng tỷ lệ chốt đơn.<br>
-            3. <b>Đồng hành coaching thực chiến cùng SS:</b> Sắp xếp lịch đi tuyến chung (Field Coaching) trong 2-3 ngày tới để hỗ trợ kỹ năng xử lý từ chối và thuyết phục chủ cửa hàng.
-        </div>
+    • <b>Đề Xuất Hành Động Cho 3 Bạn Bottom:</b> Tập trung rà soát tuyến chưa mua, đẩy mạnh combo kích cầu và SS đồng hành đi thị trường (Field Coaching) trong 2 ngày tới.
     """
     return html_out
 
@@ -636,25 +630,21 @@ def build_visit_report(df_mcp, df_rpt, report_date, filter_nv=None, f_thu_list=N
         da_mua_total = sub[sub['Is_Bought']]['MA_str'].nunique()
         pct_total = round(da_mua_total / total_kh * 100, 1) if total_kh else 0
         
-        # VIP 3
         sub_v3 = sub[sub[c_vip].astype(str).str.strip() == 'VIP3'] if c_vip else pd.DataFrame()
         v3_kh = sub_v3['MA_str'].nunique() if not sub_v3.empty else 0
         v3_mua = sub_v3[sub_v3['Is_Bought']]['MA_str'].nunique() if not sub_v3.empty else 0
         v3_pct = round(v3_mua / v3_kh * 100, 1) if v3_kh else 0
         
-        # VIP 5
         sub_v5 = sub[sub[c_vip].astype(str).str.strip() == 'VIP5'] if c_vip else pd.DataFrame()
         v5_kh = sub_v5['MA_str'].nunique() if not sub_v5.empty else 0
         v5_mua = sub_v5[sub_v5['Is_Bought']]['MA_str'].nunique() if not sub_v5.empty else 0
         v5_pct = round(v5_mua / v5_kh * 100, 1) if v5_kh else 0
         
-        # VIPSI
         sub_vsi = sub[sub[c_vip].astype(str).str.strip() == 'VIPSI'] if c_vip else pd.DataFrame()
         vsi_kh = sub_vsi['MA_str'].nunique() if not sub_vsi.empty else 0
         vsi_mua = sub_vsi[sub_vsi['Is_Bought']]['MA_str'].nunique() if not sub_vsi.empty else 0
         vsi_pct = round(vsi_mua / vsi_kh * 100, 1) if vsi_kh else 0
         
-        # Lẻ (Off Premise trừ các VIP)
         off_sub = sub[~sub[c_l1].astype(str).str.contains('On', case=False, na=False)] if c_l1 else sub
         if c_vip:
             sub_ch_le = off_sub[~off_sub[c_vip].astype(str).str.strip().isin(['VIP3', 'VIP5', 'VIPSI'])]
@@ -664,7 +654,6 @@ def build_visit_report(df_mcp, df_rpt, report_date, filter_nv=None, f_thu_list=N
         le_mua = sub_ch_le[sub_ch_le['Is_Bought']]['MA_str'].nunique() if not sub_ch_le.empty else 0
         le_pct = round(le_mua / le_kh * 100, 1) if le_kh else 0
         
-        # Kênh ON
         sub_on = sub[sub[c_l1].astype(str).str.contains('On', case=False, na=False)] if c_l1 else pd.DataFrame()
         on_kh = sub_on['MA_str'].nunique() if not sub_on.empty else 0
         on_mua = sub_on[sub_on['Is_Bought']]['MA_str'].nunique() if not sub_on.empty else 0
@@ -1204,7 +1193,7 @@ st.markdown(f"""
 <div class="main-header">
     <div class="logo">{logo_svg}</div>
     <div class="title-block">
-        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10 - TEST</h1>
+        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</h1>
         <h2>TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN</h2>
     </div>
 </div>
@@ -1349,11 +1338,12 @@ with tab_kpi:
         
         st.markdown(render_summary_html_table(df_summary, selected_metrics), unsafe_allow_html=True)
         
-        top_bottom_summary_html = generate_top_bottom_analysis(df_summary, 'Tên NV', '% MTD (VIP)')
+        tot_mtd_s = int(tot_row_s['VIP MCH'])
+        tot_tgt_s = int(tot_row_s['VIP MCH']) # Tùy chỉnh theo tổng tương ứng
+        top_bottom_summary_html = generate_top_bottom_analysis(df_summary, 'Tên NV', '% MTD (VIP)', tot_mtd_s, tot_tgt_s)
         st.markdown(f"""
         <div class="note-box">
-            <b>NHẬN XÉT & ĐÁNH GIÁ TỔNG HỢP (THÁNG {report_date.strftime('%m/%Y')}):</b><br>
-            • <b>Tổng Quan Chỉ Số:</b> Theo dõi sát sao các chỉ tiêu trọng yếu bao gồm VIP MCH, Combo OFF/ON và doanh số Cat/Brand.<br>
+            <b>NHẬN XÉT & ĐÁNH GIÁ TỔNG HỢP (THÁNG {report_date.strftime('%m/%Y')}):</b>
             {top_bottom_summary_html}
         </div>
         """, unsafe_allow_html=True)
@@ -1413,11 +1403,12 @@ with tab_kpi:
         
         st.markdown(render_visit_html_table(df_visit), unsafe_allow_html=True)
         
-        top_bottom_visit_html = generate_top_bottom_analysis(df_visit, 'Tên NVBH', 'Lịch VT - % Active')
+        tot_mua_v = int(tot_row_v['Lịch VT - Đã Mua']) if tot_row_v is not None else 0
+        tot_kh_v = int(tot_row_v['Lịch VT - Tổng KH']) if tot_row_v is not None else 0
+        top_bottom_visit_html = generate_top_bottom_analysis(df_visit, 'Tên NVBH', 'Lịch VT - % Active', tot_mua_v, tot_kh_v)
         st.markdown(f"""
         <div class="note-box">
-            <b>NHẬN XÉT & ĐÁNH GIÁ LỊCH VIẾNG THĂM {wname} - NGÀY {report_date.strftime('%d/%m/%Y')} (TUẦN ISO {iso_week} - {week_type_str}):</b><br>
-            • <b>Phân Bổ Tuyến Viếng Thăm:</b> Kiểm soát chặt chẽ số lượng thực hiện so với tổng tuyến theo từng phân khúc <b>VIP 3, VIP 5, VIPSI, LẺ và ON</b>.<br>
+            <b>NHẬN XÉT & ĐÁNH GIÁ LỊCH VIẾNG THĂM {wname} - NGÀY {report_date.strftime('%d/%m/%Y')} (TUẦN ISO {iso_week} - {week_type_str}):</b>
             {top_bottom_visit_html}
         </div>
         """, unsafe_allow_html=True)
@@ -1436,14 +1427,13 @@ with tab_kpi:
         
         df_display = df_r.copy()
         for col in ['Chỉ Tiêu Doanh Số', 'Thực Hiện Ngày', 'Doanh Số MTD']:
-            df_display[col] = df_display[col].apply(lambda x: f"{x:,.0f}".replace(",", ".") if isinstance(x, (int, float)) and x > 0 else ("0" if x == 0 else x))
+            df_display[col] = df_display[col].apply(lambda x: f"{x:,.0f}".replace(",", ".") if isinstance(x, (int, float)) and x > 0 else ("0" == x and "0" or x))
         st.markdown(render_html_table(df_display), unsafe_allow_html=True)
         
-        top_bottom_turnover_html = generate_top_bottom_analysis(df_r, 'Tên NVBH', '% MTD')
+        top_bottom_turnover_html = generate_top_bottom_analysis(df_r, 'Tên NVBH', '% MTD', int(total_mtd), int(team_tgt))
         st.markdown(f"""
         <div class="note-box">
-            <b>NHẬN XÉT & ĐÁNH GIÁ DOANH SỐ TURNOVER:</b><br>
-            • <b>Tiến Độ Thực Hiện:</b> Đánh giá mức độ hoàn thành doanh số MTD so với chỉ tiêu giao cho từng ĐDKD.<br>
+            <b>NHẬN XÉT & ĐÁNH GIÁ DOANH SỐ TURNOVER:</b>
             {top_bottom_turnover_html}
         </div>
         """, unsafe_allow_html=True)
@@ -1460,11 +1450,10 @@ with tab_kpi:
         with c4: render_metric_card("🆕 Ngày", f"+{total_ngay}")
         st.markdown(render_html_table(df_r), unsafe_allow_html=True)
         
-        top_bottom_kpi_html = generate_top_bottom_analysis(df_r, 'Tên NVBH', '% MTD')
+        top_bottom_kpi_html = generate_top_bottom_analysis(df_r, 'Tên NVBH', '% MTD', total_mtd, team_tgt)
         st.markdown(f"""
         <div class="note-box">
-            <b>NHẬN XÉT & ĐÁNH GIÁ CHỈ SỐ {title}:</b><br>
-            • <b>Kết Quả Thực Hiện:</b> Theo dõi độ phủ phát sinh mới trong ngày và lũy kế MTD của từng nhân sự.<br>
+            <b>NHẬN XÉT & ĐÁNH GIÁ CHỈ SỐ {title}:</b>
             {top_bottom_kpi_html}
         </div>
         """, unsafe_allow_html=True)
@@ -1483,11 +1472,10 @@ with tab_kpi:
         with c4: render_metric_card("Phát sinh Ngày (ON)", f"+{ngay_on}")
         st.markdown(render_html_table(df_combo), unsafe_allow_html=True)
         
-        top_bottom_combo_html = generate_top_bottom_analysis(df_combo, 'Tên NVBH', '% MTD (OFF)')
+        top_bottom_combo_html = generate_top_bottom_analysis(df_combo, 'Tên NVBH', '% MTD (OFF)', total_off, target_off_total)
         st.markdown(f"""
         <div class="note-box">
-            <b>NHẬN XÉT & ĐÁNH GIÁ CHƯƠNG TRÌNH COMBO (OFF/ON):</b><br>
-            • <b>Hiệu Quả Triển Khai:</b> Đo lường số lượng cửa hàng phát sinh đơn hàng Combo theo từng kênh.<br>
+            <b>NHẬN XÉT & ĐÁNH GIÁ CHƯƠNG TRÌNH COMBO (OFF/ON):</b>
             {top_bottom_combo_html}
         </div>
         """, unsafe_allow_html=True)
