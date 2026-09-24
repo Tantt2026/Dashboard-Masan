@@ -101,6 +101,7 @@ st.markdown("""
         color: #ffffff !important;
         font-weight: bold !important;
         text-align: center !important;
+        vertical-align: middle !important;
         border: 1px solid #cbd5e0 !important;
         padding: 6px 5px;
         white-space: nowrap;
@@ -108,6 +109,28 @@ st.markdown("""
     .custom-kpi-table td {
         border: 1px solid #e2e8f0 !important;
         padding: 5px 6px;
+        vertical-align: middle !important;
+    }
+
+    /* Kỹ thuật cố định 3 cột đầu tiên (STT, Mã NVBH, Tên NVBH) */
+    .custom-kpi-table th:nth-child(1), .custom-kpi-table td:nth-child(1) {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+    }
+    .custom-kpi-table th:nth-child(2), .custom-kpi-table td:nth-child(2) {
+        position: sticky;
+        left: 36px;
+        z-index: 2;
+    }
+    .custom-kpi-table th:nth-child(3), .custom-kpi-table td:nth-child(3) {
+        position: sticky;
+        left: 105px;
+        z-index: 2;
+    }
+    .custom-kpi-table th:nth-child(1), .custom-kpi-table th:nth-child(2), .custom-kpi-table th:nth-child(3) {
+        background-color: #1a365d !important;
+        z-index: 3;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -733,24 +756,33 @@ def render_visit_html_table(df):
                       'Lẻ - Tổng KH', 'Lẻ - Đã Mua', 'Lẻ - % Active',
                       'Kênh ON - Tổng KH', 'Kênh ON - Đã Mua', 'Kênh ON - % Active']
         
-        for col in cols_order:
+        for idx, col in enumerate(cols_order):
             val = row[col]
             if pd.isna(val): val = ""
             is_pct = '%' in col
             style_bg = color_pct_bg(val) if is_pct else ''
             
-            if is_total:
-                if is_pct:
-                    html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important;">{val}</td>')
-                else:
-                    align = 'left' if col in ['Tên NVBH'] else ('center' if col in ['STT', 'Mã NVBH'] else 'right')
-                    html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: {align}; white-space: nowrap;">{val}</td>')
+            # Cố định 3 cột đầu tiên
+            if idx < 3:
+                sticky_bg = '#fff5f5' if is_total else '#f7fafc'
+                text_color = '#c53030 !important' if is_total else 'inherit'
+                font_w = '900 !important' if is_total else 'normal'
+                align = 'left' if col in ['Tên NVBH'] else 'center'
+                left_pos = 0 if idx == 0 else (36 if idx == 1 else 105)
+                html.append(f'<td style="background-color: {sticky_bg}; color: {text_color}; font-weight: {font_w}; text-align: {align}; white-space: nowrap; position: sticky; left: {left_pos}px; z-index: 2;">{val}</td>')
             else:
-                if is_pct:
-                    html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
+                if is_total:
+                    if is_pct:
+                        html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important;">{val}</td>')
+                    else:
+                        align = 'right'
+                        html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: {align}; white-space: nowrap;">{val}</td>')
                 else:
-                    align = 'left' if col == 'Tên NVBH' else ('center' if col in ['STT', 'Mã NVBH'] else 'right')
-                    html.append(f'<td style="text-align: {align}; white-space: nowrap;">{val}</td>')
+                    if is_pct:
+                        html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
+                    else:
+                        align = 'right'
+                        html.append(f'<td style="text-align: {align}; white-space: nowrap;">{val}</td>')
         html.append('</tr>')
     html.append('</tbody></table></div>')
     return "".join(html)
@@ -1119,7 +1151,7 @@ def render_summary_html_table(df, selected_metrics):
         if has_cat: cols_order.extend(['MBS Cat', 'Đã Mua (Cat)', '% MTD (Cat)', 'CT DS (Cat)', 'MTD (Cat)', '% MTD DS (Cat)'])
         if has_brand: cols_order.extend(['MBS Brand', 'Đã Mua (Brand)', '% MTD (Brand)', 'CT DS (Brand)', 'MTD (Brand)', '% MTD DS (Brand)'])
         
-        for col in cols_order:
+        for idx, col in enumerate(cols_order):
             val = row[col]
             if pd.isna(val): val = ""
             if 'CT DS' in col or 'MTD (Cat)' in col or 'MTD (Brand)' in col:
@@ -1127,22 +1159,31 @@ def render_summary_html_table(df, selected_metrics):
             is_pct = '%' in col
             style_bg = color_pct_bg(val) if is_pct else ''
             
-            if is_total:
-                if col in ['CT DS (Cat)', 'MTD (Cat)', 'CT DS (Brand)', 'MTD (Brand)']:
-                    html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: right; white-space: nowrap;">{val}</td>')
-                elif is_pct:
-                    html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important;">{val}</td>')
-                else:
-                    align = 'left' if col == 'Tên NV' else 'center'
-                    html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: {align}; white-space: nowrap;">{val}</td>')
+            # Cố định 2 cột đầu (vì bảng tổng hợp chỉ có STT và Tên NV)
+            if idx < 2:
+                sticky_bg = '#fff5f5' if is_total else '#f7fafc'
+                text_color = '#c53030 !important' if is_total else 'inherit'
+                font_w = '900 !important' if is_total else 'normal'
+                align = 'left' if col == 'Tên NV' else 'center'
+                left_pos = 0 if idx == 0 else 36
+                html.append(f'<td style="background-color: {sticky_bg}; color: {text_color}; font-weight: {font_w}; text-align: {align}; white-space: nowrap; position: sticky; left: {left_pos}px; z-index: 2;">{val}</td>')
             else:
-                if col in ['CT DS (Cat)', 'MTD (Cat)', 'CT DS (Brand)', 'MTD (Brand)']:
-                    html.append(f'<td style="text-align: right; white-space: nowrap;">{val}</td>')
-                elif is_pct:
-                    html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
+                if is_total:
+                    if col in ['CT DS (Cat)', 'MTD (Cat)', 'CT DS (Brand)', 'MTD (Brand)']:
+                        html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: right; white-space: nowrap;">{val}</td>')
+                    elif is_pct:
+                        html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important;">{val}</td>')
+                    else:
+                        align = 'left' if col == 'Tên NV' else 'right'
+                        html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: {align}; white-space: nowrap;">{val}</td>')
                 else:
-                    align = 'left' if col == 'Tên NV' else 'center'
-                    html.append(f'<td style="text-align: {align}; white-space: nowrap;">{val}</td>')
+                    if col in ['CT DS (Cat)', 'MTD (Cat)', 'CT DS (Brand)', 'MTD (Brand)']:
+                        html.append(f'<td style="text-align: right; white-space: nowrap;">{val}</td>')
+                    elif is_pct:
+                        html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
+                    else:
+                        align = 'left' if col == 'Tên NV' else 'right'
+                        html.append(f'<td style="text-align: {align}; white-space: nowrap;">{val}</td>')
         html.append('</tr>')
     html.append('</tbody></table></div>')
     return "".join(html)
@@ -1157,24 +1198,32 @@ def render_html_table(df):
     for _, row in df.iterrows():
         is_total = str(row.get('Tên NVBH', '')).strip() == 'TỔNG CỘNG' or str(row.get('Tên NV', '')).strip() == 'TỔNG CỘNG'
         html.append('<tr>')
-        for col in df.columns:
+        for idx, col in enumerate(df.columns):
             val = row[col]
             if pd.isna(val): val = ""
-            if col in ['% MTD', '% MTD (OFF)', '% MTD (ON)', '% Hoàn Thành']:
-                style_bg = color_pct_bg(val)
-                if is_total:
-                    html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important;">{val}</td>')
-                else:
-                    html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
-            elif is_total:
-                align = 'left' if col in ['Tên NVBH', 'Tên NV'] else ('center' if col in ['STT', 'Mã NVBH'] else 'right')
-                html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: {align}; white-space: nowrap;">{val}</td>')
-            elif col in ['Tên NVBH', 'Tên NV']:
-                html.append(f'<td style="color: #1a365d; text-align: left; white-space: nowrap;">{val}</td>')
+            
+            # Cố định 3 cột đầu tiên (STT, Mã NVBH, Tên NVBH) cho các bảng KPI thông thường
+            if idx < 3:
+                sticky_bg = '#fff5f5' if is_total else '#f7fafc'
+                text_color = '#c53030 !important' if is_total else ('#1a365d' if col in ['Tên NVBH', 'Tên NV'] else 'inherit')
+                font_w = '900 !important' if is_total else 'normal'
+                align = 'left' if col in ['Tên NVBH', 'Tên NV'] else 'center'
+                left_pos = 0 if idx == 0 else (36 if idx == 1 else 105)
+                html.append(f'<td style="background-color: {sticky_bg}; color: {text_color}; font-weight: {font_w}; text-align: {align}; white-space: nowrap; position: sticky; left: {left_pos}px; z-index: 2;">{val}</td>')
             else:
-                align = 'center' if col in ['STT', 'Mã NVBH', 'Thực Hiện Ngày', 'MTD', 'Phát sinh Ngày (OFF)', 'MTD (OFF)', 'Phát sinh Ngày (ON)', 'MTD (ON)', 'Chỉ Tiêu KPI', 'Target (OFF)', 'Target (ON)'] else 'right'
-                if col in ['Chỉ Tiêu Doanh Số', 'Doanh Số MTD', 'Thực Hiện Ngày']: align = 'right'
-                html.append(f'<td style="text-align: {align}; white-space: nowrap;">{val}</td>')
+                if col in ['% MTD', '% MTD (OFF)', '% MTD (ON)', '% Hoàn Thành']:
+                    style_bg = color_pct_bg(val)
+                    if is_total:
+                        html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important;">{val}</td>')
+                    else:
+                        html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
+                elif is_total:
+                    align = 'right'
+                    html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: {align}; white-space: nowrap;">{val}</td>')
+                else:
+                    align = 'center' if col in ['STT', 'Mã NVBH', 'Thực Hiện Ngày', 'MTD', 'Phát sinh Ngày (OFF)', 'MTD (OFF)', 'Phát sinh Ngày (ON)', 'MTD (ON)', 'Chỉ Tiêu KPI', 'Target (OFF)', 'Target (ON)'] else 'right'
+                    if col in ['Chỉ Tiêu Doanh Số', 'Doanh Số MTD', 'Thực Hiện Ngày']: align = 'right'
+                    html.append(f'<td style="text-align: {align}; white-space: nowrap;">{val}</td>')
         html.append('</tr>')
     html.append('</tbody></table></div>')
     return "".join(html)
