@@ -395,8 +395,7 @@ def process_mcp_sales(df_rpt, df_mcp):
         sales_agg, left_on='_key', right_on='Outlet_code_key', how='left'
     )
     target_sales_col = sales_col if sales_col else 'Doanh Số MTD'
-    # Quy đổi về Triệu VNĐ (chia 1.000.000)
-    df_out[target_sales_col] = df_out['Total_Sales'].fillna(0.0) / 1000000.0
+    df_out[target_sales_col] = df_out['Total_Sales'].fillna(0.0) / 1000.0
     drop_cols = [
         c for c in ['_key', 'Outlet_code_key', 'Total_Sales'] if c in df_out.columns
     ]
@@ -486,11 +485,10 @@ def process_cat_sales(df_rpt, df_cat):
     if 'Outlet_key' in df_out.columns:
         df_out = df_out.drop(columns=['Outlet_key', 'Cat_Key'])
 
-    # Quy đổi về Triệu VNĐ (chia 1.000.000)
     if col_val1:
-        df_out[col_val1] = df_out['Val1'].fillna(0.0) / 1000000.0
+        df_out[col_val1] = df_out['Val1'].fillna(0.0) / 1000.0
     if col_val2:
-        df_out[col_val2] = df_out['Val2'].fillna(0.0) / 1000000.0
+        df_out[col_val2] = df_out['Val2'].fillna(0.0) / 1000.0
 
     drop_cols = [
         c
@@ -606,11 +604,10 @@ def process_brand_sales(df_rpt, df_brand):
     if 'Outlet_key' in df_out.columns:
         df_out = df_out.drop(columns=['Outlet_key', 'Brand_Key'])
 
-    # Quy đổi về Triệu VNĐ (chia 1.000.000)
     if col_val1:
-        df_out[col_val1] = df_out['Val1'].fillna(0.0) / 1000000.0
+        df_out[col_val1] = df_out['Val1'].fillna(0.0) / 1000.0
     if col_val2:
-        df_out[col_val2] = df_out['Val2'].fillna(0.0) / 1000000.0
+        df_out[col_val2] = df_out['Val2'].fillna(0.0) / 1000.0
 
     drop_cols = [
         c
@@ -901,6 +898,7 @@ with tab_mcp:
                 .str.contains(f_ten.lower(), na=False)
             ]
 
+        # Ô chọn hiển thị cột tiêu đề
         st.markdown(
             '<p class="filter-label" style="margin-top: 8px;">👁️ Chọn các cột tiêu đề hiển thị trong bảng:</p>',
             unsafe_allow_html=True,
