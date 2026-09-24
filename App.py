@@ -89,7 +89,7 @@ st.markdown(
     footer {visibility: hidden;}
     #MainMenu, header {visibility: visible !important;}
     
-    /* FIX TRIỆT ĐỂ LỖI CUỘN: BẢNG CHUẨN STICKY ĐA CHIỀU */
+    /* FIX TRIỆT ĐỂ LỖI CUỘN & KHOẢNG HỞ CỘT */
     .custom-kpi-table-container {
         max-height: 500px;
         overflow: auto;
@@ -103,7 +103,7 @@ st.markdown(
     }
     .custom-kpi-table {
         width: 100%;
-        border-collapse: separate;
+        border-collapse: collapse !important;
         border-spacing: 0;
         font-family: sans-serif;
         font-size: 11px;
@@ -116,48 +116,55 @@ st.markdown(
         font-weight: bold !important;
         text-align: center !important;
         vertical-align: middle !important;
-        border-top: none !important;
-        border-bottom: 1px solid #cbd5e0 !important;
-        border-right: 1px solid #cbd5e0 !important;
+        border: 1px solid #cbd5e0 !important;
         padding: 8px 6px;
         position: sticky;
         top: 0;
-        z-index: 10;
+        z-index: 100;
     }
     .custom-kpi-table th[rowspan="2"] {
         top: 0;
-        z-index: 11;
+        z-index: 101;
+    }
+    .custom-kpi-table thead tr:nth-child(2) th {
+        top: 31px !important;
+        z-index: 100;
     }
     .custom-kpi-table td {
-        border-bottom: 1px solid #e2e8f0 !important;
-        border-right: 1px solid #e2e8f0 !important;
+        border: 1px solid #e2e8f0 !important;
         padding: 6px 8px;
         vertical-align: middle !important;
         background-color: #ffffff;
     }
 
-    /* CỐ ĐỊNH CÁC CỘT ĐẦU TIÊN AN TOÀN TRÊN MOBILE */
+    /* CỐ ĐỊNH CHUẨN XÁC 3 CỘT ĐẦU TIÊN KHÔNG BỊ HỞ */
     .custom-kpi-table th.sticky-col-1, .custom-kpi-table td.sticky-col-1 {
         position: sticky;
         left: 0;
-        z-index: 5;
+        z-index: 10;
+        width: 40px;
+        min-width: 40px;
     }
     .custom-kpi-table th.sticky-col-2, .custom-kpi-table td.sticky-col-2 {
         position: sticky;
-        left: 38px;
-        z-index: 5;
+        left: 40px;
+        z-index: 10;
+        width: 85px;
+        min-width: 85px;
     }
     .custom-kpi-table th.sticky-col-3, .custom-kpi-table td.sticky-col-3 {
         position: sticky;
-        left: 110px;
-        z-index: 5;
+        left: 125px;
+        z-index: 10;
+        width: 120px;
+        min-width: 120px;
     }
     
     .custom-kpi-table th.sticky-col-1, 
     .custom-kpi-table th.sticky-col-2, 
     .custom-kpi-table th.sticky-col-3 {
         background-color: #1a365d !important;
-        z-index: 20 !important;
+        z-index: 200 !important;
     }
 </style>
 """,
@@ -177,7 +184,6 @@ def render_metric_card(label, value):
   )
 
 
-# ====================== HÀM TẠO NHẬN XÉT TOP 3 / BOTTOM 3 ======================
 def generate_top_bottom_analysis(
     df_source, name_col, pct_col, total_mtd, total_tgt
 ):
@@ -255,7 +261,6 @@ COMBO_ON_PATH = (
 )
 
 
-# ====================== LOAD ======================
 @st.cache_data(ttl=600)
 def load_main_data():
   if not os.path.exists(RPT_PATH) or not os.path.exists(MCP_PATH):
@@ -2263,7 +2268,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Bộ lọc chính
 f1, f2, f3 = st.columns([1, 1, 1.3])
 with f1:
   st.markdown('<p class="filter-label">MONTH</p>', unsafe_allow_html=True)
@@ -2325,7 +2329,6 @@ tab_kpi, tab_mcp, tab_cat, tab_brand, tab_dskh_off, tab_dskh_on = st.tabs([
     '📋 DSKH_Combo ON',
 ])
 
-# ----- TAB KPI -----
 with tab_kpi:
   if selected_kpi == 'SUMMARY':
     saved_sum_thu = st.query_params.get('sum_thu', '')
@@ -2735,7 +2738,6 @@ def update_mcp_params():
   )
 
 
-# ----- TAB MCP -----
 with tab_mcp:
   st.markdown(
       '<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
@@ -2790,7 +2792,6 @@ with tab_mcp:
     st.dataframe(df_f, use_container_width=True, height=450, hide_index=True)
     st.caption(f'Hiển thị: {len(df_f):,} / {len(mcp):,} cửa hàng')
 
-# ----- TAB CAT -----
 with tab_cat:
   st.markdown(
       '<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
@@ -2802,7 +2803,6 @@ with tab_cat:
   else:
     st.dataframe(df_cat, use_container_width=True, height=450, hide_index=True)
 
-# ----- TAB BRAND -----
 with tab_brand:
   st.markdown(
       '<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
@@ -2816,7 +2816,6 @@ with tab_brand:
         df_brand, use_container_width=True, height=450, hide_index=True
     )
 
-# ----- TAB DSKH_Combo OFF -----
 with tab_dskh_off:
   st.markdown(
       '<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
@@ -2830,7 +2829,6 @@ with tab_dskh_off:
         df_combo_off, use_container_width=True, height=450, hide_index=True
     )
 
-# ----- TAB DSKH_Combo ON -----
 with tab_dskh_on:
   st.markdown(
       '<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
