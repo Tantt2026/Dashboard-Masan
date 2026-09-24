@@ -88,10 +88,20 @@ st.markdown("""
     footer {visibility: hidden;}
     #MainMenu, header {visibility: visible !important;}
     
+    /* BẢNG TÙY CHỈNH CHUẨN CỐ ĐỊNH (STICKY HEADER & STICKY COLUMNS) */
+    .custom-kpi-table-container {
+        max-height: 500px;
+        overflow: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        background-color: #ffffff;
+        margin-bottom: 15px;
+    }
     .custom-kpi-table {
         width: 100%;
-        border-collapse: collapse;
-        border: 1px solid #e2e8f0 !important;
+        border-collapse: separate;
+        border-spacing: 0;
         font-family: sans-serif;
         font-size: 11px;
         background-color: #ffffff;
@@ -105,32 +115,41 @@ st.markdown("""
         border: 1px solid #cbd5e0 !important;
         padding: 6px 5px;
         white-space: nowrap;
+        position: sticky;
+        top: 0;
+        z-index: 5;
+    }
+    .custom-kpi-table th[rowspan="2"] {
+        top: 0;
+        z-index: 6;
     }
     .custom-kpi-table td {
         border: 1px solid #e2e8f0 !important;
         padding: 5px 6px;
         vertical-align: middle !important;
+        background-color: #ffffff;
     }
 
-    /* Kỹ thuật cố định 3 cột đầu tiên (STT, Mã NVBH, Tên NVBH) */
+    /* Kỹ thuật cố định 3 cột đầu tiên (STT, Mã NVBH, Tên NVBH) khi cuộn ngang */
     .custom-kpi-table th:nth-child(1), .custom-kpi-table td:nth-child(1) {
         position: sticky;
         left: 0;
-        z-index: 2;
+        z-index: 3;
     }
     .custom-kpi-table th:nth-child(2), .custom-kpi-table td:nth-child(2) {
         position: sticky;
         left: 36px;
-        z-index: 2;
+        z-index: 3;
     }
     .custom-kpi-table th:nth-child(3), .custom-kpi-table td:nth-child(3) {
         position: sticky;
         left: 105px;
-        z-index: 2;
+        z-index: 3;
     }
+    /* Đảm bảo tiêu đề của 3 cột đầu tiên nằm trên cùng khi vừa cuộn dọc vừa cuộn ngang */
     .custom-kpi-table th:nth-child(1), .custom-kpi-table th:nth-child(2), .custom-kpi-table th:nth-child(3) {
         background-color: #1a365d !important;
-        z-index: 3;
+        z-index: 7 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -727,7 +746,7 @@ def build_visit_report(df_mcp, df_rpt, report_date, filter_nv=None, f_thu_list=N
     return df_out, f"10. BÁO CÁO LỊCH VIẾNG THĂM & % ACTIVE (Tuần ISO {iso_week})"
 
 def render_visit_html_table(df):
-    html = ['<div style="overflow-x: auto; -webkit-overflow-scrolling: touch;"><table class="custom-kpi-table">']
+    html = ['<div class="custom-kpi-table-container"><table class="custom-kpi-table">']
     html.append('<thead><tr>')
     html.append('<th rowspan="2" style="vertical-align: middle;">STT</th>')
     html.append('<th rowspan="2" style="vertical-align: middle;">Mã NVBH</th>')
@@ -764,12 +783,12 @@ def render_visit_html_table(df):
             
             # Cố định 3 cột đầu tiên
             if idx < 3:
-                sticky_bg = '#fff5f5' if is_total else '#f7fafc'
+                sticky_bg = '#fff5f5' if is_total else '#ffffff'
                 text_color = '#c53030 !important' if is_total else 'inherit'
                 font_w = '900 !important' if is_total else 'normal'
                 align = 'left' if col in ['Tên NVBH'] else 'center'
                 left_pos = 0 if idx == 0 else (36 if idx == 1 else 105)
-                html.append(f'<td style="background-color: {sticky_bg}; color: {text_color}; font-weight: {font_w}; text-align: {align}; white-space: nowrap; position: sticky; left: {left_pos}px; z-index: 2;">{val}</td>')
+                html.append(f'<td style="background-color: {sticky_bg}; color: {text_color}; font-weight: {font_w}; text-align: {align}; white-space: nowrap; position: sticky; left: {left_pos}px; z-index: 3;">{val}</td>')
             else:
                 if is_total:
                     if is_pct:
@@ -1118,7 +1137,7 @@ def render_summary_html_table(df, selected_metrics):
     has_cat = 'MBS Cat' in selected_metrics
     has_brand = 'MBS Brand' in selected_metrics
     
-    html = ['<div style="overflow-x: auto; -webkit-overflow-scrolling: touch;"><table class="custom-kpi-table">']
+    html = ['<div class="custom-kpi-table-container"><table class="custom-kpi-table">']
     html.append('<thead><tr>')
     html.append('<th rowspan="2" style="vertical-align: middle;">STT</th>')
     html.append('<th rowspan="2" style="vertical-align: middle;">Tên NV</th>')
@@ -1161,12 +1180,12 @@ def render_summary_html_table(df, selected_metrics):
             
             # Cố định 2 cột đầu (vì bảng tổng hợp chỉ có STT và Tên NV)
             if idx < 2:
-                sticky_bg = '#fff5f5' if is_total else '#f7fafc'
+                sticky_bg = '#fff5f5' if is_total else '#ffffff'
                 text_color = '#c53030 !important' if is_total else 'inherit'
                 font_w = '900 !important' if is_total else 'normal'
                 align = 'left' if col == 'Tên NV' else 'center'
                 left_pos = 0 if idx == 0 else 36
-                html.append(f'<td style="background-color: {sticky_bg}; color: {text_color}; font-weight: {font_w}; text-align: {align}; white-space: nowrap; position: sticky; left: {left_pos}px; z-index: 2;">{val}</td>')
+                html.append(f'<td style="background-color: {sticky_bg}; color: {text_color}; font-weight: {font_w}; text-align: {align}; white-space: nowrap; position: sticky; left: {left_pos}px; z-index: 3;">{val}</td>')
             else:
                 if is_total:
                     if col in ['CT DS (Cat)', 'MTD (Cat)', 'CT DS (Brand)', 'MTD (Brand)']:
@@ -1189,7 +1208,7 @@ def render_summary_html_table(df, selected_metrics):
     return "".join(html)
 
 def render_html_table(df):
-    html = ['<div style="overflow-x: auto; -webkit-overflow-scrolling: touch;"><table class="custom-kpi-table">']
+    html = ['<div class="custom-kpi-table-container"><table class="custom-kpi-table">']
     html.append('<thead><tr>')
     for col in df.columns:
         html.append(f'<th>{col}</th>')
@@ -1204,12 +1223,12 @@ def render_html_table(df):
             
             # Cố định 3 cột đầu tiên (STT, Mã NVBH, Tên NVBH) cho các bảng KPI thông thường
             if idx < 3:
-                sticky_bg = '#fff5f5' if is_total else '#f7fafc'
+                sticky_bg = '#fff5f5' if is_total else '#ffffff'
                 text_color = '#c53030 !important' if is_total else ('#1a365d' if col in ['Tên NVBH', 'Tên NV'] else 'inherit')
                 font_w = '900 !important' if is_total else 'normal'
                 align = 'left' if col in ['Tên NVBH', 'Tên NV'] else 'center'
                 left_pos = 0 if idx == 0 else (36 if idx == 1 else 105)
-                html.append(f'<td style="background-color: {sticky_bg}; color: {text_color}; font-weight: {font_w}; text-align: {align}; white-space: nowrap; position: sticky; left: {left_pos}px; z-index: 2;">{val}</td>')
+                html.append(f'<td style="background-color: {sticky_bg}; color: {text_color}; font-weight: {font_w}; text-align: {align}; white-space: nowrap; position: sticky; left: {left_pos}px; z-index: 3;">{val}</td>')
             else:
                 if col in ['% MTD', '% MTD (OFF)', '% MTD (ON)', '% Hoàn Thành']:
                     style_bg = color_pct_bg(val)
