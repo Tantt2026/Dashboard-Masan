@@ -78,6 +78,15 @@ st.markdown("""
         font-size: 11px !important;
         margin-bottom: 2px;
     }
+    .note-box {
+        background: #ebf8ff;
+        border-left: 4px solid #3182ce;
+        padding: 10px 14px;
+        border-radius: 0 6px 6px 0;
+        margin-top: 10px;
+        font-size: 12px;
+        line-height: 1.5;
+    }
     
     [data-testid="stPopover"] button {
         color: #e53e3e !important;
@@ -137,18 +146,18 @@ def generate_top_bottom_analysis(df_source, name_col, pct_col, total_mtd, total_
     top3 = df_sorted.head(3)
     bottom3 = df_sorted.tail(3).sort_values(by='__sort_val', ascending=True)
     
-    top_str = ", ".join([f"**{r[name_col]}** ({r[pct_col]})" for _, r in top3.iterrows()])
-    bottom_str = ", ".join([f"**{r[name_col]}** ({r[pct_col]})" for _, r in bottom3.iterrows()])
+    top_str = ", ".join([f"<b>{r[name_col]}</b> ({r[pct_col]})" for _, r in top3.iterrows()])
+    bottom_str = ", ".join([f"<b>{r[name_col]}</b> ({r[pct_col]})" for _, r in bottom3.iterrows()])
     
     team_pct = round(total_mtd / total_tgt * 100, 1) if total_tgt else 0
     
-    markdown_out = f"""
-* **Kết Quả Thực Hiện:** Đạt {total_mtd:,} / {total_tgt:,} ({team_pct}% MTD).
-* **Top 3 ĐDKD Dẫn Đầu:** {top_str}.
-* **Bottom 3 ĐDKD Cần Cải Thiện:** {bottom_str}.
-* **Đề Xuất Hành Động Cho 3 Bạn Bottom:** Tập trung rà soát tuyến chưa mua, đẩy mạnh combo kích cầu và SS đồng hành đi thị trường (Field Coaching) trong 2 ngày tới.
+    html_out = f"""
+    • <b>Kết Quả Thực Hiện:</b> Đạt {total_mtd:,} / {total_tgt:,} ({team_pct}% MTD).<br>
+    • <b>Top 3 ĐDKD Dẫn Đầu:</b> {top_str}.<br>
+    • <b>Bottom 3 ĐDKD Cần Cải Thiện:</b> {bottom_str}.<br>
+    • <b>Đề Xuất Hành Động Cho 3 Bạn Bottom:</b> Tập trung rà soát tuyến chưa mua, đẩy mạnh combo kích cầu và SS đồng hành đi thị trường (Field Coaching) trong 2 ngày tới.
     """
-    return markdown_out
+    return html_out
 
 # ====================== ĐƯỜNG DẪN ======================
 DATA_DIR = "data"
@@ -1330,10 +1339,14 @@ with tab_kpi:
         st.markdown(render_summary_html_table(df_summary, selected_metrics), unsafe_allow_html=True)
         
         tot_mtd_s = int(tot_row_s['VIP MCH'])
-        tot_tgt_s = int(tot_row_s['VIP MCH'])
+        tot_tgt_s = int(tot_row_s['VIP MCH']) # Tùy chỉnh theo tổng tương ứng
         top_bottom_summary_html = generate_top_bottom_analysis(df_summary, 'Tên NV', '% MTD (VIP)', tot_mtd_s, tot_tgt_s)
-        
-        st.info(f"**NHẬN XÉT & ĐÁNH GIÁ TỔNG HỢP (THÁNG {report_date.strftime('%m/%Y')}):**\n{top_bottom_summary_html}")
+        st.markdown(f"""
+        <div class="note-box">
+            <b>NHẬN XÉT & ĐÁNH GIÁ TỔNG HỢP (THÁNG {report_date.strftime('%m/%Y')}):</b>
+            {top_bottom_summary_html}
+        </div>
+        """, unsafe_allow_html=True)
         
     elif selected_kpi == "VISIT":
         saved_visit_thu = st.query_params.get("visit_thu", "")
@@ -1393,8 +1406,12 @@ with tab_kpi:
         tot_mua_v = int(tot_row_v['Lịch VT - Đã Mua']) if tot_row_v is not None else 0
         tot_kh_v = int(tot_row_v['Lịch VT - Tổng KH']) if tot_row_v is not None else 0
         top_bottom_visit_html = generate_top_bottom_analysis(df_visit, 'Tên NVBH', 'Lịch VT - % Active', tot_mua_v, tot_kh_v)
-        
-        st.info(f"**NHẬN XÉT & ĐÁNH GIÁ LỊCH VIẾNG THĂM {wname} - NGÀY {report_date.strftime('%d/%m/%Y')} (TUẦN ISO {iso_week} - {week_type_str}):**\n{top_bottom_visit_html}")
+        st.markdown(f"""
+        <div class="note-box">
+            <b>NHẬN XÉT & ĐÁNH GIÁ LỊCH VIẾNG THĂM {wname} - NGÀY {report_date.strftime('%d/%m/%Y')} (TUẦN ISO {iso_week} - {week_type_str}):</b>
+            {top_bottom_visit_html}
+        </div>
+        """, unsafe_allow_html=True)
 
     elif selected_kpi == "TURNOVER":
         df_r, team_tgt, title = build_turnover_report(df, report_date, turnover_targets, filter_nv)
@@ -1414,8 +1431,12 @@ with tab_kpi:
         st.markdown(render_html_table(df_display), unsafe_allow_html=True)
         
         top_bottom_turnover_html = generate_top_bottom_analysis(df_r, 'Tên NVBH', '% MTD', int(total_mtd), int(team_tgt))
-        
-        st.info(f"**NHẬN XÉT & ĐÁNH GIÁ DOANH SỐ TURNOVER:**\n{top_bottom_turnover_html}")
+        st.markdown(f"""
+        <div class="note-box">
+            <b>NHẬN XÉT & ĐÁNH GIÁ DOANH SỐ TURNOVER:</b>
+            {top_bottom_turnover_html}
+        </div>
+        """, unsafe_allow_html=True)
 
     elif selected_kpi != "COMBO":
         df_r, team_tgt, title = build_report(df, report_date, targets, selected_kpi, filter_nv, mcp_df=mcp)
@@ -1430,8 +1451,12 @@ with tab_kpi:
         st.markdown(render_html_table(df_r), unsafe_allow_html=True)
         
         top_bottom_kpi_html = generate_top_bottom_analysis(df_r, 'Tên NVBH', '% MTD', total_mtd, team_tgt)
-        
-        st.info(f"**NHẬN XÉT & ĐÁNH GIÁ CHỈ SỐ {title}:**\n{top_bottom_kpi_html}")
+        st.markdown(f"""
+        <div class="note-box">
+            <b>NHẬN XÉT & ĐÁNH GIÁ CHỈ SỐ {title}:</b>
+            {top_bottom_kpi_html}
+        </div>
+        """, unsafe_allow_html=True)
     else:
         df_combo, target_off_total, target_on_total = build_combo_matrix(df, report_date, df_combo_off, df_combo_on, filter_nv)
         total_row = df_combo.iloc[-1]
@@ -1448,8 +1473,12 @@ with tab_kpi:
         st.markdown(render_html_table(df_combo), unsafe_allow_html=True)
         
         top_bottom_combo_html = generate_top_bottom_analysis(df_combo, 'Tên NVBH', '% MTD (OFF)', total_off, target_off_total)
-        
-        st.info(f"**NHẬN XÉT & ĐÁNH GIÁ CHƯƠNG TRÌNH COMBO (OFF/ON):**\n{top_bottom_combo_html}")
+        st.markdown(f"""
+        <div class="note-box">
+            <b>NHẬN XÉT & ĐÁNH GIÁ CHƯƠNG TRÌNH COMBO (OFF/ON):</b>
+            {top_bottom_combo_html}
+        </div>
+        """, unsafe_allow_html=True)
 
 def update_mcp_params():
     st.query_params["mcp_nv"] = ",".join(st.session_state.mcp_nv_input) if st.session_state.mcp_nv_input else ""
