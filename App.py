@@ -6,7 +6,7 @@ import os
 import datetime as dt
 
 st.set_page_config(
-    page_title="TRACKING KPI ĐDKD - SS Nguyễn Thị Tường Vy",
+    page_title="TRACKING KPI ĐDKD - SS Trương Thanh Tân",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -541,7 +541,7 @@ def build_report(df, report_date, targets, report_type, filter_nv=None, mcp_df=N
     total_row = pd.DataFrame([{
         'STT': '-',
         'Mã NVBH': 'TỔNG CỘNG',
-        'Tên NVBH': 'SS Nguyễn Thị Tường Vy Total' if filter_nv == "Tất cả ĐDKD" else filter_nv,
+        'Tên NVBH': 'SS Trương Thanh Tân Total' if filter_nv == "Tất cả ĐDKD" else filter_nv,
         'Chỉ Tiêu KPI': team_tgt,
         'Thực Hiện Ngày': total_ngay,
         'MTD': total_mtd,
@@ -578,7 +578,7 @@ def build_turnover_report(df, report_date, turnover_targets, filter_nv=None):
     total_pct = round(total_mtd / team_tgt * 100, 1) if team_tgt else 0.0
     total_row = pd.DataFrame([{
         'STT': '-', 'Mã NVBH': 'TỔNG CỘNG',
-        'Tên NVBH': 'SS Nguyễn Thị Tường Vy Total' if filter_nv == "Tất cả ĐDKD" else filter_nv,
+        'Tên NVBH': 'SS Trương Thanh Tân Total' if filter_nv == "Tất cả ĐDKD" else filter_nv,
         'Chỉ Tiêu Doanh Số': team_tgt, 'Thực Hiện Ngày': total_today, 'Doanh Số MTD': total_mtd, '% MTD': f"{total_pct}%"
     }])
     return pd.concat([df_out, total_row], ignore_index=True), team_tgt, "8. BÁO CÁO DOANH SỐ TURNOVER"
@@ -754,7 +754,7 @@ def build_combo_matrix(df, report_date, df_off_master, df_on_master, filter_nv=N
     tot_pct_on = round(tot_m_on / tot_tgt_on * 100, 1) if tot_tgt_on else 0
     
     total_row = pd.DataFrame([{
-        'STT': '-', 'Mã NVBH': 'TỔNG CỘNG', 'Tên NVBH': 'SS Nguyễn Thị Tường Vy Total' if filter_nv == "Tất cả ĐDKD" else filter_nv,
+        'STT': '-', 'Mã NVBH': 'TỔNG CỘNG', 'Tên NVBH': 'SS Trương Thanh Tân Total' if filter_nv == "Tất cả ĐDKD" else filter_nv,
         'Target (OFF)': tot_tgt_off, 'Phát sinh Ngày (OFF)': tot_n_off, 'MTD (OFF)': tot_m_off, '% MTD (OFF)': f"{tot_pct_off}%",
         'Target (ON)': tot_tgt_on, 'Phát sinh Ngày (ON)': tot_n_on, 'MTD (ON)': tot_m_on, '% MTD (ON)': f"{tot_pct_on}%",
     }])
@@ -1037,7 +1037,7 @@ def render_summary_html_table(df, selected_metrics):
             if 'CT DS' in col or 'MTD (Cat)' in col or 'MTD (Brand)' in col:
                 val = format_scaled_thousand(val)
             is_pct = '%' in col
-            style_bg = color_pct_bg(val) if is_pct else ''
+            style_bg = color_pct_bg(val) if is_pct else ''  # Áp dụng cho cả dòng tổng cộng
             
             if is_total:
                 if col in ['CT DS (Cat)', 'MTD (Cat)', 'CT DS (Brand)', 'MTD (Brand)']:
@@ -1096,8 +1096,8 @@ st.markdown(f"""
 <div class="main-header">
     <div class="logo">{logo_svg}</div>
     <div class="title-block">
-        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 11 - TEST</h1>
-        <h2>TRACKING KPI ĐDKD - TEAM SS NGUYỄN THỊ TƯỜNG VY</h2>
+        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10 - TEST</h1>
+        <h2>TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN</h2>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -1182,7 +1182,7 @@ with f3:
 f4, f5 = st.columns([1, 1])
 with f4:
     st.markdown('<p class="filter-label">SALE SUP</p>', unsafe_allow_html=True)
-    st.selectbox("", ["Nguyễn Thị Tường Vy Total"], key="sup", label_visibility="collapsed")
+    st.selectbox("", ["Trương Thanh Tân Total"], key="sup", label_visibility="collapsed")
 with f5:
     st.markdown('<p class="filter-label">ĐDKD (Nhân viên)</p>', unsafe_allow_html=True)
     filter_nv = st.selectbox("", ["Tất cả ĐDKD"] + nv_list, key="ddkd", label_visibility="collapsed")
