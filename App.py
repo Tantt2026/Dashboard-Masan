@@ -89,10 +89,11 @@ st.markdown(
     footer {visibility: hidden;}
     #MainMenu, header {visibility: visible !important;}
     
-    /* FIX TRIỆT ĐỂ LỖI CUỘN & KHOẢNG HỞ CỘT */
+    /* BỎ CUỘN DỌC, CHỈ GIỮ CUỘN NGANG VÀ HIỂN THỊ ĐỦ TOÀN BỘ DÒNG */
     .custom-kpi-table-container {
-        max-height: 500px;
-        overflow: auto;
+        max-height: none !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
         position: relative;
         border: 1px solid #cbd5e0;
         border-radius: 6px;
