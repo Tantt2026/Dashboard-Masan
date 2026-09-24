@@ -14,7 +14,7 @@ st.set_page_config(
 
 # ====================== LOGO ======================
 logo_svg = """
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 158.15 61.91" width="90" height="34">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 158.15 61.91" width="110" height="42">
 <title>Masan Group logo</title>
 <path d="M490.29,502.16s17.83-12.81,45.76-12.93c25.9-.11,30.18,8.14,38,10.79,0,0-3.8,5.82-5.78,9.63s-13.32,17.93-26.5,22.21c0,0,18.71-15.72,21.55-27.57,0,0-26.87-20.43-73.26-1.92" transform="translate(-432.92 -481.05)" style="fill:#f36f21"/>
 <path d="M521.55,489.11c42-10.64,59.59,9.56,59.59,9.56A60.39,60.39,0,0,1,561,521.3c11.28-1.28,21.79-13,24-16.69s6.16-9.17,6.16-9.17c-7.12-3.22-13.13-12-35.93-14.22-16.3-1.59-33.6,7.88-33.6,7.88" transform="translate(-432.92 -481.05)" style="fill:#034ea2"/>
@@ -34,64 +34,66 @@ logo_svg = """
 </svg>
 """
 
-# ====================== MOBILE & FOLDABLE RESPONSIVE CSS ======================
+# ====================== CSS ======================
 st.markdown("""
 <style>
-    .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 2rem !important;
-        padding-left: 0.6rem !important;
-        padding-right: 0.6rem !important;
-    }
-    
     .main-header {
         background: linear-gradient(90deg, #1a365d 0%, #2b6cb0 100%);
         color: white;
-        padding: 6px 8px;
-        border-radius: 6px;
-        margin-bottom: 8px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        padding: 8px 12px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.12);
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
     }
     .main-header .logo {
         flex-shrink: 0;
         background: white;
-        border-radius: 4px;
-        padding: 3px 5px;
+        border-radius: 6px;
+        padding: 4px 6px;
         display: flex;
         align-items: center;
     }
     .main-header .title-block { flex: 1; text-align: center; }
     .main-header h1 {
         margin: 0;
-        font-size: 13px;
+        font-size: 18px;
         font-weight: 800;
-        letter-spacing: 0.3px;
-        line-height: 1.1;
+        letter-spacing: 0.5px;
+        line-height: 1.2;
     }
     .main-header h2 {
-        margin: 1px 0 0 0;
-        font-size: 10px;
+        margin: 2px 0 0 0;
+        font-size: 12px;
         font-weight: 600;
         color: #fefcbf;
+        letter-spacing: 0.3px;
     }
     
     .filter-label {
         font-weight: 700 !important;
         color: #c53030 !important;
-        font-size: 10.5px !important;
-        margin-bottom: 1px !important;
+        font-size: 11px !important;
+        margin-bottom: 2px;
     }
     
-    /* Tối ưu bảng, canh giữa tiêu đề dọc & Cố định cột STT, Mã NVBH, Tên NVBH */
+    [data-testid="stPopover"] button {
+        color: #e53e3e !important;
+        font-weight: 900 !important;
+        font-size: 13px !important;
+    }
+    
+    footer {visibility: hidden;}
+    #MainMenu, header {visibility: visible !important;}
+    
     .custom-kpi-table {
         width: 100%;
         border-collapse: collapse;
         border: 1px solid #e2e8f0 !important;
         font-family: sans-serif;
-        font-size: 10px;
+        font-size: 11px;
         background-color: #ffffff;
     }
     .custom-kpi-table th {
@@ -99,60 +101,22 @@ st.markdown("""
         color: #ffffff !important;
         font-weight: bold !important;
         text-align: center !important;
-        vertical-align: middle !important;
         border: 1px solid #cbd5e0 !important;
-        padding: 6px 4px;
+        padding: 6px 5px;
         white-space: nowrap;
     }
     .custom-kpi-table td {
         border: 1px solid #e2e8f0 !important;
-        padding: 4px 5px;
-        vertical-align: middle !important;
+        padding: 5px 6px;
     }
-    
-    /* Cố định 3 cột đầu tiên (STT, Mã NVBH, Tên NVBH) khi cuộn ngang */
-    .custom-kpi-table th:nth-child(1), .custom-kpi-table td:nth-child(1) {
-        position: sticky;
-        left: 0;
-        z-index: 2;
-        background-color: #f7fafc;
-    }
-    .custom-kpi-table th:nth-child(2), .custom-kpi-table td:nth-child(2) {
-        position: sticky;
-        left: 32px;
-        z-index: 2;
-        background-color: #f7fafc;
-    }
-    .custom-kpi-table th:nth-child(3), .custom-kpi-table td:nth-child(3) {
-        position: sticky;
-        left: 95px;
-        z-index: 2;
-        background-color: #f7fafc;
-    }
-    .custom-kpi-table th:nth-child(1), .custom-kpi-table th:nth-child(2), .custom-kpi-table th:nth-child(3) {
-        background-color: #1a365d !important;
-        z-index: 3;
-    }
-    
-    @media (max-width: 640px) {
-        .block-container {
-            padding-left: 0.4rem !important;
-            padding-right: 0.4rem !important;
-        }
-        .main-header h1 { font-size: 11.5px; }
-        .main-header h2 { font-size: 9px; }
-    }
-    
-    footer {visibility: hidden;}
-    #MainMenu, header {visibility: visible !important;}
 </style>
 """, unsafe_allow_html=True)
 
 def render_metric_card(label, value):
     st.markdown(f"""
-    <div style="background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 6px; padding: 6px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.04); margin-bottom: 5px;">
-        <div style="color: #c53030; font-weight: 800; font-size: 0.85rem; margin-bottom: 1px;">{label}</div>
-        <div style="color: #c53030; font-weight: 800; font-size: 1.15rem;">{value}</div>
+    <div style="background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 6px; padding: 8px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.04); margin-bottom: 6px;">
+        <div style="color: #c53030; font-weight: 800; font-size: 0.95rem; margin-bottom: 2px;">{label}</div>
+        <div style="color: #c53030; font-weight: 800; font-size: 1.3rem;">{value}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -748,13 +712,13 @@ def render_visit_html_table(df):
     
     sections = ['Lịch VT', 'VIP 3', 'VIP 5', 'VIPSI', 'Lẻ', 'Kênh ON']
     for sec in sections:
-        html.append(f'<th colspan="3" style="background-color: #1a365d; color: #ffffff; vertical-align: middle;">{sec}</th>')
+        html.append(f'<th colspan="3" style="background-color: #1a365d; color: #ffffff;">{sec}</th>')
     html.append('</tr><tr>')
     
     for _ in sections:
-        html.append('<th style="vertical-align: middle;">Tổng KH</th>')
-        html.append('<th style="vertical-align: middle;">Đã Mua</th>')
-        html.append('<th style="vertical-align: middle;">% Active</th>')
+        html.append('<th>Tổng KH</th>')
+        html.append('<th>Đã Mua</th>')
+        html.append('<th>% Active</th>')
     html.append('</tr></thead><tbody>')
     
     for _, row in df.iterrows():
@@ -769,29 +733,24 @@ def render_visit_html_table(df):
                       'Lẻ - Tổng KH', 'Lẻ - Đã Mua', 'Lẻ - % Active',
                       'Kênh ON - Tổng KH', 'Kênh ON - Đã Mua', 'Kênh ON - % Active']
         
-        for idx, col in enumerate(cols_order):
+        for col in cols_order:
             val = row[col]
             if pd.isna(val): val = ""
             is_pct = '%' in col
             style_bg = color_pct_bg(val) if is_pct else ''
-            sticky_bg = 'background-color: #fff5f5;' if is_total else 'background-color: #f7fafc;'
             
-            if idx < 3: # Cố định 3 cột STT, Mã NVBH, Tên NVBH
-                if is_total:
-                    html.append(f'<td style="{sticky_bg} color: #c53030 !important; font-weight: 900 !important; text-align: {"left" if col=="Tên NVBH" else "center"}; white-space: nowrap; position: sticky; left: {0 if idx==0 else (32 if idx==1 else 95)}px; z-index: 2;">{val}</td>')
+            if is_total:
+                if is_pct:
+                    html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important;">{val}</td>')
                 else:
-                    html.append(f'<td style="{sticky_bg} text-align: {"left" if col=="Tên NVBH" else "center"}; white-space: nowrap; position: sticky; left: {0 if idx==0 else (32 if idx==1 else 95)}px; z-index: 2;">{val}</td>')
+                    align = 'left' if col in ['Tên NVBH'] else ('center' if col in ['STT', 'Mã NVBH'] else 'right')
+                    html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: {align}; white-space: nowrap;">{val}</td>')
             else:
-                if is_total:
-                    if is_pct:
-                        html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important;">{val}</td>')
-                    else:
-                        html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: right; white-space: nowrap;">{val}</td>')
+                if is_pct:
+                    html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
                 else:
-                    if is_pct:
-                        html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
-                    else:
-                        html.append(f'<td style="text-align: right; white-space: nowrap;">{val}</td>')
+                    align = 'left' if col == 'Tên NVBH' else ('center' if col in ['STT', 'Mã NVBH'] else 'right')
+                    html.append(f'<td style="text-align: {align}; white-space: nowrap;">{val}</td>')
         html.append('</tr>')
     html.append('</tbody></table></div>')
     return "".join(html)
@@ -1132,11 +1091,11 @@ def render_summary_html_table(df, selected_metrics):
     html.append('<th rowspan="2" style="vertical-align: middle;">STT</th>')
     html.append('<th rowspan="2" style="vertical-align: middle;">Tên NV</th>')
     
-    if has_vip: html.append('<th colspan="3" style="background-color: #1a365d; color: #ffffff; vertical-align: middle;">VIP MCH</th>')
-    if has_off: html.append('<th colspan="3" style="background-color: #1a365d; color: #ffffff; vertical-align: middle;">KH Combo OFF</th>')
-    if has_on: html.append('<th colspan="3" style="background-color: #1a365d; color: #ffffff; vertical-align: middle;">KH Combo ON</th>')
-    if has_cat: html.append('<th colspan="6" style="background-color: #1a365d; color: #ffffff; vertical-align: middle;">MBS Cat (K VNĐ)</th>')
-    if has_brand: html.append('<th colspan="6" style="background-color: #1a365d; color: #ffffff; vertical-align: middle;">MBS Brand (K VNĐ)</th>')
+    if has_vip: html.append('<th colspan="3" style="background-color: #1a365d; color: #ffffff;">VIP MCH</th>')
+    if has_off: html.append('<th colspan="3" style="background-color: #1a365d; color: #ffffff;">KH Combo OFF</th>')
+    if has_on: html.append('<th colspan="3" style="background-color: #1a365d; color: #ffffff;">KH Combo ON</th>')
+    if has_cat: html.append('<th colspan="6" style="background-color: #1a365d; color: #ffffff;">MBS Cat (K VNĐ)</th>')
+    if has_brand: html.append('<th colspan="6" style="background-color: #1a365d; color: #ffffff;">MBS Brand (K VNĐ)</th>')
     html.append('</tr><tr>')
     
     sub_headers = []
@@ -1147,7 +1106,7 @@ def render_summary_html_table(df, selected_metrics):
     if has_brand: sub_headers.extend(['MBS Brand', 'Đã Mua', '% MTD', 'CT DS', 'MTD', '% MTD'])
     
     for sh in sub_headers:
-        html.append(f'<th style="vertical-align: middle;">{sh}</th>')
+        html.append(f'<th>{sh}</th>')
     html.append('</tr></thead><tbody>')
     
     for _, row in df.iterrows():
@@ -1160,35 +1119,30 @@ def render_summary_html_table(df, selected_metrics):
         if has_cat: cols_order.extend(['MBS Cat', 'Đã Mua (Cat)', '% MTD (Cat)', 'CT DS (Cat)', 'MTD (Cat)', '% MTD DS (Cat)'])
         if has_brand: cols_order.extend(['MBS Brand', 'Đã Mua (Brand)', '% MTD (Brand)', 'CT DS (Brand)', 'MTD (Brand)', '% MTD DS (Brand)'])
         
-        for idx, col in enumerate(cols_order):
+        for col in cols_order:
             val = row[col]
             if pd.isna(val): val = ""
             if 'CT DS' in col or 'MTD (Cat)' in col or 'MTD (Brand)' in col:
                 val = format_scaled_thousand(val)
             is_pct = '%' in col
             style_bg = color_pct_bg(val) if is_pct else ''
-            sticky_bg = 'background-color: #fff5f5;' if is_total else 'background-color: #f7fafc;'
             
-            if idx < 2: # Cố định 2 cột STT, Tên NV đối với bảng tổng hợp
-                if is_total:
-                    html.append(f'<td style="{sticky_bg} color: #c53030 !important; font-weight: 900 !important; text-align: {"left" if col=="Tên NV" else "center"}; white-space: nowrap; position: sticky; left: {0 if idx==0 else 32}px; z-index: 2;">{val}</td>')
+            if is_total:
+                if col in ['CT DS (Cat)', 'MTD (Cat)', 'CT DS (Brand)', 'MTD (Brand)']:
+                    html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: right; white-space: nowrap;">{val}</td>')
+                elif is_pct:
+                    html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important;">{val}</td>')
                 else:
-                    html.append(f'<td style="{sticky_bg} text-align: {"left" if col=="Tên NV" else "center"}; white-space: nowrap; position: sticky; left: {0 if idx==0 else 32}px; z-index: 2;">{val}</td>')
+                    align = 'left' if col == 'Tên NV' else 'center'
+                    html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: {align}; white-space: nowrap;">{val}</td>')
             else:
-                if is_total:
-                    if col in ['CT DS (Cat)', 'MTD (Cat)', 'CT DS (Brand)', 'MTD (Brand)']:
-                        html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: right; white-space: nowrap;">{val}</td>')
-                    elif is_pct:
-                        html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important;">{val}</td>')
-                    else:
-                        html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: right; white-space: nowrap;">{val}</td>')
+                if col in ['CT DS (Cat)', 'MTD (Cat)', 'CT DS (Brand)', 'MTD (Brand)']:
+                    html.append(f'<td style="text-align: right; white-space: nowrap;">{val}</td>')
+                elif is_pct:
+                    html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
                 else:
-                    if col in ['CT DS (Cat)', 'MTD (Cat)', 'CT DS (Brand)', 'MTD (Brand)']:
-                        html.append(f'<td style="text-align: right; white-space: nowrap;">{val}</td>')
-                    elif is_pct:
-                        html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
-                    else:
-                        html.append(f'<td style="text-align: right; white-space: nowrap;">{val}</td>')
+                    align = 'left' if col == 'Tên NV' else 'center'
+                    html.append(f'<td style="text-align: {align}; white-space: nowrap;">{val}</td>')
         html.append('</tr>')
     html.append('</tbody></table></div>')
     return "".join(html)
@@ -1197,34 +1151,30 @@ def render_html_table(df):
     html = ['<div style="overflow-x: auto; -webkit-overflow-scrolling: touch;"><table class="custom-kpi-table">']
     html.append('<thead><tr>')
     for col in df.columns:
-        html.append(f'<th style="vertical-align: middle;">{col}</th>')
+        html.append(f'<th>{col}</th>')
     html.append('</tr></thead><tbody>')
     
     for _, row in df.iterrows():
         is_total = str(row.get('Tên NVBH', '')).strip() == 'TỔNG CỘNG' or str(row.get('Tên NV', '')).strip() == 'TỔNG CỘNG'
         html.append('<tr>')
-        for idx, col in enumerate(df.columns):
+        for col in df.columns:
             val = row[col]
             if pd.isna(val): val = ""
-            sticky_bg = 'background-color: #fff5f5;' if is_total else 'background-color: #f7fafc;'
-            
-            if idx < 3: # Cố định STT, Mã NVBH, Tên NVBH
-                align = 'left' if col in ['Tên NVBH', 'Tên NV'] else 'center'
+            if col in ['% MTD', '% MTD (OFF)', '% MTD (ON)', '% Hoàn Thành']:
+                style_bg = color_pct_bg(val)
                 if is_total:
-                    html.append(f'<td style="{sticky_bg} color: #c53030 !important; font-weight: 900 !important; text-align: {align}; white-space: nowrap; position: sticky; left: {0 if idx==0 else (32 if idx==1 else 95)}px; z-index: 2;">{val}</td>')
+                    html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important;">{val}</td>')
                 else:
-                    html.append(f'<td style="{sticky_bg} text-align: {align}; white-space: nowrap; position: sticky; left: {0 if idx==0 else (32 if idx==1 else 95)}px; z-index: 2;">{val}</td>')
+                    html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
+            elif is_total:
+                align = 'left' if col in ['Tên NVBH', 'Tên NV'] else ('center' if col in ['STT', 'Mã NVBH'] else 'right')
+                html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: {align}; white-space: nowrap;">{val}</td>')
+            elif col in ['Tên NVBH', 'Tên NV']:
+                html.append(f'<td style="color: #1a365d; text-align: left; white-space: nowrap;">{val}</td>')
             else:
-                if col in ['% MTD', '% MTD (OFF)', '% MTD (ON)', '% Hoàn Thành']:
-                    style_bg = color_pct_bg(val)
-                    if is_total:
-                        html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important;">{val}</td>')
-                    else:
-                        html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
-                elif is_total:
-                    html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: right; white-space: nowrap;">{val}</td>')
-                else:
-                    html.append(f'<td style="text-align: right; white-space: nowrap;">{val}</td>')
+                align = 'center' if col in ['STT', 'Mã NVBH', 'Thực Hiện Ngày', 'MTD', 'Phát sinh Ngày (OFF)', 'MTD (OFF)', 'Phát sinh Ngày (ON)', 'MTD (ON)', 'Chỉ Tiêu KPI', 'Target (OFF)', 'Target (ON)'] else 'right'
+                if col in ['Chỉ Tiêu Doanh Số', 'Doanh Số MTD', 'Thực Hiện Ngày']: align = 'right'
+                html.append(f'<td style="text-align: {align}; white-space: nowrap;">{val}</td>')
         html.append('</tr>')
     html.append('</tbody></table></div>')
     return "".join(html)
@@ -1234,15 +1184,15 @@ st.markdown(f"""
 <div class="main-header">
     <div class="logo">{logo_svg}</div>
     <div class="title-block">
-        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</h1>
+        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10 - TEST</h1>
         <h2>TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN</h2>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-col_reload, col_empty = st.columns([2, 4])
+col_reload, col_empty = st.columns([2, 5])
 with col_reload:
-    if st.button("🔄 Xóa Cache & Reload"):
+    if st.button("🔄 Xóa Cache & Reload Dữ Liệu"):
         st.cache_data.clear()
         st.rerun()
 
@@ -1281,19 +1231,19 @@ def get_timegone_stats(target_date):
 tot_days, elapsed_days, remain_days, pct_tg = get_timegone_stats(default_date_t_minus_1)
 
 st.markdown(f"""
-<div style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; margin: 4px 0 10px 0; text-align: center;">
-    <div style="font-weight: 800; color: #1a365d; font-size: 11.5px; margin-bottom: 4px;">⏳ TIẾN ĐỘ THỜI GIAN THÁNG {default_date_t_minus_1.strftime('%m/%Y')}</div>
-    <div style="display: flex; justify-content: space-around; font-size: 10.5px; gap: 4px; flex-wrap: wrap;">
-        <div style="background: #fff; padding: 2px 6px; border-radius: 3px; border: 1px solid #edf2f7;">Làm việc: <span style="color: #2b6cb0; font-weight: 700;">{tot_days}</span></div>
-        <div style="background: #fff; padding: 2px 6px; border-radius: 3px; border: 1px solid #edf2f7;">Đã qua: <span style="color: #c53030; font-weight: 700;">{elapsed_days}</span></div>
-        <div style="background: #fff; padding: 2px 6px; border-radius: 3px; border: 1px solid #edf2f7;">Còn lại: <span style="color: #2f855a; font-weight: 700;">{remain_days}</span></div>
-        <div style="background: #c6f6d5; padding: 2px 6px; border-radius: 3px; border: 1px solid #9ae6b4; color: #22543d;">Timegone: <span style="font-weight: 800;">{pct_tg}%</span></div>
+<div class="timegone-container" style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; margin: 5px 0 12px 0; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <div class="timegone-title" style="font-weight: 800; color: #1a365d; font-size: 12.5px; margin-bottom: 6px;">⏳ TIẾN ĐỘ THỜI GIAN THÁNG {default_date_t_minus_1.strftime('%m/%Y')}</div>
+    <div class="timegone-grid" style="display: flex; justify-content: space-around; font-size: 11.5px; gap: 6px; flex-wrap: wrap;">
+        <div class="timegone-item" style="background: #fff; padding: 3px 8px; border-radius: 4px; border: 1px solid #edf2f7;"><b>Tổng làm việc:</b> <span style="color: #2b6cb0; font-weight: 700;">{tot_days}</span></div>
+        <div class="timegone-item" style="background: #fff; padding: 3px 8px; border-radius: 4px; border: 1px solid #edf2f7;"><b>Đã trôi qua:</b> <span style="color: #c53030; font-weight: 700;">{elapsed_days}</span></div>
+        <div class="timegone-item" style="background: #fff; padding: 3px 8px; border-radius: 4px; border: 1px solid #edf2f7;"><b>Còn lại:</b> <span style="color: #2f855a; font-weight: 700;">{remain_days}</span></div>
+        <div class="timegone-item" style="background: #c6f6d5; padding: 3px 8px; border-radius: 4px; border: 1px solid #9ae6b4; color: #22543d;"><b>% Timegone:</b> <span style="font-weight: 800;">{pct_tg}%</span></div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
 # Bộ lọc chính
-f1, f2, f3 = st.columns([1, 1, 1.2])
+f1, f2, f3 = st.columns([1, 1, 1.3])
 with f1:
     st.markdown('<p class="filter-label">MONTH</p>', unsafe_allow_html=True)
     st.selectbox("", ["Tháng 09/2026"], key="month", label_visibility="collapsed")
@@ -1328,7 +1278,7 @@ with f5:
 st.markdown("---")
 
 tab_kpi, tab_mcp, tab_cat, tab_brand, tab_dskh_off, tab_dskh_on = st.tabs([
-    "📊 KPI", "🗺️ MCP", "📦 CAT", "🏷️ BRAND", "📋 OFF", "📋 ON"
+    "📊 BÁO CÁO KPI", "🗺️ MCP VISIT", "📦 TRACKING MBS - CAT", "🏷️ TRACKING MBS - BRAND", "📋 DSKH_Combo OFF", "📋 DSKH_Combo ON"
 ])
 
 # ----- TAB KPI -----
@@ -1345,13 +1295,13 @@ with tab_kpi:
         def update_sum_params():
             st.query_params["sum_thu"] = ",".join(st.session_state.sum_thu_input) if st.session_state.sum_thu_input else ""
 
-        col_f_thu, col_f_metrics = st.columns([1, 1.3])
+        col_f_thu, col_f_metrics = st.columns([1, 1.5])
         with col_f_thu:
-            st.markdown('<p class="filter-label">📅 Thứ / Chu kỳ</p>', unsafe_allow_html=True)
+            st.markdown('<p class="filter-label">📅 Lọc Theo Thứ / Chu kỳ</p>', unsafe_allow_html=True)
             thu_opts = ["2","3","4","5","6","7","25","36","47"]
             f_thu_sum = st.multiselect("", thu_opts, default=[t for t in default_sum_thu_list if t in thu_opts], key="sum_thu_input", on_change=update_sum_params, label_visibility="collapsed")
         with col_f_metrics:
-            st.markdown('<p class="filter-label">📊 Chọn Chỉ Số</p>', unsafe_allow_html=True)
+            st.markdown('<p class="filter-label">📊 Chọn Chỉ Số Hiển Thị</p>', unsafe_allow_html=True)
             metric_opts = ["VIP MCH", "KH Combo OFF", "KH Combo ON", "MBS Cat", "MBS Brand"]
             saved_metrics = st.query_params.get("sum_metrics", "")
             default_metrics = [x.strip() for x in saved_metrics.split(",") if x.strip()] if saved_metrics else metric_opts
@@ -1368,22 +1318,22 @@ with tab_kpi:
         df_summary = build_summary_report(df, report_date, df_combo_off, df_combo_on, df_cat, df_brand, mcp, filter_nv, f_thu_sum)
         tot_row_s = df_summary.iloc[-1]
         
-        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px; font-size: 13.5px;">9. BÁO CÁO TỔNG HỢP - THÁNG {report_date.strftime("%m/%Y")}</h3>', unsafe_allow_html=True)
+        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">9. BÁO CÁO TỔNG HỢP - THÁNG {report_date.strftime("%m/%Y")}</h3>', unsafe_allow_html=True)
+        st.caption(f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc NV: {filter_nv}")
         
-        c1, c2 = st.columns(2)
-        with c1: 
-            render_metric_card("VIP MCH", f"{tot_row_s['VIP MCH']:,}")
-            render_metric_card("Combo ON", f"{tot_row_s['KH Combo ON']:,}")
-        with c2: 
-            render_metric_card("Combo OFF", f"{tot_row_s['KH Combo OFF']:,}")
-            render_metric_card("MBS Cat/Brand", f"{tot_row_s['MBS Cat']:,}/{tot_row_s['MBS Brand']:,}")
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: render_metric_card("Tổng VIP MCH", f"{tot_row_s['VIP MCH']:,}")
+        with c2: render_metric_card("Tổng KH Combo OFF", f"{tot_row_s['KH Combo OFF']:,}")
+        with c3: render_metric_card("Tổng KH Combo ON", f"{tot_row_s['KH Combo ON']:,}")
+        with c4: render_metric_card("Tổng MBS Cat / Brand", f"{tot_row_s['MBS Cat']:,} / {tot_row_s['MBS Brand']:,}")
         
         st.markdown(render_summary_html_table(df_summary, selected_metrics), unsafe_allow_html=True)
         
         tot_mtd_s = int(tot_row_s['VIP MCH'])
         tot_tgt_s = int(tot_row_s['VIP MCH'])
         top_bottom_summary_html = generate_top_bottom_analysis(df_summary, 'Tên NV', '% MTD (VIP)', tot_mtd_s, tot_tgt_s)
-        st.info(f"**NHẬN XÉT & ĐÁNH GIÁ TỔNG HỢP:**\n{top_bottom_summary_html}")
+        
+        st.info(f"**NHẬN XÉT & ĐÁNH GIÁ TỔNG HỢP (THÁNG {report_date.strftime('%m/%Y')}):**\n{top_bottom_summary_html}")
         
     elif selected_kpi == "VISIT":
         saved_visit_thu = st.query_params.get("visit_thu", "")
@@ -1392,9 +1342,9 @@ with tab_kpi:
         def update_visit_params():
             st.query_params["visit_thu"] = ",".join(st.session_state.visit_thu_input) if st.session_state.visit_thu_input else ""
 
-        col_f_thu_v, _ = st.columns([1, 1.2])
+        col_f_thu_v, _ = st.columns([1, 1.5])
         with col_f_thu_v:
-            st.markdown('<p class="filter-label">📅 Lọc Theo Thứ Viếng Thăm</p>', unsafe_allow_html=True)
+            st.markdown('<p class="filter-label">📅 Lọc Theo Thứ / Chu kỳ Viếng Thăm (Chọn nhiều)</p>', unsafe_allow_html=True)
             thu_opts = ["2","3","4","5","6","7","25","36","47"]
             f_thu_visit = st.multiselect("", thu_opts, default=[t for t in default_visit_thu_list if t in thu_opts], key="visit_thu_input", on_change=update_visit_params, label_visibility="collapsed")
             
@@ -1426,39 +1376,37 @@ with tab_kpi:
         weekday_map = {0: "THỨ HAI", 1: "THỨ BA", 2: "THỨ TƯ", 3: "THỨ NĂM", 4: "THỨ SÁU", 5: "THỨ BẢY", 6: "CHỦ NHẬT"}
         wname = weekday_map.get(report_date.weekday(), "")
         iso_year, iso_week, _ = report_date.isocalendar()
+        week_type_str = "ODD WEEK (Tuần Lẻ)" if iso_week % 2 == 1 else "EVEN WEEK (Tuần Chẵn)"
         
-        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px; font-size: 13.5px; text-align: center;">BÁO CÁO LỊCH VIẾNG THĂM {wname} - {report_date.strftime("%d/%m/%Y")} (TUẦN {iso_week})</h3>', unsafe_allow_html=True)
+        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px; font-size: 16px; text-align: center;">BÁO CÁO LỊCH VIẾNG THĂM & % ACTIVE {wname} - {report_date.strftime("%d/%m/%Y")} (TUẦN ISO {iso_week} - {week_type_str})</h3>', unsafe_allow_html=True)
+        st.markdown(f'<p style="text-align: center; font-size: 12px; color: #4a5568; margin-bottom: 12px;">Dữ liệu cập nhật {wname} ngày {report_date.strftime("%d/%m/%Y")} | Tuần ISO {iso_week} | Kèm tỷ lệ % Active (Đã mua / Tổng KH)</p>', unsafe_allow_html=True)
         
-        c1, c2, c3 = st.columns(3)
-        with c1: 
-            render_metric_card("VIP 3", f"{v3_mua}/{v3_kh} ({v3_pct}%)")
-            render_metric_card("LẺ", f"{le_mua}/{le_kh} ({le_pct}%)")
-        with c2: 
-            render_metric_card("VIP 5", f"{v5_mua}/{v5_kh} ({v5_pct}%)")
-            render_metric_card("ON", f"{on_mua}/{on_kh} ({on_pct}%)")
-        with c3: 
-            render_metric_card("VIPSI", f"{vsi_mua}/{vsi_kh} ({vsi_pct}%)")
+        c1, c2, c3, c4, c5 = st.columns(5)
+        with c1: render_metric_card("VIP 3", f"{v3_mua:,} / {v3_kh:,} ({v3_pct}%)")
+        with c2: render_metric_card("VIP 5", f"{v5_mua:,} / {v5_kh:,} ({v5_pct}%)")
+        with c3: render_metric_card("VIPSI", f"{vsi_mua:,} / {vsi_kh:,} ({vsi_pct}%)")
+        with c4: render_metric_card("LẺ", f"{le_mua:,} / {le_kh:,} ({le_pct}%)")
+        with c5: render_metric_card("ON", f"{on_mua:,} / {on_kh:,} ({on_pct}%)")
         
         st.markdown(render_visit_html_table(df_visit), unsafe_allow_html=True)
         
         tot_mua_v = int(tot_row_v['Lịch VT - Đã Mua']) if tot_row_v is not None else 0
         tot_kh_v = int(tot_row_v['Lịch VT - Tổng KH']) if tot_row_v is not None else 0
         top_bottom_visit_html = generate_top_bottom_analysis(df_visit, 'Tên NVBH', 'Lịch VT - % Active', tot_mua_v, tot_kh_v)
-        st.info(f"**NHẬN XÉT & ĐÁNH GIÁ LỊCH VIẾNG THĂM {wname}:**\n{top_bottom_visit_html}")
+        
+        st.info(f"**NHẬN XÉT & ĐÁNH GIÁ LỊCH VIẾNG THĂM {wname} - NGÀY {report_date.strftime('%d/%m/%Y')} (TUẦN ISO {iso_week} - {week_type_str}):**\n{top_bottom_visit_html}")
 
     elif selected_kpi == "TURNOVER":
         df_r, team_tgt, title = build_turnover_report(df, report_date, turnover_targets, filter_nv)
         total_row = df_r.iloc[-1]
         total_mtd, total_today, pct_team = float(total_row['Doanh Số MTD']), float(total_row['Thực Hiện Ngày']), total_row['% MTD']
         
-        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px; font-size: 13.5px;">{title}</h3>', unsafe_allow_html=True)
-        c1, c2 = st.columns(2)
-        with c1: 
-            render_metric_card("🎯 Chỉ Tiêu DS", f"{team_tgt:,.0f}".replace(",", "."))
-            render_metric_card("📊 % MTD", pct_team)
-        with c2: 
-            render_metric_card("📈 Doanh Số MTD", f"{total_mtd:,.0f}".replace(",", "."))
-            render_metric_card("🆕 Thực Hiện Ngày", f"{total_today:,.0f}".replace(",", "."))
+        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">{title} - THÁNG {report_date.strftime("%m/%Y")}</h3>', unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: render_metric_card("🎯 Chỉ Tiêu DS", f"{team_tgt:,.0f}".replace(",", "."))
+        with c2: render_metric_card("📈 Doanh Số MTD", f"{total_mtd:,.0f}".replace(",", "."))
+        with c3: render_metric_card("📊 % MTD", pct_team)
+        with c4: render_metric_card("🆕 Thực Hiện Ngày", f"{total_today:,.0f}".replace(",", "."))
         
         df_display = df_r.copy()
         for col in ['Chỉ Tiêu Doanh Số', 'Thực Hiện Ngày', 'Doanh Số MTD']:
@@ -1466,23 +1414,23 @@ with tab_kpi:
         st.markdown(render_html_table(df_display), unsafe_allow_html=True)
         
         top_bottom_turnover_html = generate_top_bottom_analysis(df_r, 'Tên NVBH', '% MTD', int(total_mtd), int(team_tgt))
+        
         st.info(f"**NHẬN XÉT & ĐÁNH GIÁ DOANH SỐ TURNOVER:**\n{top_bottom_turnover_html}")
 
     elif selected_kpi != "COMBO":
         df_r, team_tgt, title = build_report(df, report_date, targets, selected_kpi, filter_nv, mcp_df=mcp)
         total_row = df_r.iloc[-1]
         total_mtd, total_ngay, pct_team = int(total_row['MTD']), int(total_row['Thực Hiện Ngày']), total_row['% MTD']
-        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px; font-size: 13.5px;">{title}</h3>', unsafe_allow_html=True)
-        c1, c2 = st.columns(2)
-        with c1: 
-            render_metric_card("🎯 Target", f"{team_tgt:,}")
-            render_metric_card("📊 % MTD", pct_team)
-        with c2: 
-            render_metric_card("📈 MTD", f"{total_mtd:,}")
-            render_metric_card("🆕 Ngày", f"+{total_ngay}")
+        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">{title} - THÁNG {report_date.strftime("%m/%Y")}</h3>', unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: render_metric_card("🎯 Target", f"{team_tgt:,}")
+        with c2: render_metric_card("📈 MTD", f"{total_mtd:,}")
+        with c3: render_metric_card("📊 % MTD", pct_team)
+        with c4: render_metric_card("🆕 Ngày", f"+{total_ngay}")
         st.markdown(render_html_table(df_r), unsafe_allow_html=True)
         
         top_bottom_kpi_html = generate_top_bottom_analysis(df_r, 'Tên NVBH', '% MTD', total_mtd, team_tgt)
+        
         st.info(f"**NHẬN XÉT & ĐÁNH GIÁ CHỈ SỐ {title}:**\n{top_bottom_kpi_html}")
     else:
         df_combo, target_off_total, target_on_total = build_combo_matrix(df, report_date, df_combo_off, df_combo_on, filter_nv)
@@ -1491,18 +1439,17 @@ with tab_kpi:
         pct_off_team = round(total_off / target_off_total * 100, 1) if target_off_total else 0
         pct_on_team = round(total_on / target_on_total * 100, 1) if target_on_total else 0
 
-        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px; font-size: 13.5px;">7. BÁO CÁO ĐH COMBO (MATRIX OFF/ON)</h3>', unsafe_allow_html=True)
-        c1, c2 = st.columns(2)
-        with c1: 
-            render_metric_card("MTD OFF / Target", f"{total_off}/{target_off_total} ({pct_off_team}%)")
-            render_metric_card("Phát sinh Ngày OFF", f"+{ngay_off}")
-        with c2: 
-            render_metric_card("MTD ON / Target", f"{total_on}/{target_on_total} ({pct_on_team}%)")
-            render_metric_card("Phát sinh Ngày ON", f"+{ngay_on}")
+        st.markdown(f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">7. BÁO CÁO ĐH COMBO (MATRIX OFF/ON) - THÁNG {report_date.strftime("%m/%Y")}</h3>', unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: render_metric_card("MTD OFF / Target", f"{total_off:,} / {target_off_total:,} ({pct_off_team}%)")
+        with c2: render_metric_card("MTD ON / Target", f"{total_on:,} / {target_on_total:,} ({pct_on_team}%)")
+        with c3: render_metric_card("Phát sinh Ngày (OFF)", f"+{ngay_off}")
+        with c4: render_metric_card("Phát sinh Ngày (ON)", f"+{ngay_on}")
         st.markdown(render_html_table(df_combo), unsafe_allow_html=True)
         
         top_bottom_combo_html = generate_top_bottom_analysis(df_combo, 'Tên NVBH', '% MTD (OFF)', total_off, target_off_total)
-        st.info(f"**NHẬN XÉT & ĐÁNH GIÁ CHƯƠNG TRÌNH COMBO:**\n{top_bottom_combo_html}")
+        
+        st.info(f"**NHẬN XÉT & ĐÁNH GIÁ CHƯƠNG TRÌNH COMBO (OFF/ON):**\n{top_bottom_combo_html}")
 
 def update_mcp_params():
     st.query_params["mcp_nv"] = ",".join(st.session_state.mcp_nv_input) if st.session_state.mcp_nv_input else ""
@@ -1510,16 +1457,20 @@ def update_mcp_params():
 
 # ----- TAB MCP -----
 with tab_mcp:
-    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px; font-size: 13.5px;">🗺️ MCP VISIT & MAPPING DOANH SỐ</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">🗺️ MCP VISIT & MAPPING DOANH SỐ BÁN HÀNG</h3>', unsafe_allow_html=True)
     if mcp.empty:
         st.warning("Chưa có dữ liệu MCP")
     else:
         col_nv = find_col(mcp, ['SM name','SM Name','Tên NVBH','Nhân viên'])
+        col_ma = find_col(mcp, ['Outlet_code','Outlet Code','Mã CH'])
+        col_ten = find_col(mcp, ['Outlet_name','Outlet Name','Tên CH'])
         col_thu = find_col(mcp, ['Thứ','Frequency','Tần suất'])
+        col_vip = find_col(mcp, ['VIP MCH', 'VIP_MCH'])
+        col_ds = find_col(mcp, ['Doanh Số MTD', 'Doanh số MTD'])
         
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown('<p class="filter-label">👤 Nhân Viên</p>', unsafe_allow_html=True)
+            st.markdown('<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD)</p>', unsafe_allow_html=True)
             nv_opts = sorted(mcp[col_nv].dropna().astype(str).unique().tolist()) if col_nv else []
             f_nv = st.multiselect("", nv_opts, key="mcp_nv_input", on_change=update_mcp_params, label_visibility="collapsed")
         with c2:
@@ -1530,29 +1481,29 @@ with tab_mcp:
         df_f = mcp.copy()
         if f_nv and col_nv: df_f = df_f[df_f[col_nv].astype(str).isin(f_nv)]
         df_f = filter_by_thu_multi(df_f, col_thu, f_thu)
-        st.dataframe(df_f, use_container_width=True, height=400, hide_index=True)
+        st.dataframe(df_f, use_container_width=True, height=450, hide_index=True)
         st.caption(f"Hiển thị: {len(df_f):,} / {len(mcp):,} cửa hàng")
 
 # ----- TAB CAT -----
 with tab_cat:
-    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px; font-size: 13.5px;">📦 TRACKING MBS - CATEGORY</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">📦 TRACKING MBS - THEO NGÀNH HÀNG (CATEGORY)</h3>', unsafe_allow_html=True)
     if df_cat.empty: st.error("❌ Không tìm thấy Data_Cat.xlsx")
-    else: st.dataframe(df_cat, use_container_width=True, height=400, hide_index=True)
+    else: st.dataframe(df_cat, use_container_width=True, height=450, hide_index=True)
 
 # ----- TAB BRAND -----
 with tab_brand:
-    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px; font-size: 13.5px;">🏷️ TRACKING MBS - BRAND</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">🏷️ TRACKING MBS - THEO THƯƠNG HIỆU (BRAND)</h3>', unsafe_allow_html=True)
     if df_brand.empty: st.error("❌ Không tìm thấy Data_Brand.xlsx")
-    else: st.dataframe(df_brand, use_container_width=True, height=400, hide_index=True)
+    else: st.dataframe(df_brand, use_container_width=True, height=450, hide_index=True)
 
 # ----- TAB DSKH_Combo OFF -----
 with tab_dskh_off:
-    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px; font-size: 13.5px;">📋 DSKH COMBO OFF</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">📋 DANH SÁCH KHÁCH HÀNG COMBO OFF</h3>', unsafe_allow_html=True)
     if df_combo_off.empty: st.warning("Chưa có dữ liệu Combo OFF")
-    else: st.dataframe(df_combo_off, use_container_width=True, height=400, hide_index=True)
+    else: st.dataframe(df_combo_off, use_container_width=True, height=450, hide_index=True)
 
 # ----- TAB DSKH_Combo ON -----
 with tab_dskh_on:
-    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px; font-size: 13.5px;">📋 DSKH COMBO ON</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px; font-size: 15px;">📋 DANH SÁCH KHÁCH HÀNG COMBO ON</h3>', unsafe_allow_html=True)
     if df_combo_on.empty: st.warning("Chưa có dữ liệu Combo ON")
-    else: st.dataframe(df_combo_on, use_container_width=True, height=400, hide_index=True)
+    else: st.dataframe(df_combo_on, use_container_width=True, height=450, hide_index=True)
