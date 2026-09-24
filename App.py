@@ -1339,7 +1339,7 @@ with tab_kpi:
         st.markdown(render_summary_html_table(df_summary, selected_metrics), unsafe_allow_html=True)
         
         tot_mtd_s = int(tot_row_s['VIP MCH'])
-        tot_tgt_s = int(tot_row_s['VIP MCH']) # Tùy chỉnh theo tổng tương ứng
+        tot_tgt_s = int(tot_row_s['VIP MCH'])
         top_bottom_summary_html = generate_top_bottom_analysis(df_summary, 'Tên NV', '% MTD (VIP)', tot_mtd_s, tot_tgt_s)
         st.markdown(f"""
         <div class="note-box">
