@@ -1313,6 +1313,14 @@ with tab_kpi:
         
         st.markdown(render_summary_html_table(df_summary, selected_metrics), unsafe_allow_html=True)
         
+        st.markdown(f"""
+        <div class="note-box">
+            <b>NHẬN XÉT & ĐÁNH GIÁ TỔNG HỢP (THÁNG {report_date.strftime('%m/%Y')}):</b><br>
+            • <b>Tổng Quan Chỉ Số:</b> Theo dõi sát sao các chỉ tiêu trọng yếu bao gồm VIP MCH, Combo OFF/ON và doanh số Cat/Brand.<br>
+            • <b>Định Hướng Đôn Đốc:</b> Tập trung tối ưu hóa độ phủ tại các nhóm cửa hàng chưa đạt tiến độ chuẩn để đảm bảo hoàn thành kế hoạch tháng.
+        </div>
+        """, unsafe_allow_html=True)
+        
     elif selected_kpi == "VISIT":
         saved_visit_thu = st.query_params.get("visit_thu", "")
         default_visit_thu_list = [x.strip() for x in saved_visit_thu.split(",") if x.strip()] if saved_visit_thu else []
@@ -1393,6 +1401,14 @@ with tab_kpi:
         for col in ['Chỉ Tiêu Doanh Số', 'Thực Hiện Ngày', 'Doanh Số MTD']:
             df_display[col] = df_display[col].apply(lambda x: f"{x:,.0f}".replace(",", ".") if isinstance(x, (int, float)) and x > 0 else ("0" if x == 0 else x))
         st.markdown(render_html_table(df_display), unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="note-box">
+            <b>NHẬN XÉT & ĐÁNH GIÁ DOANH SỐ TURNOVER:</b><br>
+            • <b>Tiến Độ Thực Hiện:</b> Đánh giá mức độ hoàn thành doanh số MTD so với chỉ tiêu giao cho từng ĐDKD.<br>
+            • <b>Giải Pháp Thúc Đẩy:</b> Đẩy mạnh các đơn hàng phát sinh trong ngày, tập trung vào các SKU có trọng số doanh thu lớn.
+        </div>
+        """, unsafe_allow_html=True)
 
     elif selected_kpi != "COMBO":
         df_r, team_tgt, title = build_report(df, report_date, targets, selected_kpi, filter_nv, mcp_df=mcp)
@@ -1405,6 +1421,14 @@ with tab_kpi:
         with c3: render_metric_card("📊 % MTD", pct_team)
         with c4: render_metric_card("🆕 Ngày", f"+{total_ngay}")
         st.markdown(render_html_table(df_r), unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="note-box">
+            <b>NHẬN XÉT & ĐÁNH GIÁ CHỈ SỐ {title}:</b><br>
+            • <b>Kết Quả Thực Hiện:</b> Theo dõi độ phủ phát sinh mới trong ngày và lũy kế MTD của từng nhân sự.<br>
+            • <b>Kế Hoạch Hành Động:</b> Hỗ trợ ĐDKD khắc phục các điểm nghẽn, đảm bảo bám sát tiến độ thời gian (Timegone) của tháng.
+        </div>
+        """, unsafe_allow_html=True)
     else:
         df_combo, target_off_total, target_on_total = build_combo_matrix(df, report_date, df_combo_off, df_combo_on, filter_nv)
         total_row = df_combo.iloc[-1]
@@ -1419,6 +1443,14 @@ with tab_kpi:
         with c3: render_metric_card("Phát sinh Ngày (OFF)", f"+{ngay_off}")
         with c4: render_metric_card("Phát sinh Ngày (ON)", f"+{ngay_on}")
         st.markdown(render_html_table(df_combo), unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="note-box">
+            <b>NHẬN XÉT & ĐÁNH GIÁ CHƯƠNG TRÌNH COMBO (OFF/ON):</b><br>
+            • <b>Hiệu Quả Triển Khai:</b> Đo lường số lượng cửa hàng phát sinh đơn hàng Combo theo từng kênh.<br>
+            • <b>Định Hướng Đôn Đốc:</b> Nhắc nhở đội ngũ sales đẩy mạnh các gói combo quà tặng / hàng khuyến mãi tại điểm bán nhằm kích cầu mua sắm.
+        </div>
+        """, unsafe_allow_html=True)
 
 def update_mcp_params():
     st.query_params["mcp_nv"] = ",".join(st.session_state.mcp_nv_input) if st.session_state.mcp_nv_input else ""
