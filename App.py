@@ -81,11 +81,11 @@ st.markdown("""
     .note-box {
         background: #ebf8ff;
         border-left: 4px solid #3182ce;
-        padding: 8px 12px;
+        padding: 10px 14px;
         border-radius: 0 6px 6px 0;
         margin-top: 10px;
         font-size: 12px;
-        line-height: 1.4;
+        line-height: 1.5;
     }
     
     [data-testid="stPopover"] button {
@@ -128,6 +128,42 @@ def render_metric_card(label, value):
         <div style="color: #c53030; font-weight: 800; font-size: 1.3rem;">{value}</div>
     </div>
     """, unsafe_allow_html=True)
+
+# ====================== HÀM TẠO NHẬN XÉT TOP 3 / BOTTOM 3 ======================
+def generate_top_bottom_analysis(df_source, name_col, pct_col):
+    if df_source is None or df_source.empty:
+        return "<br>• Không có dữ liệu để tổng hợp Top/Bottom."
+    
+    # Lọc bỏ dòng tổng cộng nếu có
+    df_clean = df_source[~df_source[name_col].astype(str).str.contains('TỔNG CỘNG|Tổng cộng', case=False, na=False)].copy()
+    if df_clean.empty:
+        return "<br>• Không đủ dữ liệu chi tiết nhân sự."
+        
+    # Chuẩn hóa cột % thành dạng số để sort
+    df_clean['__sort_val'] = df_clean[pct_col].astype(str).str.replace('%','').str.strip()
+    df_clean['__sort_val'] = pd.to_numeric(df_clean['__sort_val'], errors='coerce').fillna(0)
+    
+    df_sorted = df_clean.sort_values(by='__sort_val', ascending=False)
+    
+    # Lấy Top 3 (cao nhất)
+    top3 = df_sorted.head(3)
+    # Lấy Bottom 3 (thấp nhất, lấy ngược từ cuối lên)
+    bottom3 = df_sorted.tail(3).sort_values(by='__sort_val', ascending=True)
+    
+    top_str = ", ".join([f"<b>{r[name_col]}</b> ({r[pct_col]})" for _, r in top3.iterrows()])
+    bottom_str = ", ".join([f"<b>{r[name_col]}</b> ({r[pct_col]})" for _, r in bottom3.iterrows()])
+    
+    html_out = f"""
+    <br>• <b>Top 3 ĐDKD Dẫn Đầu:</b> {top_str}.<br>
+    • <b>Bottom 3 ĐDKD Cần Cải Thiện:</b> {bottom_str}.<br>
+    • <b>Đề Xuất Hành Động Cho 3 Bạn Bottom:</b>
+        <div style="margin-left: 15px; margin-top: 4px;">
+            1. <b>Rà soát lại lịch tuyến & danh sách cửa hàng chưa mua:</b> Lên danh sách cụ thể các điểm bán trọng điểm chưa phát sinh đơn hàng trong tuần/tháng để đi thị trường trực tiếp.<br>
+            2. <b>Đẩy mạnh sản phẩm trọng tâm / Combo kích cầu:</b> Tập trung tư vấn các chương trình khuyến mãi, gói combo quà tặng hoặc trưng bày đủ SKU để tăng tỷ lệ chốt đơn.<br>
+            3. <b>Đồng hành coaching thực chiến cùng SS:</b> Sắp xếp lịch đi tuyến chung (Field Coaching) trong 2-3 ngày tới để hỗ trợ kỹ năng xử lý từ chối và thuyết phục chủ cửa hàng.
+        </div>
+    """
+    return html_out
 
 # ====================== ĐƯỜNG DẪN ======================
 DATA_DIR = "data"
@@ -451,7 +487,7 @@ def build_report(df, report_date, targets, report_type, filter_nv=None, mcp_df=N
         on_mtd = df_mtd[df_mtd['L1'] == 'Kênh On Premise']
         mtd = on_mtd.groupby('Mã NVBH')['Mã CH'].nunique()
         df_today = df[df['date'] == report_date]
-        if filter_nv and filter_nv != "Tất cả ĐDKD": df_today = df_today[df_today['Tên NVBH'] == filter_nv]
+        if filter_nv and filter_nv != "Tất cả ĐDKD": df_today = df_today[df_today['Tên NVBH']==filter_nv]
         on_today = df_today[df_today['L1'] == 'Kênh On Premise']
         ngay = on_today.groupby('Mã NVBH')['Mã đơn hàng'].nunique()
         on_targets = {}
@@ -1168,7 +1204,7 @@ st.markdown(f"""
 <div class="main-header">
     <div class="logo">{logo_svg}</div>
     <div class="title-block">
-        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10</h1>
+        <h1>SƯ ĐOÀN HCM4 - TRUNG ĐOÀN 10 - TEST</h1>
         <h2>TRACKING KPI ĐDKD - TEAM SS TRƯƠNG THANH TÂN</h2>
     </div>
 </div>
@@ -1313,11 +1349,12 @@ with tab_kpi:
         
         st.markdown(render_summary_html_table(df_summary, selected_metrics), unsafe_allow_html=True)
         
+        top_bottom_summary_html = generate_top_bottom_analysis(df_summary, 'Tên NV', '% MTD (VIP)')
         st.markdown(f"""
         <div class="note-box">
             <b>NHẬN XÉT & ĐÁNH GIÁ TỔNG HỢP (THÁNG {report_date.strftime('%m/%Y')}):</b><br>
             • <b>Tổng Quan Chỉ Số:</b> Theo dõi sát sao các chỉ tiêu trọng yếu bao gồm VIP MCH, Combo OFF/ON và doanh số Cat/Brand.<br>
-            • <b>Định Hướng Đôn Đốc:</b> Tập trung tối ưu hóa độ phủ tại các nhóm cửa hàng chưa đạt tiến độ chuẩn để đảm bảo hoàn thành kế hoạch tháng.
+            {top_bottom_summary_html}
         </div>
         """, unsafe_allow_html=True)
         
@@ -1376,12 +1413,12 @@ with tab_kpi:
         
         st.markdown(render_visit_html_table(df_visit), unsafe_allow_html=True)
         
+        top_bottom_visit_html = generate_top_bottom_analysis(df_visit, 'Tên NVBH', 'Lịch VT - % Active')
         st.markdown(f"""
         <div class="note-box">
             <b>NHẬN XÉT & ĐÁNH GIÁ LỊCH VIẾNG THĂM {wname} - NGÀY {report_date.strftime('%d/%m/%Y')} (TUẦN ISO {iso_week} - {week_type_str}):</b><br>
             • <b>Phân Bổ Tuyến Viếng Thăm:</b> Kiểm soát chặt chẽ số lượng thực hiện so với tổng tuyến theo từng phân khúc <b>VIP 3, VIP 5, VIPSI, LẺ và ON</b>.<br>
-            • <b>Độ Phủ Active:</b> Theo dõi sát sao tỷ lệ % Active để thúc đẩy chỉ tiêu MTD toàn tuyến.<br>
-            • <b>Định Hướng Vận Hành:</b> Đôn đốc ĐDKD tập trung các điểm bán trọng điểm chưa mua hàng trong lịch tuyến ngày hôm nay.
+            {top_bottom_visit_html}
         </div>
         """, unsafe_allow_html=True)
 
@@ -1402,11 +1439,12 @@ with tab_kpi:
             df_display[col] = df_display[col].apply(lambda x: f"{x:,.0f}".replace(",", ".") if isinstance(x, (int, float)) and x > 0 else ("0" if x == 0 else x))
         st.markdown(render_html_table(df_display), unsafe_allow_html=True)
         
+        top_bottom_turnover_html = generate_top_bottom_analysis(df_r, 'Tên NVBH', '% MTD')
         st.markdown(f"""
         <div class="note-box">
             <b>NHẬN XÉT & ĐÁNH GIÁ DOANH SỐ TURNOVER:</b><br>
             • <b>Tiến Độ Thực Hiện:</b> Đánh giá mức độ hoàn thành doanh số MTD so với chỉ tiêu giao cho từng ĐDKD.<br>
-            • <b>Giải Pháp Thúc Đẩy:</b> Đẩy mạnh các đơn hàng phát sinh trong ngày, tập trung vào các SKU có trọng số doanh thu lớn.
+            {top_bottom_turnover_html}
         </div>
         """, unsafe_allow_html=True)
 
@@ -1422,11 +1460,12 @@ with tab_kpi:
         with c4: render_metric_card("🆕 Ngày", f"+{total_ngay}")
         st.markdown(render_html_table(df_r), unsafe_allow_html=True)
         
+        top_bottom_kpi_html = generate_top_bottom_analysis(df_r, 'Tên NVBH', '% MTD')
         st.markdown(f"""
         <div class="note-box">
             <b>NHẬN XÉT & ĐÁNH GIÁ CHỈ SỐ {title}:</b><br>
             • <b>Kết Quả Thực Hiện:</b> Theo dõi độ phủ phát sinh mới trong ngày và lũy kế MTD của từng nhân sự.<br>
-            • <b>Kế Hoạch Hành Động:</b> Hỗ trợ ĐDKD khắc phục các điểm nghẽn, đảm bảo bám sát tiến độ thời gian (Timegone) của tháng.
+            {top_bottom_kpi_html}
         </div>
         """, unsafe_allow_html=True)
     else:
@@ -1444,11 +1483,12 @@ with tab_kpi:
         with c4: render_metric_card("Phát sinh Ngày (ON)", f"+{ngay_on}")
         st.markdown(render_html_table(df_combo), unsafe_allow_html=True)
         
+        top_bottom_combo_html = generate_top_bottom_analysis(df_combo, 'Tên NVBH', '% MTD (OFF)')
         st.markdown(f"""
         <div class="note-box">
             <b>NHẬN XÉT & ĐÁNH GIÁ CHƯƠNG TRÌNH COMBO (OFF/ON):</b><br>
             • <b>Hiệu Quả Triển Khai:</b> Đo lường số lượng cửa hàng phát sinh đơn hàng Combo theo từng kênh.<br>
-            • <b>Định Hướng Đôn Đốc:</b> Nhắc nhở đội ngũ sales đẩy mạnh các gói combo quà tặng / hàng khuyến mãi tại điểm bán nhằm kích cầu mua sắm.
+            {top_bottom_combo_html}
         </div>
         """, unsafe_allow_html=True)
 
