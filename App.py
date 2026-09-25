@@ -2501,26 +2501,48 @@ with tab_kpi:
     )
 
   elif selected_kpi == 'VISIT':
-    # ===== TÍNH TUẦN ISO (CHẴN / LẺ) =====
+    # ===== TỰ NHẬN THỨ + TUẦN ISO CHẴN/LẺ TỪ NGÀY CHỌN =====
     iso_year, iso_week, iso_weekday = report_date.isocalendar()
     week_type = 'Tuần Chẵn' if iso_week % 2 == 0 else 'Tuần Lẻ'
+    wday = report_date.weekday()  # 0=Mon ... 6=Sun
+
+    weekday_map = {
+        0: 'THỨ HAI',
+        1: 'THỨ BA',
+        2: 'THỨ TƯ',
+        3: 'THỨ NĂM',
+        4: 'THỨ SÁU',
+        5: 'THỨ BẢY',
+        6: 'CHỦ NHẬT',
+    }
+    wname = weekday_map.get(wday, '')
+
+    # Map thứ → mã chu kỳ viếng thăm tương ứng
+    # Thứ 2/5 → 2 + 25 | Thứ 3/6 → 3 + 36 | Thứ 4/7 → 4 + 47
+    auto_thu_map = {
+        0: ['2', '25'],   # Thứ 2
+        1: ['3', '36'],   # Thứ 3
+        2: ['4', '47'],   # Thứ 4
+        3: ['5', '25'],   # Thứ 5
+        4: ['6', '36'],   # Thứ 6
+        5: ['7', '47'],   # Thứ 7
+        6: [],            # Chủ nhật
+    }
+    auto_thu = auto_thu_map.get(wday, [])
+
+    # Khi đổi NGÀY → tự reset filter theo thứ của ngày đó
+    date_key = report_date.strftime('%Y-%m-%d')
+    if st.session_state.get('visit_last_date') != date_key:
+      st.session_state['visit_last_date'] = date_key
+      st.session_state['visit_thu_input'] = auto_thu
+      st.query_params['visit_thu'] = ','.join(auto_thu)
 
     saved_visit_thu = st.query_params.get('visit_thu', '')
     default_visit_thu_list = (
         [x.strip() for x in saved_visit_thu.split(',') if x.strip()]
         if saved_visit_thu
-        else []
+        else auto_thu
     )
-
-    # Auto gợi ý chu kỳ theo thứ trong tuần nếu chưa chọn
-    if not default_visit_thu_list and report_date:
-      wday = report_date.weekday()  # 0=Mon ... 6=Sun
-      if wday in [0, 3]:      # Thứ 2, Thứ 5
-        default_visit_thu_list = ['25']
-      elif wday in [1, 4]:    # Thứ 3, Thứ 6
-        default_visit_thu_list = ['36']
-      elif wday in [2, 5]:    # Thứ 4, Thứ 7
-        default_visit_thu_list = ['47']
 
     def update_visit_params():
       st.query_params['visit_thu'] = (
@@ -2529,7 +2551,7 @@ with tab_kpi:
           else ''
       )
 
-    col_f_thu_v, col_week_info = st.columns([1, 1.5])
+    col_f_thu_v, col_week_info = st.columns([1, 1.2])
     with col_f_thu_v:
       st.markdown(
           '<p class="filter-label">📅 Lọc Theo Thứ / Chu kỳ Viếng Thăm (Chọn'
@@ -2551,7 +2573,7 @@ with tab_kpi:
           (
               '<div style="background:#ebf8ff;border:1px solid #bee3f8;border-radius:8px;'
               'padding:10px 14px;margin-top:18px;text-align:center;">'
-              f'<div style="font-size:12px;color:#2b6cb0;font-weight:700;">📅 Tuần ISO {iso_week}/{iso_year}</div>'
+              f'<div style="font-size:12px;color:#2b6cb0;font-weight:700;">📅 {wname} | Tuần ISO {iso_week}/{iso_year}</div>'
               f'<div style="font-size:15px;color:#c53030;font-weight:800;margin-top:2px;">{week_type}</div>'
               '</div>'
           ),
@@ -2578,17 +2600,6 @@ with tab_kpi:
         on_t,
         title_v,
     ) = build_visit_report(mcp, df, report_date, filter_nv, f_thu_visit)
-
-    weekday_map = {
-        0: 'THỨ HAI',
-        1: 'THỨ BA',
-        2: 'THỨ TƯ',
-        3: 'THỨ NĂM',
-        4: 'THỨ SÁU',
-        5: 'THỨ BẢY',
-        6: 'CHỦ NHẬT',
-    }
-    wname = weekday_map.get(report_date.weekday(), '')
 
     st.markdown(
         f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px;'
