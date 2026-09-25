@@ -991,7 +991,7 @@ def build_summary_report(df, report_date, df_combo_off_raw, df_combo_on_raw, cat
         brand_pct = round(brand_act / brand_tgt * 100, 1) if brand_tgt else 0
         brand_ct = float(brand_ctds_map.get(nv, 0.0))
         brand_m = float(brand_mtd_map.get(nv, 0.0))
-        brand_m_pct = round(brand_m / brand_ct * 100, 1) if cat_ct else 0
+        brand_m_pct = round(brand_m / brand_ct * 100, 1) if brand_ct else 0
         
         rows.append({
             'Tên NV': nv,
