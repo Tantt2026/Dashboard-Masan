@@ -18,7 +18,7 @@ logo_svg = """
 <title>Masan Group logo</title>
 <path d="M490.29,502.16s17.83-12.81,45.76-12.93c25.9-.11,30.18,8.14,38,10.79,0,0-3.8,5.82-5.78,9.63s-13.32,17.93-26.5,22.21c0,0,18.71-15.72,21.55-27.57,0,0-26.87-20.43-73.26-1.92" transform="translate(-432.92 -481.05)" style="fill:#f36f21"/>
 <path d="M521.55,489.11c42-10.64,59.59,9.56,59.59,9.56A60.39,60.39,0,0,1,561,521.3c11.28-1.28,21.79-13,24-16.69s6.16-9.17,6.16-9.17c-7.12-3.22-13.13-12-35.93-14.22-16.3-1.59-33.6,7.88-33.6,7.88" transform="translate(-432.92 -481.05)" style="fill:#034ea2"/>
-<path d="M454.12,528V512.92a58.92,58.92,0,0,1-.15-6.31l-.06,0-7.1,21.11h-3.41l-7.25-21h-.09c0,2.33.1,5.52.09,6.28v15h-3.24V502.39h4.8L445.1,524h.07l7.17-21.31h5V528Z" transform="translate(-432.92 -481.05)" style="fill:#034ea2"/>
+<path d="M454.12,528V512.92a58.92,58.92,0,0_0.15-6.31l-.06,0-7.1,21.11h-3.41l-7.25-21h-.09c0,2.33.1,5.52.09,6.28v15h-3.24V502.39h4.8L445.1,524h.07l7.17-21.31h5V528Z" transform="translate(-432.92 -481.05)" style="fill:#034ea2"/>
 <path d="M465.15,515c.21-1.42.7-3.56,4.21-3.58,2.94,0,4.35,1,4.37,3s-.87,2.12-1.62,2.19l-5.11.65c-5.13.67-5.58,4.26-5.57,5.81,0,3.16,2.42,5.3,5.8,5.29a8.32,8.32,0,0,0,6.64-3c.12,1.42.55,2.82,3.3,2.81a6.24,6.24,0,0,0,1.69-.36v-2.26a4.84,4.84,0,0,1-1,.14c-.63,0-1-.3-1-1.09l-.05-10.6c0-4.73-5.37-5.13-6.85-5.13-4.54,0-7.47,1.76-7.6,6.17Zm8.42,6.37c0,2.48-2.85,4.35-5.74,4.36-2.35,0-3.38-1.17-3.39-3.19,0-2.32,2.42-2.8,4-3,3.86-.52,4.64-.78,5.15-1.18Z" transform="translate(-432.92 -481.05)" style="fill:#034ea2"/>
 <path d="M492.47,514.47c0-1.17-.47-3.12-4.44-3.1-1,0-3.7.34-3.7,2.64,0,1.53,1,1.88,3.4,2.46l3.14.77c3.89.94,5.27,2.35,5.27,4.87,0,3.83-3.15,6.14-7.37,6.16-7.39,0-7.94-4.21-8-6.44h3c.11,1.45.55,3.78,5,3.75,2.24,0,4.27-.89,4.26-3,0-1.47-1-2-3.72-2.63l-3.65-.88c-2.59-.62-4.31-1.91-4.34-4.46,0-4.09,3.39-6,7.05-6,6.66,0,7.17,4.87,7.17,5.78Z" transform="translate(-432.92 -481.05)" style="fill:#034ea2"/>
 <path d="M502.6,514.75c.2-1.42.68-3.58,4.2-3.6,2.91,0,4.33,1.06,4.33,3s-.86,2.13-1.61,2.18l-5.1.66c-5.11.65-5.57,4.27-5.56,5.79,0,3.19,2.41,5.31,5.79,5.31a8.34,8.34,0,0,0,6.63-3c.11,1.41.53,2.83,3.28,2.8a5.87,5.87,0,0,0,1.68-.35l0-2.26a6.5,6.5,0,0,1-1,.15c-.62,0-1-.32-1-1.1l0-10.61c0-4.72-5.35-5.11-6.83-5.11-4.53,0-7.44,1.76-7.56,6.16Zm8.36,6.49c0,2.47-2.82,4.36-5.74,4.37-2.35,0-3.37-1.18-3.39-3.18,0-2.34,2.44-2.8,4-3,3.87-.51,4.65-.8,5.14-1.2Z" transform="translate(-432.92 -481.05)" style="fill:#034ea2"/>
@@ -104,13 +104,16 @@ st.markdown(
         margin-bottom: 2px;
     }
     .note-box {
-        background: #ebf8ff;
-        border-left: 4px solid #3182ce;
-        padding: 8px 12px;
-        border-radius: 0 6px 6px 0;
-        margin-top: 10px;
-        font-size: 12px;
-        line-height: 1.4;
+        background: #f0f4f8;
+        border: 1px solid #d1d5db;
+        border-left: 5px solid #034ea2;
+        padding: 14px 18px;
+        border-radius: 8px;
+        margin-top: 12px;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #1a202c;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
     
     [data-testid="stPopover"] button {
@@ -2480,11 +2483,12 @@ with tab_kpi:
     st.markdown(
         f"""
         <div class="note-box">
-            <b>NHẬN XÉT BÁO CÁO TỔNG HỢP:</b><br>
-            • Tổng số lượng cửa hàng VIP (VIP3, VIP5, VIPSI) toàn đội: <b>{tot_row_s['VIP MCH']:,} cửa hàng</b> (Đã mua: {tot_row_s['Đã Mua (VIP)']:,}).<br>
-            • Tổng KH tham gia Combo OFF: <b>{tot_row_s['KH Combo OFF']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (OFF)']:,}) | Combo ON: <b>{tot_row_s['KH Combo ON']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (ON)']:,}).<br>
-            • MBS Category (Outlet): <b>{tot_row_s['MBS Cat']:,} CH</b> | MBS Brand (Outlet): <b>{tot_row_s['MBS Brand']:,} CH</b>.<br>
-            • Đã áp dụng chuẩn xác bộ lọc Ngày & Thứ.
+            <div style="font-weight: 800; color: #034ea2; margin-bottom: 8px; font-size: 13.5px;">NHẬN XÉT & ĐÁNH GIÁ BÁO CÁO TỔNG HỢP:</div>
+            <ul style="margin: 0; padding-left: 18px; line-height: 1.6;">
+                <li><b>Kết Quả Tổng Quan:</b> Tổng số lượng cửa hàng VIP (VIP3, VIP5, VIPSI) toàn đội đạt <b>{tot_row_s['VIP MCH']:,} cửa hàng</b> (Đã mua: {tot_row_s['Đã Mua (VIP)']:,}).</li>
+                <li><b>Chương Trình Combo & MBS:</b> Tổng KH tham gia Combo OFF: <b>{tot_row_s['KH Combo OFF']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (OFF)']:,}) | Combo ON: <b>{tot_row_s['KH Combo ON']:,} CH</b> (Đã mua: {tot_row_s['Đã Mua (ON)']:,}). MBS Category: <b>{tot_row_s['MBS Cat']:,} CH</b> | MBS Brand: <b>{tot_row_s['MBS Brand']:,} CH</b>.</li>
+                <li><b>Đề Xuất Hành Động:</b> Tiếp tục bám sát lịch tuyến, đẩy mạnh các nhóm cửa hàng chưa phát sinh và đôn đốc các ĐDKD hoàn thành toàn diện các chỉ tiêu trong tháng {report_date.strftime('%m/%Y')}.</li>
+            </ul>
         </div>
         """,
         unsafe_allow_html=True,
@@ -2591,9 +2595,12 @@ with tab_kpi:
     st.markdown(
         f"""
         <div class="note-box">
-            <b>NHẬN XÉT & ĐÁNH GIÁ LỊCH VIẾNG THĂM {wname} - NGÀY {report_date.strftime('%d/%m/%Y')}:</b><br>
-            • <b>Theo dõi Active từng nhóm cửa hàng:</b> Cập nhật liên tục tỷ lệ mua hàng thực tế so với lịch tuyến viếng thăm.<br>
-            • <b>Trọng Tâm Vận Hành:</b> Ưu tiên bám sát các nhóm VIP và Kênh ON Premise để đảm bảo đạt chuẩn bao phủ và tối ưu sản lượng.
+            <div style="font-weight: 800; color: #034ea2; margin-bottom: 8px; font-size: 13.5px;">NHẬN XÉT & ĐÁNH GIÁ LỊCH VIẾNG THĂM {wname}:</div>
+            <ul style="margin: 0; padding-left: 18px; line-height: 1.6;">
+                <li><b>Kết Quả Thực Hiện:</b> Theo dõi sát sao tỷ lệ mua hàng thực tế (Active) so với lịch tuyến viếng thăm trong ngày {report_date.strftime('%d/%m/%Y')}.</li>
+                <li><b>Trọng Tâm Vận Hành:</b> Ưu tiên bám sát các nhóm cửa hàng VIP và Kênh ON Premise để đảm bảo đạt chuẩn bao phủ và tối ưu sản lượng.</li>
+                <li><b>Đề Xuất Hành Động:</b> SS đồng hành cùng các ĐDKD đi thị trường (Field Coaching) trực tiếp tại các tuyến có tỷ lệ active chưa đạt yêu cầu.</li>
+            </ul>
         </div>
         """,
         unsafe_allow_html=True,
@@ -2662,10 +2669,13 @@ with tab_kpi:
     st.markdown(
         f"""
         <div class="note-box">
-            <b>NHẬN XÉT ({title} - {report_date.strftime('%d/%m/%Y')}):</b><br>
-            • Tổng Doanh Số MTD: <b>{total_mtd:,.0f} / {team_tgt:,.0f} VNĐ ({pct_team})</b> | Thực hiện ngày: <b>{total_today:,.0f} VNĐ</b>.<br>
-            • <b>Top 3 ĐDKD dẫn đầu:</b> {top3_text}<br>
-            • <b>Top 3 ĐDKD cần đôn đốc:</b> {bottom3_text}
+            <div style="font-weight: 800; color: #034ea2; margin-bottom: 8px; font-size: 13.5px;">NHẬN XÉT & ĐÁNH GIÁ {title}:</div>
+            <ul style="margin: 0; padding-left: 18px; line-height: 1.6;">
+                <li><b>Kết Quả Thực Hiện:</b> Đạt {total_mtd:,.0f} / {team_tgt:,.0f} VNĐ ({pct_team} MTD). Thực hiện ngày: {total_today:,.0f} VNĐ.</li>
+                <li><b>Top 3 ĐDKD Dẫn Đầu:</b> {top3_text}.</li>
+                <li><b>Bottom 3 ĐDKD Cần Cải Thiện:</b> {bottom3_text}.</li>
+                <li><b>Đề Xuất Hành Động Cho 3 Bạn Bottom:</b> Tập trung rà soát doanh số khách hàng trọng điểm, thúc đẩy đơn hàng lớn và SS hỗ trợ trực tiếp tại tuyến.</li>
+            </ul>
         </div>
         """,
         unsafe_allow_html=True,
@@ -2716,10 +2726,13 @@ with tab_kpi:
     st.markdown(
         f"""
         <div class="note-box">
-            <b>NHẬN XÉT ({title} - {report_date.strftime('%d/%m/%Y')}):</b><br>
-            • Tiến độ MTD: <b>{total_mtd}/{team_tgt} ({pct_team})</b>. Phát sinh ngày: <b>+{total_ngay}</b>.<br>
-            • <b>Top 3:</b> {top3_text}<br>
-            • <b>Bottom 3:</b> {bottom3_text}
+            <div style="font-weight: 800; color: #034ea2; margin-bottom: 8px; font-size: 13.5px;">NHẬN XÉT & ĐÁNH GIÁ CHỈ SỐ {title.upper()}:</div>
+            <ul style="margin: 0; padding-left: 18px; line-height: 1.6;">
+                <li><b>Kết Quả Thực Hiện:</b> Đạt {total_mtd:,} / {team_tgt:,} ({pct_team} MTD). Phát sinh ngày: +{total_ngay}.</li>
+                <li><b>Top 3 ĐDKD Dẫn Đầu:</b> {top3_text}.</li>
+                <li><b>Bottom 3 ĐDKD Cần Cải Thiện:</b> {bottom3_text}.</li>
+                <li><b>Đề Xuất Hành Động Cho 3 Bạn Bottom:</b> Tập trung rà soát tuyến chưa mua, đẩy mạnh combo kích cầu và SS đồng hành đi thị trường (Field Coaching) trong 2 ngày tới.</li>
+            </ul>
         </div>
         """,
         unsafe_allow_html=True,
@@ -2770,14 +2783,37 @@ with tab_kpi:
     with c4:
       render_metric_card('Phát sinh Ngày (ON)', f'+{ngay_on}')
 
+    df_eval_off = df_combo.iloc[:-1].copy()
+    df_eval_off['_pct_val_off'] = (
+        df_eval_off['% MTD (OFF)'].str.replace('%', '').astype(float)
+    )
+    df_sorted_off = df_eval_off.sort_values(
+        by='_pct_val_off', ascending=False
+    )
+    top3_off = df_sorted_off.head(3)
+    bottom3_off = df_sorted_off.tail(3).iloc[::-1]
+
+    top3_off_text = ', '.join(
+        [f"{r['Tên NVBH']} ({r['% MTD (OFF)']})" for _, r in top3_off.iterrows()]
+    )
+    bottom3_off_text = ', '.join(
+        [
+            f"{r['Tên NVBH']} ({r['% MTD (OFF)']})"
+            for _, r in bottom3_off.iterrows()
+        ]
+    )
+
     st.markdown(render_html_table(df_combo), unsafe_allow_html=True)
     st.markdown(
         f"""
         <div class="note-box">
-            <b>NHẬN XÉT BÁO CÁO COMBO LŨY KẾ (MATRIX OFF/ON):</b><br>
-            • <b>Kênh OFF:</b> Đạt <b>{total_off:,} / {target_off_total:,} CH ({pct_off_team}%)</b> | Phát sinh mới trong ngày: <b>+{ngay_off} CH</b>.<br>
-            • <b>Kênh ON:</b> Đạt <b>{total_on:,} / {target_on_total:,} CH ({pct_on_team}%)</b> | Phát sinh mới trong ngày: <b>+{ngay_on} CH</b>.<br>
-            • Đã sắp xếp danh sách theo <b>% MTD (OFF) từ thấp đến cao</b> để bro dễ dàng tracking các ĐDKD cần đôn đốc.
+            <div style="font-weight: 800; color: #034ea2; margin-bottom: 8px; font-size: 13.5px;">NHẬN XÉT & ĐÁNH GIÁ BÁO CÁO ĐH COMBO (MATRIX OFF/ON):</div>
+            <ul style="margin: 0; padding-left: 18px; line-height: 1.6;">
+                <li><b>Kết Quả Thực Hiện:</b> Kênh OFF đạt <b>{total_off:,} / {target_off_total:,} CH ({pct_off_team}%)</b> (Phát sinh ngày: +{ngay_off} CH) | Kênh ON đạt <b>{total_on:,} / {target_on_total:,} CH ({pct_on_team}%)</b> (Phát sinh ngày: +{ngay_on} CH).</li>
+                <li><b>Top 3 ĐDKD Dẫn Đầu (OFF):</b> {top3_off_text}.</li>
+                <li><b>Bottom 3 ĐDKD Cần Cải Thiện (OFF):</b> {bottom3_off_text}.</li>
+                <li><b>Đề Xuất Hành Động Cho 3 Bạn Bottom:</b> Tập trung rà soát các cửa hàng trong danh sách combo chưa phát sinh đơn hàng, kiểm tra trưng bày sản phẩm và kích hoạt chương trình khuyến mại đẩy mạnh doanh số.</li>
+            </ul>
         </div>
         """,
         unsafe_allow_html=True,
