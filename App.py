@@ -427,6 +427,34 @@ def filter_by_thu_multi(df, col_thu, f_thu_list):
   return df[mask]
 
 
+def filter_by_odd_week(df, report_date):
+  """Lọc cửa hàng theo tuần chẵn/lẻ ISO dựa trên cột ODD_WEEK.
+  - Tuần lẻ (ISO week % 2 == 1): giữ Odd Week + Both
+  - Tuần chẵn (ISO week % 2 == 0): giữ Even Week + Both
+  """
+  if df is None or df.empty or report_date is None:
+    return df
+  col = find_col(df, ['ODD_WEEK', 'Odd_Week', 'Odd Week', 'WEEK_TYPE', 'Week Type'])
+  if not col:
+    return df
+
+  iso_week = report_date.isocalendar()[1]
+  is_odd = (iso_week % 2 == 1)
+
+  s = df[col].astype(str).str.strip().str.lower()
+  # Both / trống / nan → luôn giữ
+  both_mask = (
+      s.isin(['both', 'cả hai', 'all', 'nan', 'none', ''])
+      | df[col].isna()
+  )
+  if is_odd:
+    week_mask = s.str.contains('odd', na=False) | s.str.contains('lẻ', na=False)
+  else:
+    week_mask = s.str.contains('even', na=False) | s.str.contains('chẵn', na=False) | s.str.contains('chan', na=False)
+
+  return df[both_mask | week_mask]
+
+
 def process_mcp_sales(df_rpt, df_mcp):
   if df_mcp.empty or df_rpt.empty:
     return df_mcp
@@ -1007,6 +1035,9 @@ def build_visit_report(
   if f_thu_list:
     c_thu = find_col(mcp_f, ['Thứ', 'Frequency', 'Tần suất'])
     mcp_f = filter_by_thu_multi(mcp_f, c_thu, f_thu_list)
+
+  # Lọc theo tuần chẵn/lẻ ISO (cột ODD_WEEK)
+  mcp_f = filter_by_odd_week(mcp_f, report_date)
 
   c_nv_name = (
       find_col(mcp_f, ['SM Name', 'SM name', 'Tên NVBH', 'Nhân viên'])
