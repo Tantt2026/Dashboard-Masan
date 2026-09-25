@@ -610,7 +610,7 @@ def build_turnover_report(df, report_date, turnover_targets, filter_nv=None):
     }])
     return pd.concat([df_out, total_row], ignore_index=True), team_tgt, "8. BÁO CÁO DOANH SỐ TURNOVER"
 
-# ====================== HÀM BÁO CÁO LỊCH VIẾNG THĂM (CHUẨN THEO MẪU HÌNH ẢNH) ======================
+# ====================== HÀM BÁO CÁO LỊCH VIẾNG THĂM ======================
 def build_visit_report(df_mcp, report_date, filter_nv=None, f_thu_list=None):
     if df_mcp.empty:
         return pd.DataFrame(), "10. BÁO CÁO LỊCH VIẾNG THĂM"
@@ -640,17 +640,12 @@ def build_visit_report(df_mcp, report_date, filter_nv=None, f_thu_list=None):
         
         total_visit_today = sub[c_ma_col].nunique()
         
-        # Nhóm VIP3
         v3 = sub[sub[c_vip].astype(str).str.strip() == 'VIP3'][c_ma_col].nunique() if c_vip else 0
-        # Nhóm VIP5
         v5 = sub[sub[c_vip].astype(str).str.strip() == 'VIP5'][c_ma_col].nunique() if c_vip else 0
-        # Nhóm VIPSI
         vsi = sub[sub[c_vip].astype(str).str.strip() == 'VIPSI'][c_ma_col].nunique() if c_vip else 0
         
-        # Kênh ON
         on_cnt = sub[sub[c_l1].astype(str).str.contains('On', case=False, na=False)][c_ma_col].nunique() if c_l1 else 0
         
-        # CH Lẻ (Off Premise và không phải VIP3, VIP5, VIPSI)
         off_sub = sub[~sub[c_l1].astype(str).str.contains('On', case=False, na=False)] if c_l1 else sub
         if c_vip:
             ch_le = off_sub[~off_sub[c_vip].astype(str).str.strip().isin(['VIP3', 'VIP5', 'VIPSI'])][c_ma_col].nunique()
@@ -1104,13 +1099,15 @@ def render_summary_html_table(df, selected_metrics):
                 val = format_scaled_thousand(val)
                 
             is_pct = '%' in col
-            style_bg = color_pct_bg(val) if is_pct and not is_total else ''
+            # ĐÃ FIX: Cho phép style_bg tính cho cả dòng tổng cộng để lấy đúng màu nền theo % MTD
+            style_bg = color_pct_bg(val) if is_pct else ''
             
             if is_total:
                 if col in ['CT DS (Cat)', 'MTD (Cat)', 'CT DS (Brand)', 'MTD (Brand)']:
                     html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: right; white-space: nowrap;">{val}</td>')
                 elif is_pct:
-                    html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important; color: #c53030 !important;">{val}</td>')
+                    # Giữ nguyên background theo color_pct_bg và ép in đậm font-weight: 900 !important cho dòng tổng cộng
+                    html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important;">{val}</td>')
                 else:
                     align = 'left' if col == 'Tên NV' else 'center'
                     html.append(f'<td style="background-color: #fff5f5; color: #c53030 !important; font-weight: 900 !important; text-align: {align}; white-space: nowrap;">{val}</td>')
@@ -1145,7 +1142,7 @@ def render_html_table(df):
             if col in ['% MTD', '% MTD (OFF)', '% MTD (ON)', '% Hoàn Thành']:
                 style_bg = color_pct_bg(val)
                 if is_total:
-                    html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important; color: #c53030 !important;">{val}</td>')
+                    html.append(f'<td style="{style_bg} text-align: center; font-weight: 900 !important;">{val}</td>')
                 else:
                     html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
             elif is_total:
