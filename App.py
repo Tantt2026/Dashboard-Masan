@@ -2601,34 +2601,21 @@ with tab_kpi:
           else ''
       )
 
-    col_f_thu_v, col_week_info = st.columns([1, 1.2])
-    with col_f_thu_v:
-      st.markdown(
-          '<p class="filter-label">📅 Lọc Theo Thứ / Chu kỳ Viếng Thăm (Chọn'
-          ' nhiều)</p>',
-          unsafe_allow_html=True,
-      )
-      thu_opts = ['2', '3', '4', '5', '6', '7', '25', '36', '47']
-      valid_visit_thu = [t for t in default_visit_thu_list if t in thu_opts]
-      f_thu_visit = st.multiselect(
-          '',
-          thu_opts,
-          default=valid_visit_thu,
-          key='visit_thu_input',
-          on_change=update_visit_params,
-          label_visibility='collapsed',
-      )
-    with col_week_info:
-      st.markdown(
-          (
-              '<div style="background:#ebf8ff;border:1px solid #bee3f8;border-radius:8px;'
-              'padding:10px 14px;margin-top:18px;text-align:center;">'
-              f'<div style="font-size:12px;color:#2b6cb0;font-weight:700;">📅 {wname} | Tuần ISO {iso_week}/{iso_year}</div>'
-              f'<div style="font-size:15px;color:#c53030;font-weight:800;margin-top:2px;">{week_type}</div>'
-              '</div>'
-          ),
-          unsafe_allow_html=True,
-      )
+    st.markdown(
+        '<p class="filter-label">📅 Lọc Theo Thứ / Chu kỳ Viếng Thăm (Chọn'
+        ' nhiều)</p>',
+        unsafe_allow_html=True,
+    )
+    thu_opts = ['2', '3', '4', '5', '6', '7', '25', '36', '47']
+    valid_visit_thu = [t for t in default_visit_thu_list if t in thu_opts]
+    f_thu_visit = st.multiselect(
+        '',
+        thu_opts,
+        default=valid_visit_thu,
+        key='visit_thu_input',
+        on_change=update_visit_params,
+        label_visibility='collapsed',
+    )
 
     st.query_params['visit_thu'] = (
         ','.join(st.session_state.visit_thu_input)
@@ -2650,12 +2637,6 @@ with tab_kpi:
         on_t,
         title_v,
     ) = build_visit_report(mcp, df, report_date, filter_nv, f_thu_visit)
-
-    st.caption(
-        f'🔎 Đã lọc theo {wname} + {week_type} (ISO tuần {iso_week}/{iso_year})'
-        f' | Cột ODD_WEEK: chỉ lấy '
-        f'{"Odd Week + Both" if iso_week % 2 == 1 else "Even Week + Both"}'
-    )
 
     st.markdown(
         f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px;'
