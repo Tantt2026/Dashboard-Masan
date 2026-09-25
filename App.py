@@ -128,7 +128,7 @@ st.markdown(
     .custom-kpi-table {
         width: 100%;
         border-collapse: collapse;
-        border: 1px solid #e2e8f0 !important;
+        border: 1px solid #bce2f5 !important;
         font-family: sans-serif;
         font-size: 11px;
         background-color: #ffffff;
@@ -138,13 +138,19 @@ st.markdown(
         color: #ffffff !important;
         font-weight: bold !important;
         text-align: center !important;
-        border: 1px solid #cbd5e0 !important;
+        border: 1px solid #90cdf4 !important;
         padding: 6px 5px;
         white-space: nowrap;
     }
     .custom-kpi-table td {
-        border: 1px solid #e2e8f0 !important;
+        border: 1px solid #bce2f5 !important;
         padding: 5px 6px;
+    }
+    .custom-kpi-table tbody tr:nth-child(even) {
+        background-color: #e6f4fc !important;
+    }
+    .custom-kpi-table tbody tr:nth-child(odd) {
+        background-color: #ffffff !important;
     }
 </style>
 """,
