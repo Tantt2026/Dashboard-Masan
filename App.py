@@ -434,25 +434,44 @@ def filter_by_odd_week(df, report_date):
   """
   if df is None or df.empty or report_date is None:
     return df
+
+  # Tìm cột ODD_WEEK (nhiều biến thể tên)
   col = find_col(df, ['ODD_WEEK', 'Odd_Week', 'Odd Week', 'WEEK_TYPE', 'Week Type'])
+  if not col:
+    for c in df.columns:
+      cl = str(c).lower().replace(' ', '').replace('_', '')
+      if 'oddweek' in cl or (cl == 'oddweek') or ('odd' in cl and 'week' in cl):
+        col = c
+        break
   if not col:
     return df
 
-  iso_week = report_date.isocalendar()[1]
-  is_odd = (iso_week % 2 == 1)
+  iso_week = int(report_date.isocalendar()[1])
+  is_odd_week = (iso_week % 2 == 1)  # 1,3,5... = Tuần Lẻ
 
-  s = df[col].astype(str).str.strip().str.lower()
-  # Both / trống / nan → luôn giữ
-  both_mask = (
-      s.isin(['both', 'cả hai', 'all', 'nan', 'none', ''])
-      | df[col].isna()
+  # Chuẩn hoá giá trị
+  raw = df[col]
+  s = (
+      raw.astype(str)
+      .str.strip()
+      .str.lower()
+      .str.replace('_', ' ', regex=False)
+      .str.replace(r'\s+', ' ', regex=True)
   )
-  if is_odd:
-    week_mask = s.str.contains('odd', na=False) | s.str.contains('lẻ', na=False)
-  else:
-    week_mask = s.str.contains('even', na=False) | s.str.contains('chẵn', na=False) | s.str.contains('chan', na=False)
 
-  return df[both_mask | week_mask]
+  both_mask = (
+      s.isin(['both', 'cả hai', 'ca hai', 'all', 'nan', 'none', '', 'nat'])
+      | raw.isna()
+  )
+  odd_mask = s.isin(['odd week', 'odd', 'tuần lẻ', 'tuan le', 'lẻ', 'le'])
+  even_mask = s.isin(['even week', 'even', 'tuần chẵn', 'tuan chan', 'chẵn', 'chan'])
+
+  if is_odd_week:
+    keep = both_mask | odd_mask
+  else:
+    keep = both_mask | even_mask
+
+  return df.loc[keep].copy()
 
 
 def process_mcp_sales(df_rpt, df_mcp):
@@ -2631,6 +2650,12 @@ with tab_kpi:
         on_t,
         title_v,
     ) = build_visit_report(mcp, df, report_date, filter_nv, f_thu_visit)
+
+    st.caption(
+        f'🔎 Đã lọc theo {wname} + {week_type} (ISO tuần {iso_week}/{iso_year})'
+        f' | Cột ODD_WEEK: chỉ lấy '
+        f'{"Odd Week + Both" if iso_week % 2 == 1 else "Even Week + Both"}'
+    )
 
     st.markdown(
         f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px;'
