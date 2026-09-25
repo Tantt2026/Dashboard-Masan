@@ -114,27 +114,18 @@ st.markdown(
         vertical-align: middle !important;
         background-color: #ffffff;
     }
-    .custom-kpi-table th.sticky-col-1, .custom-kpi-table td.sticky-col-1 {
-        position: sticky; left: 0; z-index: 10;
-    }
-    .custom-kpi-table th.sticky-col-2, .custom-kpi-table td.sticky-col-2 {
-        position: sticky; left: 40px; z-index: 10;
-    }
-    .custom-kpi-table th.sticky-col-3, .custom-kpi-table td.sticky-col-3 {
-        position: sticky; left: 125px; z-index: 10;
-    }
 </style>
 """,
     unsafe_allow_html=True,
 )
 
 
-def render_metric_card(label, value):
+def render_metric_card(label, value, sub_val=None):
   st.markdown(
       f"""
-    <div style="background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 6px; padding: 8px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.04); margin-bottom: 6px;">
-        <div style="color: #c53030; font-weight: 800; font-size: 0.95rem; margin-bottom: 2px;">{label}</div>
-        <div style="color: #c53030; font-weight: 800; font-size: 1.3rem;">{value}</div>
+    <div style="background: #ffffff; border: 1px solid #bee3f8; border-radius: 6px; padding: 6px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 8px;">
+        <div style="color: #2b6cb0; font-weight: 700; font-size: 0.85rem; margin-bottom: 2px;">{label}</div>
+        <div style="color: #c53030; font-weight: 800; font-size: 1.25rem;">{value}</div>
     </div>
     """,
       unsafe_allow_html=True,
@@ -690,63 +681,159 @@ def build_turnover_report(df, report_date, turnover_targets, filter_nv=None):
   )
 
 
-def build_generic_kpi_report(
-    df, report_date, targets, kpi_key, title, filter_nv=None
+def build_report(
+    df, report_date, targets, report_type, filter_nv=None, mcp_df=None
 ):
   df_mtd = df[
       df['date'] >= date(report_date.year, report_date.month, 1)
   ].copy()
-  df_today = df[df['date'] == report_date].copy()
   if filter_nv and filter_nv != 'Tất cả ĐDKD':
     df_mtd = df_mtd[df_mtd['Tên NVBH'] == filter_nv]
-    df_today = df_today[df_today['Tên NVBH'] == filter_nv]
-
-  if kpi_key == 'CHANTE':
-    df_mtd = df_mtd[df_mtd['Tên SP lower'].str.contains('chanté|chante', na=False)]
-    df_today = df_today[
-        df_today['Tên SP lower'].str.contains('chanté|chante', na=False)
-    ]
-  elif kpi_key == 'OMACHI':
-    df_mtd = df_mtd[df_mtd['Tên SP lower'].str.contains('omachi', na=False)]
-    df_today = df_today[df_today['Tên SP lower'].str.contains('omachi', na=False)]
-  elif kpi_key == 'ASO_TEA':
-    df_mtd = df_mtd[df_mtd['Tên SP lower'].str.contains('tea|trà', na=False)]
-    df_today = df_today[df_today['Tên SP lower'].str.contains('tea|trà', na=False)]
-  elif kpi_key == 'PC_BT':
-    df_mtd = df_mtd[df_mtd['Tên SP lower'].str.contains('beer|bia', na=False)]
-    df_today = df_today[
-        df_today['Tên SP lower'].str.contains('beer|bia', na=False)
-    ]
-  elif kpi_key == 'PC_ON':
-    df_mtd = df_mtd[
-        df_mtd['L1'].astype(str).str.lower().str.contains('on', na=False)
-    ]
-    df_today = df_today[
-        df_today['L1'].astype(str).str.lower().str.contains('on', na=False)
-    ]
-
   sm_names = df_mtd.groupby('Mã NVBH')['Tên NVBH'].first().to_dict()
   all_sms = sorted(sm_names.keys())
-  val_col = (
-      find_col(df_mtd, ['Thành tiền trước CK', 'Tổng tiền'])
-      or 'Thành tiền trước CK'
-  )
-  mtd_sales = df_mtd.groupby('Mã NVBH')[val_col].sum().to_dict()
-  today_sales = df_today.groupby('Mã NVBH')[val_col].sum().to_dict()
+
+  if report_type == 'ASO_ALL':
+    off = df_mtd[df_mtd['L1'] == 'Kênh Off Premise'].copy()
+    mtd = off.groupby('Mã NVBH')['Mã CH'].nunique()
+    first = (
+        off.groupby(['Mã NVBH', 'Mã CH'])['date'].min().reset_index()
+    )
+    first.columns = ['Mã NVBH', 'Mã CH', 'first_date']
+    ngay = (
+        first[first['first_date'] == report_date]
+        .groupby('Mã NVBH')['Mã CH']
+        .nunique()
+    )
+    key, title = 'ASO_ALL', '5. ASO ALL KÊNH OFF'
+  elif report_type == 'PC_BT':
+    off = df_mtd[
+        (df_mtd['L1'] == 'Kênh Off Premise')
+        & ~df_mtd['Sub Division']
+        .astype(str)
+        .str.contains('Beer|Bia', case=False, na=False)
+    ]
+    lines = off.groupby(['Mã NVBH', 'Mã đơn hàng'])['Mã sản phẩm'].nunique()
+    mtd = (
+        lines[lines >= 4]
+        .reset_index()
+        .groupby('Mã NVBH')['Mã đơn hàng']
+        .nunique()
+    )
+    df_today = df[df['date'] == report_date]
+    if filter_nv and filter_nv != 'Tất cả ĐDKD':
+      df_today = df_today[df_today['Tên NVBH'] == filter_nv]
+    off_t = df_today[
+        (df_today['L1'] == 'Kênh Off Premise')
+        & ~df_today['Sub Division']
+        .astype(str)
+        .str.contains('Beer|Bia', case=False, na=False)
+    ]
+    lines_t = off_t.groupby(['Mã NVBH', 'Mã đơn hàng'])[
+        'Mã sản phẩm'
+    ].nunique()
+    ngay = (
+        lines_t[lines_t >= 4]
+        .reset_index()
+        .groupby('Mã NVBH')['Mã đơn hàng']
+        .nunique()
+    )
+    key, title = 'PC_BT', '4. PC BT (PC 4LINE - BEER)'
+  elif report_type == 'PC_ON':
+    on_mtd = df_mtd[df_mtd['L1'] == 'Kênh On Premise']
+    mtd = on_mtd.groupby('Mã NVBH')['Mã CH'].nunique()
+    df_today = df[df['date'] == report_date]
+    if filter_nv and filter_nv != 'Tất cả ĐDKD':
+      df_today = df_today[df_today['Tên NVBH'] == filter_nv]
+    on_today = df_today[df_today['L1'] == 'Kênh On Premise']
+    ngay = on_today.groupby('Mã NVBH')['Mã đơn hàng'].nunique()
+    on_targets = {}
+    if mcp_df is not None and not mcp_df.empty:
+      c_nv_mcp = find_col(mcp_df, ['SM Code', 'Mã NVBH', 'SM code', 'Tên NVBH'])
+      c_l1 = find_col(mcp_df, ['L1', 'Channel'])
+      c_ma = find_col(mcp_df, ['Outlet_code', 'Outlet Code', 'Mã CH'])
+      if c_nv_mcp and c_l1 and c_ma:
+        on_mcp = mcp_df[
+            mcp_df[c_l1].astype(str).str.contains('On', case=False, na=False)
+        ].copy()
+        on_targets = (
+            on_mcp.groupby(c_nv_mcp)[c_ma].nunique().to_dict()
+        )
+    key, title = 'PC_ON', '6. ASO ACTIVE KÊNH ON'
+  elif report_type == 'ASO_TEA':
+    on = df_mtd[df_mtd['L1'] == 'Kênh On Premise']
+    tea = on[
+        on['Tên SP lower'].str.contains(
+            'tea|trà|ô long|olong|búp non', na=False
+        )
+    ].copy()
+    tea['qty'] = pd.to_numeric(tea['Tổng lẻ'], errors='coerce').fillna(0)
+    ch = tea.groupby(['Mã NVBH', 'Mã CH'])['qty'].sum()
+    mtd = (
+        ch[ch >= 12].reset_index().groupby('Mã NVBH')['Mã CH'].nunique()
+    )
+    df_today = df[df['date'] == report_date]
+    if filter_nv and filter_nv != 'Tất cả ĐDKD':
+      df_today = df_today[df_today['Tên NVBH'] == filter_nv]
+    on_t = df_today[df_today['L1'] == 'Kênh On Premise']
+    tea_t = on_t[
+        on_t['Tên SP lower'].str.contains(
+            'tea|trà|ô long|olong|búp non', na=False
+        )
+    ]
+    ngay = tea_t.groupby('Mã NVBH')['Mã CH'].nunique()
+    key, title = 'ASO_ON', '3. ASO TEA KÊNH ON'
+  elif report_type == 'OMACHI':
+    mask = df_mtd['Tên SP lower'].str.contains(
+        'omachi', na=False
+    ) & df_mtd['Tên SP lower'].str.contains('trộn|tron|xào|xao', na=False)
+    mtd = df_mtd[mask].groupby('Mã NVBH')['Mã CH'].nunique()
+    first = (
+        df_mtd[mask]
+        .groupby(['Mã NVBH', 'Mã CH'])['date']
+        .min()
+        .reset_index()
+    )
+    first.columns = ['Mã NVBH', 'Mã CH', 'first_date']
+    ngay = (
+        first[first['first_date'] == report_date]
+        .groupby('Mã NVBH')['Mã CH']
+        .nunique()
+    )
+    key, title = 'ASO_OMACHI', '2. ASO FOCUS OMC TRỘN'
+  elif report_type == 'CHANTE':
+    mask = df_mtd['Tên SP lower'].str.contains('chanté|chante', na=False)
+    mtd = df_mtd[mask].groupby('Mã NVBH')['Mã CH'].nunique()
+    first = (
+        df_mtd[mask]
+        .groupby(['Mã NVBH', 'Mã CH'])['date']
+        .min()
+        .reset_index()
+    )
+    first.columns = ['Mã NVBH', 'Mã CH', 'first_date']
+    ngay = (
+        first[first['first_date'] == report_date]
+        .groupby('Mã NVBH')['Mã CH']
+        .nunique()
+    )
+    key, title = 'ASO_CHANTE', '1. ASO FOCUS CHANTÉ'
+  else:
+    return pd.DataFrame(), 0, ''
 
   results = []
   for sm in all_sms:
-    sm_dict = targets.get(sm, {})
-    tgt = sm_dict.get(kpi_key, 0.0)
-    m = float(mtd_sales.get(sm, 0.0)) / 1000000.0
-    t_val = float(today_sales.get(sm, 0.0)) / 1000000.0
-    pct = round(m / tgt * 100, 1) if tgt else 0.0
+    if report_type == 'PC_ON':
+      tgt = int(on_targets.get(sm, 0))
+    else:
+      tgt = targets.get(sm, {}).get(key, 0)
+    m = int(mtd.get(sm, 0))
+    n = int(ngay.get(sm, 0))
+    pct = round(m / tgt * 100, 1) if tgt else 0
     results.append({
         'Mã NVBH': sm,
         'Tên NVBH': sm_names.get(sm, ''),
-        'Chỉ Tiêu': tgt,
-        'Thực Hiện Ngày': round(t_val, 2),
-        'Thực Hiện MTD': round(m, 2),
+        'Chỉ Tiêu KPI': tgt,
+        'Thực Hiện Ngày': n,
+        'MTD': m,
         '% MTD': f'{pct}%',
         '_ratio': (m / tgt if tgt else 0),
     })
@@ -757,12 +844,10 @@ def build_generic_kpi_report(
       .reset_index(drop=True)
   )
   df_out.insert(0, 'STT', range(1, len(df_out) + 1))
-  total_mtd = float(df_out['Thực Hiện MTD'].sum()) if not df_out.empty else 0.0
-  total_today = (
-      float(df_out['Thực Hiện Ngày'].sum()) if not df_out.empty else 0.0
-  )
-  team_tgt = float(df_out['Chỉ Tiêu'].sum()) if not df_out.empty else 0.0
-  total_pct = round(total_mtd / team_tgt * 100, 1) if team_tgt else 0.0
+  total_ngay = int(df_out['Thực Hiện Ngày'].sum()) if not df_out.empty else 0
+  total_mtd = int(df_out['MTD'].sum()) if not df_out.empty else 0
+  team_tgt = int(df_out['Chỉ Tiêu KPI'].sum()) if not df_out.empty else 0
+  total_pct = round(total_mtd / team_tgt * 100, 1) if team_tgt else 0
   total_row = pd.DataFrame([{
       'STT': '-',
       'Mã NVBH': 'TỔNG CỘNG',
@@ -771,12 +856,12 @@ def build_generic_kpi_report(
           if filter_nv == 'Tất cả ĐDKD'
           else filter_nv
       ),
-      'Chỉ Tiêu': team_tgt,
-      'Thực Hiện Ngày': round(total_today, 2),
-      'Thực Hiện MTD': round(total_mtd, 2),
+      'Chỉ Tiêu KPI': team_tgt,
+      'Thực Hiện Ngày': total_ngay,
+      'MTD': total_mtd,
       '% MTD': f'{total_pct}%',
   }])
-  return pd.concat([df_out, total_row], ignore_index=True), title
+  return pd.concat([df_out, total_row], ignore_index=True), team_tgt, title
 
 
 def render_html_table(df):
@@ -914,25 +999,57 @@ with tab_kpi:
     df_r, team_tgt, title = build_turnover_report(
         df, report_date, turnover_targets, filter_nv
     )
+    tot_mtd = (
+        float(df_r.iloc[-1]['Doanh Số MTD'])
+        if not df_r.empty
+        else 0
+    )
+    tot_day = (
+        float(df_r.iloc[-1]['Thực Hiện Ngày'])
+        if not df_r.empty
+        else 0
+    )
+    tot_pct = round(tot_mtd / team_tgt * 100, 1) if team_tgt else 0
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+      render_metric_card('🎯 Target', f'{team_tgt:,.1f}')
+    with c2:
+      render_metric_card('📈 MTD', f'{tot_mtd:,.1f}')
+    with c3:
+      render_metric_card('📊 % MTD', f'{tot_pct}%')
+    with c4:
+      render_metric_card('📅 Ngày', f'+{tot_day:,.1f}')
+
     st.markdown(
-        f'<h3 style="color: #034ea2; font-weight: 800; font-size: 15px;">{title}</h3>',
+        f'<h3 style="color: #034ea2; font-weight: 800; font-size: 15px;">{title} - Tháng 09/2026</h3>',
         unsafe_allow_html=True,
     )
     st.markdown(render_html_table(df_r), unsafe_allow_html=True)
   elif selected_kpi in ['CHANTE', 'OMACHI', 'ASO_TEA', 'PC_BT', 'ASO_ALL', 'PC_ON']:
-    titles = {
-        'CHANTE': '1. ASO FOCUS CHANTÉ',
-        'OMACHI': '2. ASO FOCUS OMC TRỘN',
-        'ASO_TEA': '3. ASO TEA KÊNH ON',
-        'PC_BT': '4. PC BT (PC 4LINE - BEER)',
-        'ASO_ALL': '5. ASO ALL',
-        'PC_ON': '6. ASO ACTIVE KÊNH ON',
-    }
-    df_r, title = build_generic_kpi_report(
-        df, report_date, targets, selected_kpi, titles[selected_kpi], filter_nv
+    df_r, team_tgt, title = build_report(
+        df, report_date, targets, selected_kpi, filter_nv, mcp
     )
+    tot_mtd = int(df_r.iloc[-1]['MTD']) if not df_r.empty else 0
+    tot_day = (
+        int(df_r.iloc[-1]['Thực Hiện Ngày'])
+        if not df_r.empty
+        else 0
+    )
+    tot_pct = round(tot_mtd / team_tgt * 100, 1) if team_tgt else 0
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+      render_metric_card('🎯 Target', f'{team_tgt:,}')
+    with c2:
+      render_metric_card('📈 MTD', f'{tot_mtd:,}')
+    with c3:
+      render_metric_card('📊 % MTD', f'{tot_pct}%')
+    with c4:
+      render_metric_card('📅 Ngày', f'+{tot_day:,}')
+
     st.markdown(
-        f'<h3 style="color: #034ea2; font-weight: 800; font-size: 15px;">{title}</h3>',
+        f'<h3 style="color: #034ea2; font-weight: 800; font-size: 15px;">{title} - Tháng 09/2026</h3>',
         unsafe_allow_html=True,
     )
     st.markdown(render_html_table(df_r), unsafe_allow_html=True)
@@ -958,7 +1075,7 @@ with tab_mcp:
     c1, c2 = st.columns(2)
     with c1:
       st.markdown(
-          '<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD - Chọn nhiều)</p>',
+          '<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD)</p>',
           unsafe_allow_html=True,
       )
       nv_opts = (
@@ -971,8 +1088,7 @@ with tab_mcp:
       )
     with c2:
       st.markdown(
-          '<p class="filter-label">📅 Lọc Theo Thứ (Chọn nhiều)</p>',
-          unsafe_allow_html=True,
+          '<p class="filter-label">📅 Lọc Theo Thứ</p>', unsafe_allow_html=True
       )
       thu_opts = ['2', '3', '4', '5', '6', '7', '25', '36', '47']
       f_thu = st.multiselect(
@@ -1006,8 +1122,7 @@ with tab_mcp:
     c5, c6 = st.columns(2)
     with c5:
       st.markdown(
-          '<p class="filter-label">⭐ Lọc VIP MCH (Chọn nhiều)</p>',
-          unsafe_allow_html=True,
+          '<p class="filter-label">⭐ Lọc VIP MCH</p>', unsafe_allow_html=True
       )
       vip_opts = (
           sorted(mcp[col_vip].dropna().astype(str).unique().tolist())
@@ -1080,7 +1195,7 @@ with tab_cat:
     c1, c2 = st.columns(2)
     with c1:
       st.markdown(
-          '<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD - Chọn nhiều)</p>',
+          '<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD)</p>',
           unsafe_allow_html=True,
       )
       nv_cat_opts = (
@@ -1093,8 +1208,7 @@ with tab_cat:
       )
     with c2:
       st.markdown(
-          '<p class="filter-label">📅 Lọc Theo Thứ (Chọn nhiều)</p>',
-          unsafe_allow_html=True,
+          '<p class="filter-label">📅 Lọc Theo Thứ</p>', unsafe_allow_html=True
       )
       thu_opts = ['2', '3', '4', '5', '6', '7', '25', '36', '47']
       f_cat_thu = st.multiselect(
@@ -1174,7 +1288,7 @@ with tab_brand:
     c1, c2 = st.columns(2)
     with c1:
       st.markdown(
-          '<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD - Chọn nhiều)</p>',
+          '<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD)</p>',
           unsafe_allow_html=True,
       )
       nv_brand_opts = (
@@ -1187,8 +1301,7 @@ with tab_brand:
       )
     with c2:
       st.markdown(
-          '<p class="filter-label">📅 Lọc Theo Thứ (Chọn nhiều)</p>',
-          unsafe_allow_html=True,
+          '<p class="filter-label">📅 Lọc Theo Thứ</p>', unsafe_allow_html=True
       )
       thu_opts = ['2', '3', '4', '5', '6', '7', '25', '36', '47']
       f_brand_thu = st.multiselect(
@@ -1266,7 +1379,7 @@ with tab_dskh_off:
     c1, c2 = st.columns(2)
     with c1:
       st.markdown(
-          '<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD - Chọn nhiều)</p>',
+          '<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD)</p>',
           unsafe_allow_html=True,
       )
       off_nv_opts = (
@@ -1279,8 +1392,7 @@ with tab_dskh_off:
       )
     with c2:
       st.markdown(
-          '<p class="filter-label">📅 Lọc Theo Thứ (Chọn nhiều)</p>',
-          unsafe_allow_html=True,
+          '<p class="filter-label">📅 Lọc Theo Thứ</p>', unsafe_allow_html=True
       )
       thu_opts = ['2', '3', '4', '5', '6', '7', '25', '36', '47']
       f_thu_off = st.multiselect(
@@ -1358,7 +1470,7 @@ with tab_dskh_on:
     c1, c2 = st.columns(2)
     with c1:
       st.markdown(
-          '<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD - Chọn nhiều)</p>',
+          '<p class="filter-label">👤 Lọc Nhân Viên (ĐDKD)</p>',
           unsafe_allow_html=True,
       )
       on_nv_opts = (
@@ -1371,8 +1483,7 @@ with tab_dskh_on:
       )
     with c2:
       st.markdown(
-          '<p class="filter-label">📅 Lọc Theo Thứ (Chọn nhiều)</p>',
-          unsafe_allow_html=True,
+          '<p class="filter-label">📅 Lọc Theo Thứ</p>', unsafe_allow_html=True
       )
       thu_opts = ['2', '3', '4', '5', '6', '7', '25', '36', '47']
       f_thu_on = st.multiselect(
