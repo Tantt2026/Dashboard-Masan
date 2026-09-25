@@ -141,44 +141,6 @@ def render_metric_card(label, value):
   )
 
 
-def generate_top_bottom_analysis(
-    df_source, name_col, pct_col, total_mtd, total_tgt
-):
-  if df_source is None or df_source.empty:
-    return ''
-  df_clean = df_source[
-      ~df_source[name_col]
-      .astype(str)
-      .str.contains('TỔNG CỘNG|Tổng cộng', case=False, na=False)
-  ].copy()
-  if df_clean.empty:
-    return ''
-  df_clean['__sort_val'] = (
-      df_clean[pct_col].astype(str).str.replace('%', '').str.strip()
-  )
-  df_clean['__sort_val'] = pd.to_numeric(
-      df_clean['__sort_val'], errors='coerce'
-  ).fillna(0)
-  df_sorted = df_clean.sort_values(by='__sort_val', ascending=False)
-  top3 = df_sorted.head(3)
-  bottom3 = df_sorted.tail(3).sort_values(by='__sort_val', ascending=True)
-
-  top_str = ', '.join(
-      [f'**{r[name_col]}** ({r[pct_col]})' for _, r in top3.iterrows()]
-  )
-  bottom_str = ', '.join(
-      [f'**{r[name_col]}** ({r[pct_col]})' for _, r in bottom3.iterrows()]
-  )
-  team_pct = round(total_mtd / total_tgt * 100, 1) if total_tgt else 0
-
-  return f"""
-* **Kết Quả Thực Hiện:** Đạt {total_mtd:,} / {total_tgt:,} ({team_pct}% MTD).
-* **Top 3 ĐDKD Dẫn Đầu:** {top_str}.
-* **Bottom 3 ĐDKD Cần Cải Thiện:** {bottom_str}.
-* **Đề Xuất Hành Động Cho 3 Bạn Bottom:** Tập trung rà soát tuyến chưa mua, đẩy mạnh combo kích cầu và SS đồng hành đi thị trường (Field Coaching) trong 2 ngày tới.
-    """
-
-
 # ====================== ĐƯỜNG DẪN & LOAD DATA ======================
 DATA_DIR = 'data'
 RPT_PATH = os.path.join(DATA_DIR, 'RPT_061.xlsx')
@@ -388,16 +350,6 @@ def color_pct_bg(val):
       return 'background-color: #fed7d7; color:#742a2a; font-weight:600;'
   except:
     return ''
-
-
-def format_scaled_thousand(x):
-  try:
-    if pd.isnull(x) or str(x).lower() in ['none', 'nan', '']:
-      return ''
-    val = float(x) / 1000.0
-    return f'{val:,.0f}'.replace(',', '.')
-  except:
-    return x
 
 
 def find_col(df, candidates):
@@ -738,159 +690,63 @@ def build_turnover_report(df, report_date, turnover_targets, filter_nv=None):
   )
 
 
-def build_report(
-    df, report_date, targets, report_type, filter_nv=None, mcp_df=None
+def build_generic_kpi_report(
+    df, report_date, targets, kpi_key, title, filter_nv=None
 ):
   df_mtd = df[
       df['date'] >= date(report_date.year, report_date.month, 1)
   ].copy()
+  df_today = df[df['date'] == report_date].copy()
   if filter_nv and filter_nv != 'Tất cả ĐDKD':
     df_mtd = df_mtd[df_mtd['Tên NVBH'] == filter_nv]
+    df_today = df_today[df_today['Tên NVBH'] == filter_nv]
+
+  if kpi_key == 'CHANTE':
+    df_mtd = df_mtd[df_mtd['Tên SP lower'].str.contains('chanté|chante', na=False)]
+    df_today = df_today[
+        df_today['Tên SP lower'].str.contains('chanté|chante', na=False)
+    ]
+  elif kpi_key == 'OMACHI':
+    df_mtd = df_mtd[df_mtd['Tên SP lower'].str.contains('omachi', na=False)]
+    df_today = df_today[df_today['Tên SP lower'].str.contains('omachi', na=False)]
+  elif kpi_key == 'ASO_TEA':
+    df_mtd = df_mtd[df_mtd['Tên SP lower'].str.contains('tea|trà', na=False)]
+    df_today = df_today[df_today['Tên SP lower'].str.contains('tea|trà', na=False)]
+  elif kpi_key == 'PC_BT':
+    df_mtd = df_mtd[df_mtd['Tên SP lower'].str.contains('beer|bia', na=False)]
+    df_today = df_today[
+        df_today['Tên SP lower'].str.contains('beer|bia', na=False)
+    ]
+  elif kpi_key == 'PC_ON':
+    df_mtd = df_mtd[
+        df_mtd['L1'].astype(str).str.lower().str.contains('on', na=False)
+    ]
+    df_today = df_today[
+        df_today['L1'].astype(str).str.lower().str.contains('on', na=False)
+    ]
+
   sm_names = df_mtd.groupby('Mã NVBH')['Tên NVBH'].first().to_dict()
   all_sms = sorted(sm_names.keys())
-
-  if report_type == 'ASO_ALL':
-    off = df_mtd[df_mtd['L1'] == 'Kênh Off Premise'].copy()
-    mtd = off.groupby('Mã NVBH')['Mã CH'].nunique()
-    first = (
-        off.groupby(['Mã NVBH', 'Mã CH'])['date'].min().reset_index()
-    )
-    first.columns = ['Mã NVBH', 'Mã CH', 'first_date']
-    ngay = (
-        first[first['first_date'] == report_date]
-        .groupby('Mã NVBH')['Mã CH']
-        .nunique()
-    )
-    key, title = 'ASO_ALL', '5. ASO ALL KÊNH OFF'
-  elif report_type == 'PC_BT':
-    off = df_mtd[
-        (df_mtd['L1'] == 'Kênh Off Premise')
-        & ~df_mtd['Sub Division']
-        .astype(str)
-        .str.contains('Beer|Bia', case=False, na=False)
-    ]
-    lines = off.groupby(['Mã NVBH', 'Mã đơn hàng'])['Mã sản phẩm'].nunique()
-    mtd = (
-        lines[lines >= 4]
-        .reset_index()
-        .groupby('Mã NVBH')['Mã đơn hàng']
-        .nunique()
-    )
-    df_today = df[df['date'] == report_date]
-    if filter_nv and filter_nv != 'Tất cả ĐDKD':
-      df_today = df_today[df_today['Tên NVBH'] == filter_nv]
-    off_t = df_today[
-        (df_today['L1'] == 'Kênh Off Premise')
-        & ~df_today['Sub Division']
-        .astype(str)
-        .str.contains('Beer|Bia', case=False, na=False)
-    ]
-    lines_t = off_t.groupby(['Mã NVBH', 'Mã đơn hàng'])[
-        'Mã sản phẩm'
-    ].nunique()
-    ngay = (
-        lines_t[lines_t >= 4]
-        .reset_index()
-        .groupby('Mã NVBH')['Mã đơn hàng']
-        .nunique()
-    )
-    key, title = 'PC_BT', '4. PC BT (PC 4LINE - BEER)'
-  elif report_type == 'PC_ON':
-    on_mtd = df_mtd[df_mtd['L1'] == 'Kênh On Premise']
-    mtd = on_mtd.groupby('Mã NVBH')['Mã CH'].nunique()
-    df_today = df[df['date'] == report_date]
-    if filter_nv and filter_nv != 'Tất cả ĐDKD':
-      df_today = df_today[df_today['Tên NVBH'] == filter_nv]
-    on_today = df_today[df_today['L1'] == 'Kênh On Premise']
-    ngay = on_today.groupby('Mã NVBH')['Mã đơn hàng'].nunique()
-    on_targets = {}
-    if mcp_df is not None and not mcp_df.empty:
-      c_nv_mcp = find_col(mcp_df, ['SM Code', 'Mã NVBH', 'SM code', 'Tên NVBH'])
-      c_l1 = find_col(mcp_df, ['L1', 'Channel'])
-      c_ma = find_col(mcp_df, ['Outlet_code', 'Outlet Code', 'Mã CH'])
-      if c_nv_mcp and c_l1 and c_ma:
-        on_mcp = mcp_df[
-            mcp_df[c_l1].astype(str).str.contains('On', case=False, na=False)
-        ].copy()
-        on_targets = (
-            on_mcp.groupby(c_nv_mcp)[c_ma].nunique().to_dict()
-        )
-    key, title = 'PC_ON', '6. ASO ACTIVE KÊNH ON'
-  elif report_type == 'ASO_TEA':
-    on = df_mtd[df_mtd['L1'] == 'Kênh On Premise']
-    tea = on[
-        on['Tên SP lower'].str.contains(
-            'tea|trà|ô long|olong|búp non', na=False
-        )
-    ].copy()
-    tea['qty'] = pd.to_numeric(tea['Tổng lẻ'], errors='coerce').fillna(0)
-    ch = tea.groupby(['Mã NVBH', 'Mã CH'])['qty'].sum()
-    mtd = (
-        ch[ch >= 12].reset_index().groupby('Mã NVBH')['Mã CH'].nunique()
-    )
-    df_today = df[df['date'] == report_date]
-    if filter_nv and filter_nv != 'Tất cả ĐDKD':
-      df_today = df_today[df_today['Tên NVBH'] == filter_nv]
-    on_t = df_today[df_today['L1'] == 'Kênh On Premise']
-    tea_t = on_t[
-        on_t['Tên SP lower'].str.contains(
-            'tea|trà|ô long|olong|búp non', na=False
-        )
-    ]
-    ngay = tea_t.groupby('Mã NVBH')['Mã CH'].nunique()
-    key, title = 'ASO_ON', '3. ASO TEA KÊNH ON'
-  elif report_type == 'OMACHI':
-    mask = df_mtd['Tên SP lower'].str.contains(
-        'omachi', na=False
-    ) & df_mtd['Tên SP lower'].str.contains('trộn|tron|xào|xao', na=False)
-    mtd = df_mtd[mask].groupby('Mã NVBH')['Mã CH'].nunique()
-    first = (
-        df_mtd[mask]
-        .groupby(['Mã NVBH', 'Mã CH'])['date']
-        .min()
-        .reset_index()
-    )
-    first.columns = ['Mã NVBH', 'Mã CH', 'first_date']
-    ngay = (
-        first[first['first_date'] == report_date]
-        .groupby('Mã NVBH')['Mã CH']
-        .nunique()
-    )
-    key, title = 'ASO_OMACHI', '2. ASO FOCUS OMC TRỘN'
-  elif report_type == 'CHANTE':
-    mask = df_mtd['Tên SP lower'].str.contains('chanté|chante', na=False)
-    mtd = df_mtd[mask].groupby('Mã NVBH')['Mã CH'].nunique()
-    first = (
-        df_mtd[mask]
-        .groupby(['Mã NVBH', 'Mã CH'])['date']
-        .min()
-        .reset_index()
-    )
-    first.columns = ['Mã NVBH', 'Mã CH', 'first_date']
-    ngay = (
-        first[first['first_date'] == report_date]
-        .groupby('Mã NVBH')['Mã CH']
-        .nunique()
-    )
-    key, title = 'ASO_CHANTE', '1. ASO FOCUS CHANTÉ'
-  else:
-    return pd.DataFrame(), 0, ''
+  val_col = (
+      find_col(df_mtd, ['Thành tiền trước CK', 'Tổng tiền'])
+      or 'Thành tiền trước CK'
+  )
+  mtd_sales = df_mtd.groupby('Mã NVBH')[val_col].sum().to_dict()
+  today_sales = df_today.groupby('Mã NVBH')[val_col].sum().to_dict()
 
   results = []
   for sm in all_sms:
-    if report_type == 'PC_ON':
-      tgt = int(on_targets.get(sm, 0))
-    else:
-      tgt = targets.get(sm, {}).get(key, 0)
-    m = int(mtd.get(sm, 0))
-    n = int(ngay.get(sm, 0))
-    pct = round(m / tgt * 100, 1) if tgt else 0
+    sm_dict = targets.get(sm, {})
+    tgt = sm_dict.get(kpi_key, 0.0)
+    m = float(mtd_sales.get(sm, 0.0)) / 1000000.0
+    t_val = float(today_sales.get(sm, 0.0)) / 1000000.0
+    pct = round(m / tgt * 100, 1) if tgt else 0.0
     results.append({
         'Mã NVBH': sm,
         'Tên NVBH': sm_names.get(sm, ''),
-        'Chỉ Tiêu KPI': tgt,
-        'Thực Hiện Ngày': n,
-        'MTD': m,
+        'Chỉ Tiêu': tgt,
+        'Thực Hiện Ngày': round(t_val, 2),
+        'Thực Hiện MTD': round(m, 2),
         '% MTD': f'{pct}%',
         '_ratio': (m / tgt if tgt else 0),
     })
@@ -901,10 +757,12 @@ def build_report(
       .reset_index(drop=True)
   )
   df_out.insert(0, 'STT', range(1, len(df_out) + 1))
-  total_ngay = int(df_out['Thực Hiện Ngày'].sum()) if not df_out.empty else 0
-  total_mtd = int(df_out['MTD'].sum()) if not df_out.empty else 0
-  team_tgt = int(df_out['Chỉ Tiêu KPI'].sum()) if not df_out.empty else 0
-  total_pct = round(total_mtd / team_tgt * 100, 1) if team_tgt else 0
+  total_mtd = float(df_out['Thực Hiện MTD'].sum()) if not df_out.empty else 0.0
+  total_today = (
+      float(df_out['Thực Hiện Ngày'].sum()) if not df_out.empty else 0.0
+  )
+  team_tgt = float(df_out['Chỉ Tiêu'].sum()) if not df_out.empty else 0.0
+  total_pct = round(total_mtd / team_tgt * 100, 1) if team_tgt else 0.0
   total_row = pd.DataFrame([{
       'STT': '-',
       'Mã NVBH': 'TỔNG CỘNG',
@@ -913,12 +771,12 @@ def build_report(
           if filter_nv == 'Tất cả ĐDKD'
           else filter_nv
       ),
-      'Chỉ Tiêu KPI': team_tgt,
-      'Thực Hiện Ngày': total_ngay,
-      'MTD': total_mtd,
+      'Chỉ Tiêu': team_tgt,
+      'Thực Hiện Ngày': round(total_today, 2),
+      'Thực Hiện MTD': round(total_mtd, 2),
       '% MTD': f'{total_pct}%',
   }])
-  return pd.concat([df_out, total_row], ignore_index=True), team_tgt, title
+  return pd.concat([df_out, total_row], ignore_index=True), title
 
 
 def render_html_table(df):
@@ -1062,8 +920,16 @@ with tab_kpi:
     )
     st.markdown(render_html_table(df_r), unsafe_allow_html=True)
   elif selected_kpi in ['CHANTE', 'OMACHI', 'ASO_TEA', 'PC_BT', 'ASO_ALL', 'PC_ON']:
-    df_r, team_tgt, title = build_report(
-        df, report_date, targets, selected_kpi, filter_nv, mcp
+    titles = {
+        'CHANTE': '1. ASO FOCUS CHANTÉ',
+        'OMACHI': '2. ASO FOCUS OMC TRỘN',
+        'ASO_TEA': '3. ASO TEA KÊNH ON',
+        'PC_BT': '4. PC BT (PC 4LINE - BEER)',
+        'ASO_ALL': '5. ASO ALL',
+        'PC_ON': '6. ASO ACTIVE KÊNH ON',
+    }
+    df_r, title = build_generic_kpi_report(
+        df, report_date, targets, selected_kpi, titles[selected_kpi], filter_nv
     )
     st.markdown(
         f'<h3 style="color: #034ea2; font-weight: 800; font-size: 15px;">{title}</h3>',
