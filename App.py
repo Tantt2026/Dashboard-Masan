@@ -2501,12 +2501,26 @@ with tab_kpi:
     )
 
   elif selected_kpi == 'VISIT':
+    # ===== TÍNH TUẦN ISO (CHẴN / LẺ) =====
+    iso_year, iso_week, iso_weekday = report_date.isocalendar()
+    week_type = 'Tuần Chẵn' if iso_week % 2 == 0 else 'Tuần Lẻ'
+
     saved_visit_thu = st.query_params.get('visit_thu', '')
     default_visit_thu_list = (
         [x.strip() for x in saved_visit_thu.split(',') if x.strip()]
         if saved_visit_thu
         else []
     )
+
+    # Auto gợi ý chu kỳ theo thứ trong tuần nếu chưa chọn
+    if not default_visit_thu_list and report_date:
+      wday = report_date.weekday()  # 0=Mon ... 6=Sun
+      if wday in [0, 3]:      # Thứ 2, Thứ 5
+        default_visit_thu_list = ['25']
+      elif wday in [1, 4]:    # Thứ 3, Thứ 6
+        default_visit_thu_list = ['36']
+      elif wday in [2, 5]:    # Thứ 4, Thứ 7
+        default_visit_thu_list = ['47']
 
     def update_visit_params():
       st.query_params['visit_thu'] = (
@@ -2515,7 +2529,7 @@ with tab_kpi:
           else ''
       )
 
-    col_f_thu_v, _ = st.columns([1, 1.5])
+    col_f_thu_v, col_week_info = st.columns([1, 1.5])
     with col_f_thu_v:
       st.markdown(
           '<p class="filter-label">📅 Lọc Theo Thứ / Chu kỳ Viếng Thăm (Chọn'
@@ -2531,6 +2545,17 @@ with tab_kpi:
           key='visit_thu_input',
           on_change=update_visit_params,
           label_visibility='collapsed',
+      )
+    with col_week_info:
+      st.markdown(
+          (
+              '<div style="background:#ebf8ff;border:1px solid #bee3f8;border-radius:8px;'
+              'padding:10px 14px;margin-top:18px;text-align:center;">'
+              f'<div style="font-size:12px;color:#2b6cb0;font-weight:700;">📅 Tuần ISO {iso_week}/{iso_year}</div>'
+              f'<div style="font-size:15px;color:#c53030;font-weight:800;margin-top:2px;">{week_type}</div>'
+              '</div>'
+          ),
+          unsafe_allow_html=True,
       )
 
     st.query_params['visit_thu'] = (
@@ -2568,14 +2593,14 @@ with tab_kpi:
     st.markdown(
         f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 2px;'
         f' font-size: 16px; text-align: center;">BÁO CÁO LỊCH VIẾNG THĂM & % ACTIVE'
-        f' {wname} - {report_date.strftime("%d/%m/%Y")}</h3>',
+        f' {wname} ({week_type} - Tuần {iso_week}) - {report_date.strftime("%d/%m/%Y")}</h3>',
         unsafe_allow_html=True,
     )
     st.markdown(
         f'<p style="text-align: center; font-size: 12px; color: #4a5568;'
         f' margin-bottom: 12px;">Dữ liệu cập nhật {wname} ngày'
-        f' {report_date.strftime("%d/%m/%Y")} | Kèm tỷ lệ % Active (Đã mua / Tổng'
-        ' KH)</p>',
+        f' {report_date.strftime("%d/%m/%Y")} | {week_type} (ISO tuần {iso_week}/{iso_year})'
+        f' | Kèm tỷ lệ % Active (Đã mua / Tổng KH)</p>',
         unsafe_allow_html=True,
     )
 
@@ -2601,7 +2626,7 @@ with tab_kpi:
     st.markdown(
         f"""
         <div class="note-box">
-            <div style="font-weight: 800; color: #034ea2; margin-bottom: 8px; font-size: 13.5px;">NHẬN XÉT & ĐÁNH GIÁ LỊCH VIẾNG THĂM {wname}:</div>
+            <div style="font-weight: 800; color: #034ea2; margin-bottom: 8px; font-size: 13.5px;">NHẬN XÉT & ĐÁNH GIÁ LỊCH VIẾNG THĂM {wname} ({week_type} - Tuần {iso_week}):</div>
             <ul style="margin: 0; padding-left: 18px; line-height: 1.6;">
                 <li><b>Kết Quả Thực Hiện:</b> Theo dõi sát sao tỷ lệ mua hàng thực tế (Active) so với lịch tuyến viếng thăm trong ngày {report_date.strftime('%d/%m/%Y')}.</li>
                 <li><b>Trọng Tâm Vận Hành:</b> Ưu tiên bám sát các nhóm cửa hàng VIP và Kênh ON Premise để đảm bảo đạt chuẩn bao phủ và tối ưu sản lượng.</li>
