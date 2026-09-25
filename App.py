@@ -120,7 +120,7 @@ st.markdown(
 )
 
 
-def render_metric_card(label, value, sub_val=None):
+def render_metric_card(label, value):
   st.markdown(
       f"""
     <div style="background: #ffffff; border: 1px solid #bee3f8; border-radius: 6px; padding: 6px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 8px;">
@@ -864,6 +864,115 @@ def build_report(
   return pd.concat([df_out, total_row], ignore_index=True), team_tgt, title
 
 
+def build_combo_report(df_combo_off, df_combo_on, filter_nv=None):
+  # Báo cáo đơn hàng Combo tổng hợp từ file combo off/on
+  dfs = []
+  if not df_combo_off.empty:
+    dfs.append(df_combo_off)
+  if not df_combo_on.empty:
+    dfs.append(df_combo_on)
+  if not dfs:
+    return pd.DataFrame(), '7. BÁO CÁO ĐH COMBO'
+  combo_all = pd.concat(dfs, ignore_index=True)
+  c_nv = find_col(combo_all, ['Tên NV', 'SM name', 'Nhân viên'])
+  if not c_nv:
+    c_nv = combo_all.columns[0]
+  if filter_nv and filter_nv != 'Tất cả ĐDKD':
+    combo_all = combo_all[combo_all[c_nv].astype(str) == filter_nv]
+
+  grouped = (
+      combo_all.groupby(c_nv)
+      .size()
+      .reset_index(name='Số lượng KH Combo')
+  )
+  grouped.columns = ['Tên NVBH', 'Tổng KH Combo']
+  grouped.insert(0, 'STT', range(1, len(grouped) + 1))
+  tot_kh = (
+      int(grouped['Tổng KH Combo'].sum()) if not grouped.empty else 0
+  )
+  total_row = pd.DataFrame([{
+      'STT': '-',
+      'Tên NVBH': 'TỔNG CỘNG',
+      'Tổng KH Combo': tot_kh,
+  }])
+  return (
+      pd.concat([grouped, total_row], ignore_index=True),
+      '7. BÁO CÁO ĐH COMBO',
+  )
+
+
+def build_summary_report(df, report_date, targets, turnover_targets, filter_nv=None):
+  # Báo cáo tổng hợp các chỉ tiêu chính của team
+  sm_names = df.groupby('Mã NVBH')['Tên NVBH'].first().to_dict()
+  all_sms = sorted(sm_names.keys())
+  results = []
+  for sm in all_sms:
+    if filter_nv and filter_nv != 'Tất cả ĐDKD' and sm_names.get(sm) != filter_nv:
+      continue
+    results.append({
+        'Mã NVBH': sm,
+        'Tên NVBH': sm_names.get(sm, ''),
+        'Doanh Số Target (Tr)': round(turnover_targets.get(sm, 0) / 1000000.0, 1),
+        'ASO Chante Target': targets.get(sm, {}).get('ASO_CHANTE', 0),
+        'ASO Omachi Target': targets.get(sm, {}).get('ASO_OMACHI', 0),
+        'ASO All Target': targets.get(sm, {}).get('ASO_ALL', 0),
+    })
+  df_out = pd.DataFrame(results)
+  if not df_out.empty:
+    df_out.insert(0, 'STT', range(1, len(df_out) + 1))
+    tot_row = pd.DataFrame([{
+        'STT': '-',
+        'Mã NVBH': 'TỔNG CỘNG',
+        'Tên NVBH': (
+            'SS Trương Thanh Tân Total'
+            if filter_nv == 'Tất cả ĐDKD'
+            else filter_nv
+        ),
+        'Doanh Số Target (Tr)': round(
+            df_out['Doanh Số Target (Tr)'].sum(), 1
+        ),
+        'ASO Chante Target': int(df_out['ASO Chante Target'].sum()),
+        'ASO Omachi Target': int(df_out['ASO Omachi Target'].sum()),
+        'ASO All Target': int(df_out['ASO All Target'].sum()),
+    }])
+    df_out = pd.concat([df_out, tot_row], ignore_index=True)
+  return df_out, '9. BÁO CÁO TỔNG HỢP KPI'
+
+
+def build_visit_report(mcp_df, filter_nv=None):
+  # Báo cáo lịch viếng thăm dựa trên MCP
+  if mcp_df.empty:
+    return pd.DataFrame(), '10. BÁO CÁO LỊCH VIẾNG THĂM'
+  c_nv = find_col(mcp_df, ['SM name', 'SM Name', 'Tên NVBH', 'Nhân viên'])
+  c_ma = find_col(mcp_df, ['Outlet_code', 'Outlet Code', 'Mã CH'])
+  if not c_nv or not c_ma:
+    return mcp_df, '10. BÁO CÁO LỊCH VIẾNG THĂM'
+  df_v = mcp_df.copy()
+  if filter_nv and filter_nv != 'Tất cả ĐDKD':
+    df_v = df_v[df_v[c_nv].astype(str) == filter_nv]
+  grouped = (
+      df_v.groupby(c_nv)[c_ma]
+      .nunique()
+      .reset_index(name='Tổng KH Lịch Viếng Thăm')
+  )
+  grouped.columns = ['Tên NVBH', 'Tổng KH Lịch Viếng Thăm']
+  grouped.insert(0, 'STT', range(1, len(grouped) + 1))
+  tot_v = (
+      int(grouped['Tổng KH Lịch Viếng Thăm'].sum())
+      if not grouped.empty
+      else 0
+  )
+  total_row = pd.DataFrame([{
+      'STT': '-',
+      'Tên NVBH': 'TỔNG CỘNG',
+      'Tổng KH Lịch Viếng Thăm': tot_v,
+  }])
+  return (
+      pd.concat([grouped, total_row], ignore_index=True),
+      '10. BÁO CÁO LỊCH VIẾNG THĂM',
+  )
+
+
 def render_html_table(df):
   html = [
       '<div class="custom-kpi-table-container"><table'
@@ -1053,8 +1162,29 @@ with tab_kpi:
         unsafe_allow_html=True,
     )
     st.markdown(render_html_table(df_r), unsafe_allow_html=True)
-  else:
-    st.info('Vui lòng chọn xem các tab chi tiết hoặc báo cáo tổng hợp tương ứng.')
+  elif selected_kpi == 'COMBO':
+    df_r, title = build_combo_report(df_combo_off, df_combo_on, filter_nv)
+    st.markdown(
+        f'<h3 style="color: #034ea2; font-weight: 800; font-size: 15px;">{title} - Tháng 09/2026</h3>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(render_html_table(df_r), unsafe_allow_html=True)
+  elif selected_kpi == 'SUMMARY':
+    df_r, title = build_summary_report(
+        df, report_date, targets, turnover_targets, filter_nv
+    )
+    st.markdown(
+        f'<h3 style="color: #034ea2; font-weight: 800; font-size: 15px;">{title} - Tháng 09/2026</h3>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(render_html_table(df_r), unsafe_allow_html=True)
+  elif selected_kpi == 'VISIT':
+    df_r, title = build_visit_report(mcp, filter_nv)
+    st.markdown(
+        f'<h3 style="color: #034ea2; font-weight: 800; font-size: 15px;">{title} - Tháng 09/2026</h3>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(render_html_table(df_r), unsafe_allow_html=True)
 
 # ==================== TAB MCP ====================
 with tab_mcp:
