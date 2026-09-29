@@ -212,6 +212,18 @@ st.markdown(
         .mbs-card-kh { font-size: 18px; }
     }
 
+
+    .kpi-report-title {
+        color: #034ea2 !important;
+        font-weight: 800 !important;
+        font-size: 15px !important;
+        text-align: center !important;
+        margin-bottom: 4px !important;
+    }
+    div[data-testid="stCaptionContainer"] {
+        text-align: center !important;
+    }
+
 </style>
 """,
     unsafe_allow_html=True,
@@ -2360,12 +2372,17 @@ def render_html_table(df):
 def check_mbs_mission(df_outlet, member_type, col_loai='_loai', col_actual='_actual'):
   """Kiểm tra đạt nhiệm vụ theo Member type (CAT1/2/3 hoặc BRAND1/2/3).
 
+  LUÔN dùng Doanh số thực đạt (Actual) — KHÔNG dùng Not Cancel/Pending.
+
   CAT1 / BRAND1: >= 1 NEW có DS >= 200.000
   CAT2 / BRAND2: Duy trì đủ FOCUS, mỗi FOCUS >= 200.000 (KHÔNG bắt buộc NEW)
   CAT3 / BRAND3: Duy trì đủ FOCUS (>=200k mỗi cái) VÀ >= 1 NEW >= 200.000
   """
   mt = str(member_type or '').strip().upper().replace(' ', '')
   loai = df_outlet[col_loai].astype(str).str.upper()
+  # Bắt buộc cột Actual (không phải Not Cancel/Pending)
+  if col_actual not in df_outlet.columns and '_actual' in df_outlet.columns:
+    col_actual = '_actual'
   act = pd.to_numeric(df_outlet[col_actual], errors='coerce').fillna(0)
 
   has_new = bool(((loai.str.contains('NEW', na=False)) & (act >= 200000)).any())
@@ -2414,28 +2431,25 @@ def build_mbs_cat_report(df_cat, filter_nv=None, mcp_df=None):
           'Chỉ tiêu',
       ],
   )
-  # Actual thường (ưu tiên cột không có Not Cancel)
+  # Actual = Doanh số thực đạt (KHÔNG lấy Not Cancel/Pending)
   c_actual = None
-  for cand in [
-      'Doanh số thực đạt của CAT',
-      'Doanh so thuc dat cua CAT',
-      'Doanh so thuc dat',
-  ]:
-    for c in df.columns:
-      if str(c).strip().lower() == cand.lower() or (
-          'thực đạt' in str(c).lower()
-          and 'cat' in str(c).lower()
-          and 'not cancel' not in str(c).lower()
-          and 'pending' not in str(c).lower()
-      ):
-        c_actual = c
-        break
-    if c_actual:
+  for c in df.columns:
+    cl = str(c).strip().lower()
+    if 'not cancel' in cl or 'pending' in cl:
+      continue
+    if cl == 'doanh số thực đạt của cat' or (
+        'thực đạt' in cl and 'cat' in cl
+    ):
+      c_actual = c
       break
   if not c_actual:
-    c_actual = find_col(
-        df, ['Doanh số thực đạt của CAT', 'Doanh so thuc dat']
-    )
+    for c in df.columns:
+      cl = str(c).strip().lower()
+      if 'not cancel' in cl or 'pending' in cl:
+        continue
+      if 'thực đạt' in cl or 'doanh so thuc dat' in cl:
+        c_actual = c
+        break
 
   # Actual Not Cancel/Pending
   c_actual_nc = None
@@ -2503,10 +2517,11 @@ def build_mbs_cat_report(df_cat, filter_nv=None, mcp_df=None):
     actual = float(actual_by_outlet.get(ma, 0) or 0)
     actual_nc = float(actual_nc_by_outlet.get(ma, 0) or 0)
     target = float(target_by_outlet.get(ma, 0) or 0)
+    # % TH + phân nhóm + nhiệm vụ: chỉ trên Actual (không dùng Not Cancel)
     pct = (actual / target * 100) if target > 0 else (100.0 if actual > 0 else 0.0)
     member = member_by_outlet.get(ma, '') if len(member_by_outlet) else ''
     df_out = df[df['_ma'] == ma]
-    has_mission = check_mbs_mission(df_out, member)
+    has_mission = check_mbs_mission(df_out, member, col_actual='_actual')
 
     if actual <= 0:
       nhom, nhom_name = 5, 'Nhóm 5 · Chưa phát sinh DS'
@@ -2615,21 +2630,25 @@ def build_mbs_brand_report(df_brand, filter_nv=None, mcp_df=None):
           'Chỉ tiêu',
       ],
   )
+  # Actual = Doanh số thực đạt brand (KHÔNG lấy Not Cancel/Pending)
   c_actual = None
   for c in df.columns:
-    cl = str(c).lower()
-    if (
-        'thực đạt' in cl
-        and 'brand' in cl
-        and 'not cancel' not in cl
-        and 'pending' not in cl
+    cl = str(c).strip().lower()
+    if 'not cancel' in cl or 'pending' in cl:
+      continue
+    if cl == 'doanh số thực đạt của brand' or (
+        'thực đạt' in cl and 'brand' in cl
     ):
       c_actual = c
       break
   if not c_actual:
-    c_actual = find_col(
-        df, ['Doanh số thực đạt của brand', 'Doanh so thuc dat']
-    )
+    for c in df.columns:
+      cl = str(c).strip().lower()
+      if 'not cancel' in cl or 'pending' in cl:
+        continue
+      if 'thực đạt' in cl or 'doanh so thuc dat' in cl:
+        c_actual = c
+        break
 
   c_actual_nc = None
   for c in df.columns:
@@ -2697,10 +2716,11 @@ def build_mbs_brand_report(df_brand, filter_nv=None, mcp_df=None):
     actual = float(actual_by_outlet.get(ma, 0) or 0)
     actual_nc = float(actual_nc_by_outlet.get(ma, 0) or 0)
     target = float(target_by_outlet.get(ma, 0) or 0)
+    # % TH + phân nhóm + nhiệm vụ: chỉ trên Actual (không dùng Not Cancel)
     pct = (actual / target * 100) if target > 0 else (100.0 if actual > 0 else 0.0)
     member = member_by_outlet.get(ma, '') if len(member_by_outlet) else ''
     df_out = df[df['_ma'] == ma]
-    has_mission = check_mbs_mission(df_out, member)
+    has_mission = check_mbs_mission(df_out, member, col_actual='_actual')
 
     if actual <= 0:
       nhom, nhom_name = 5, 'Nhóm 5 · Chưa phát sinh DS'
@@ -3047,7 +3067,7 @@ with tab_kpi:
 
     st.markdown(
         f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
-        f' font-size: 15px;">9. BÁO CÁO TỔNG HỢP - THÁNG'
+        f' font-size: 15px; text-align: center;">9. BÁO CÁO TỔNG HỢP - THÁNG'
         f' {report_date.strftime("%m/%Y")}</h3>',
         unsafe_allow_html=True,
     )
@@ -3644,12 +3664,12 @@ with tab_kpi:
 
     st.markdown(
         f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
-        f' font-size: 15px;">{title} - THÁNG'
+        f' font-size: 15px; text-align: center;">{title} - THÁNG'
         f' {report_date.strftime("%m/%Y")}</h3>',
         unsafe_allow_html=True,
     )
     st.caption(
-        f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc: {filter_nv}"
+        f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc: {nv_label(filter_nv)}"
     )
 
     c1, c2, c3, c4 = st.columns(4)
@@ -3718,12 +3738,12 @@ with tab_kpi:
     pct_team = total_row['% MTD']
     st.markdown(
         f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
-        f' font-size: 15px;">{title} - THÁNG'
+        f' font-size: 15px; text-align: center;">{title} - THÁNG'
         f' {report_date.strftime("%m/%Y")}</h3>',
         unsafe_allow_html=True,
     )
     st.caption(
-        f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc: {filter_nv}"
+        f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc: {nv_label(filter_nv)}"
     )
     c1, c2, c3, c4 = st.columns(4)
     with c1:
@@ -3785,7 +3805,7 @@ with tab_kpi:
 
     st.markdown(
         f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
-        f' font-size: 15px;">7. BÁO CÁO ĐH COMBO (MATRIX OFF/ON) - THÁNG'
+        f' font-size: 15px; text-align: center;">7. BÁO CÁO ĐH COMBO (MATRIX OFF/ON) - THÁNG'
         f' {report_date.strftime("%m/%Y")}</h3>',
         unsafe_allow_html=True,
     )
