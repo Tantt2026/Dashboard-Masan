@@ -2175,7 +2175,7 @@ def render_html_table(df):
       if pd.isna(val):
         val = ''
 
-      if col in ['% MTD', '% MTD (OFF)', '% MTD (ON)', '% Hoàn Thành']:
+      if col in ['% MTD', '% MTD (OFF)', '% MTD (ON)', '% Hoàn Thành', '% TH']:
         style_bg = color_pct_bg(val)
         if is_total:
           html.append(
@@ -2239,6 +2239,399 @@ def render_html_table(df):
   html.append('</tbody>')
   html.append('</table></div>')
   return ''.join(html)
+
+
+
+# ====================== BÁO CÁO MBS CAT (6 NHÓM) ======================
+def build_mbs_cat_report(df_cat, filter_nv=None, mcp_df=None):
+  """Phân loại KH MBS CAT thành 6 nhóm.
+  Target = Doanh số nền tảng của OUTLET
+  Actual = Tổng Doanh số thực đạt của CAT (sau CK)
+  Nhiệm vụ = có >= 1 Cat NEW với DS >= 200.000
+  Thứ VT lấy từ Data_MCP (cột Thứ) theo Outlet Code
+  """
+  empty = {'groups': {}, 'df_detail': pd.DataFrame(), 'total_kh': 0}
+  if df_cat is None or df_cat.empty:
+    return empty
+
+  df = df_cat.copy()
+  c_nv = find_col(df, ['SM Name', 'SM name', 'Tên NVBH', 'Nhân viên'])
+  c_ma = find_col(df, ['Outlet Code', 'Outlet_code', 'Mã CH'])
+  c_ten = find_col(df, ['Outlet Name', 'Outlet_name', 'Tên CH'])
+  c_member = find_col(df, ['Member type', 'Member Type', 'Phân loại CAT'])
+  c_loai = find_col(df, ['Phân loại cat', 'Phan loai cat', 'Loại cat'])
+  c_target = find_col(
+      df,
+      [
+          'Doanh số nền tảng của OUTLET',
+          'Doanh so nen tang',
+          'Target',
+          'Chỉ tiêu',
+      ],
+  )
+  # Actual thường (ưu tiên cột không có Not Cancel)
+  c_actual = None
+  for cand in [
+      'Doanh số thực đạt của CAT',
+      'Doanh so thuc dat cua CAT',
+      'Doanh so thuc dat',
+  ]:
+    for c in df.columns:
+      if str(c).strip().lower() == cand.lower() or (
+          'thực đạt' in str(c).lower()
+          and 'cat' in str(c).lower()
+          and 'not cancel' not in str(c).lower()
+          and 'pending' not in str(c).lower()
+      ):
+        c_actual = c
+        break
+    if c_actual:
+      break
+  if not c_actual:
+    c_actual = find_col(
+        df, ['Doanh số thực đạt của CAT', 'Doanh so thuc dat']
+    )
+
+  # Actual Not Cancel/Pending
+  c_actual_nc = None
+  for c in df.columns:
+    cl = str(c).lower()
+    if 'not cancel' in cl or ('pending' in cl and 'thực đạt' in cl):
+      c_actual_nc = c
+      break
+  if not c_actual_nc:
+    c_actual_nc = find_col(
+        df,
+        [
+            'Doanh số thực đạt của CAT(Not Cancel/Pending)',
+            'Doanh số thực đạt của CAT (Not Cancel/Pending)',
+        ],
+    )
+
+  if not c_ma or not c_target or not c_actual:
+    return empty
+
+  if filter_nv and filter_nv != 'Tất cả ĐDKD' and c_nv:
+    df = df[df[c_nv].astype(str).str.strip() == str(filter_nv).strip()]
+
+  df['_ma'] = df[c_ma].astype(str).str.strip()
+  df['_actual'] = pd.to_numeric(df[c_actual], errors='coerce').fillna(0)
+  if c_actual_nc and c_actual_nc in df.columns:
+    df['_actual_nc'] = pd.to_numeric(
+        df[c_actual_nc], errors='coerce'
+    ).fillna(0)
+  else:
+    df['_actual_nc'] = df['_actual']
+  df['_target'] = pd.to_numeric(df[c_target], errors='coerce').fillna(0)
+  df['_loai'] = (
+      df[c_loai].astype(str).str.strip().str.upper() if c_loai else ''
+  )
+
+  # Map Thứ VT từ MCP
+  thu_map = {}
+  if mcp_df is not None and not mcp_df.empty:
+    c_ma_mcp = find_col(mcp_df, ['Outlet_code', 'Outlet Code', 'Mã CH'])
+    c_thu_mcp = find_col(mcp_df, ['Thứ', 'Frequency', 'Tần suất'])
+    if c_ma_mcp and c_thu_mcp:
+      tmp = mcp_df[[c_ma_mcp, c_thu_mcp]].copy()
+      tmp['_ma'] = tmp[c_ma_mcp].astype(str).str.strip()
+      tmp['_thu'] = tmp[c_thu_mcp].astype(str).str.strip()
+      thu_map = (
+          tmp.drop_duplicates('_ma').set_index('_ma')['_thu'].to_dict()
+      )
+
+  actual_by_outlet = df.groupby('_ma')['_actual'].sum()
+  actual_nc_by_outlet = df.groupby('_ma')['_actual_nc'].sum()
+  target_by_outlet = df.groupby('_ma')['_target'].first()
+  nv_by_outlet = (
+      df.groupby('_ma')[c_nv].first() if c_nv else pd.Series(dtype=str)
+  )
+  ten_by_outlet = (
+      df.groupby('_ma')[c_ten].first() if c_ten else pd.Series(dtype=str)
+  )
+  member_by_outlet = (
+      df.groupby('_ma')[c_member].first() if c_member else pd.Series(dtype=str)
+  )
+
+  # Nhiệm vụ NEW dựa trên Actual thường
+  new_mask = df['_loai'].str.contains('NEW', na=False)
+  new_ok = df[new_mask & (df['_actual'] >= 200000)].groupby('_ma').size()
+  has_new_mission = set(new_ok.index.tolist())
+
+  rows = []
+  for ma in actual_by_outlet.index:
+    actual = float(actual_by_outlet.get(ma, 0) or 0)
+    actual_nc = float(actual_nc_by_outlet.get(ma, 0) or 0)
+    target = float(target_by_outlet.get(ma, 0) or 0)
+    pct = (actual / target * 100) if target > 0 else (100.0 if actual > 0 else 0.0)
+    has_mission = ma in has_new_mission
+
+    if actual <= 0:
+      nhom, nhom_name = 5, 'Nhóm 5 · Chưa phát sinh DS'
+    elif actual >= target and has_mission:
+      nhom, nhom_name = 1, 'Nhóm 1 · Đã đạt MBS'
+    elif actual >= target and not has_mission:
+      nhom, nhom_name = 2, 'Nhóm 2 · Đạt DS, thiếu nhiệm vụ'
+    elif pct >= 50 and actual < target and has_mission:
+      nhom, nhom_name = 3, 'Nhóm 3 · Đạt nhiệm vụ, DS ≥50% Target'
+    elif pct >= 60 and actual < target and not has_mission:
+      nhom, nhom_name = 4, 'Nhóm 4 · DS ≥60% Target, thiếu nhiệm vụ'
+    else:
+      nhom, nhom_name = 6, 'Nhóm 6 · Còn lại'
+
+    rows.append({
+        'Outlet Code': ma,
+        'Tên CH': ten_by_outlet.get(ma, '') if len(ten_by_outlet) else '',
+        'Tên NVBH': nv_by_outlet.get(ma, '') if len(nv_by_outlet) else '',
+        'Member type': (
+            member_by_outlet.get(ma, '') if len(member_by_outlet) else ''
+        ),
+        'Thứ VT': thu_map.get(ma, ''),
+        'Actual': actual,
+        'Actual (Not Cancel/Pending)': actual_nc,
+        'Target': target,
+        '% TH': round(pct, 1),
+        'Có nhiệm vụ NEW': 'Có' if has_mission else 'Không',
+        'Nhóm': nhom,
+        'Tên nhóm': nhom_name,
+    })
+
+  df_detail = pd.DataFrame(rows)
+  total_kh = len(df_detail)
+
+  group_meta = {
+      1: ('Nhóm 1 · Đã đạt MBS', '#c6f6d5', '#22543d'),
+      2: ('Nhóm 2 · Đạt DS, thiếu nhiệm vụ', '#edf2f7', '#2d3748'),
+      3: ('Nhóm 3 · Đạt nhiệm vụ, DS ≥50% Target', '#edf2f7', '#2d3748'),
+      4: ('Nhóm 4 · DS ≥60% Target, thiếu nhiệm vụ', '#e6fffa', '#234e52'),
+      5: ('Nhóm 5 · Chưa phát sinh DS', '#fff5f5', '#c53030'),
+      6: ('Nhóm 6 · Còn lại', '#ebf8ff', '#2b6cb0'),
+  }
+
+  groups = {}
+  for g in range(1, 7):
+    sub = (
+        df_detail[df_detail['Nhóm'] == g]
+        if not df_detail.empty
+        else pd.DataFrame()
+    )
+    kh = len(sub)
+    act = float(sub['Actual'].sum()) if kh else 0.0
+    tgt = float(sub['Target'].sum()) if kh else 0.0
+    pct_th = round(act / tgt * 100, 1) if tgt > 0 else 0.0
+    pct_kh = round(kh / total_kh * 100, 1) if total_kh else 0.0
+    name, bg, color = group_meta[g]
+    groups[g] = {
+        'name': name,
+        'kh': kh,
+        'total_kh': total_kh,
+        'pct_kh': pct_kh,
+        'actual': act,
+        'target': tgt,
+        'pct_th': pct_th,
+        'bg': bg,
+        'color': color,
+    }
+
+  return {'groups': groups, 'df_detail': df_detail, 'total_kh': total_kh}
+
+
+def format_trieu(v):
+  """Format số tiền thành triệu VNĐ kiểu 1.300,3"""
+  try:
+    tr = float(v) / 1_000_000
+    s = f'{tr:,.1f}'
+    return s.replace(',', 'X').replace('.', ',').replace('X', '.')
+  except Exception:
+    return '0,0'
+
+
+
+
+def build_mbs_brand_report(df_brand, filter_nv=None, mcp_df=None):
+  """Phân loại KH MBS BRAND thành 6 nhóm (logic giống MBS CAT).
+  Target = Doanh số nền tảng của OUTLET
+  Actual = Tổng Doanh số thực đạt của brand (sau CK)
+  Nhiệm vụ = có >= 1 Brand NEW với DS >= 200.000
+  """
+  empty = {'groups': {}, 'df_detail': pd.DataFrame(), 'total_kh': 0}
+  if df_brand is None or df_brand.empty:
+    return empty
+
+  df = df_brand.copy()
+  c_nv = find_col(df, ['SM Name', 'SM name', 'Tên NVBH', 'Nhân viên'])
+  c_ma = find_col(df, ['Outlet Code', 'Outlet_code', 'Mã CH'])
+  c_ten = find_col(df, ['Outlet Name', 'Outlet_name', 'Tên CH'])
+  c_member = find_col(df, ['Member type', 'Member Type', 'Phân loại CAT'])
+  c_loai = find_col(
+      df, ['Phân loại brand', 'Phan loai brand', 'Phân loại cat', 'Loại brand']
+  )
+  c_target = find_col(
+      df,
+      [
+          'Doanh số nền tảng của OUTLET',
+          'Doanh so nen tang',
+          'Target',
+          'Chỉ tiêu',
+      ],
+  )
+  c_actual = None
+  for c in df.columns:
+    cl = str(c).lower()
+    if (
+        'thực đạt' in cl
+        and 'brand' in cl
+        and 'not cancel' not in cl
+        and 'pending' not in cl
+    ):
+      c_actual = c
+      break
+  if not c_actual:
+    c_actual = find_col(
+        df, ['Doanh số thực đạt của brand', 'Doanh so thuc dat']
+    )
+
+  c_actual_nc = None
+  for c in df.columns:
+    cl = str(c).lower()
+    if ('not cancel' in cl or 'pending' in cl) and (
+        'thực đạt' in cl or 'brand' in cl
+    ):
+      c_actual_nc = c
+      break
+  if not c_actual_nc:
+    c_actual_nc = find_col(
+        df,
+        [
+            'Doanh số thực đạt của brand (Not Cancel/Pending)',
+            'Doanh số thực đạt của brand(Not Cancel/Pending)',
+        ],
+    )
+
+  if not c_ma or not c_target or not c_actual:
+    return empty
+
+  if filter_nv and filter_nv != 'Tất cả ĐDKD' and c_nv:
+    df = df[df[c_nv].astype(str).str.strip() == str(filter_nv).strip()]
+
+  df['_ma'] = df[c_ma].astype(str).str.strip()
+  df['_actual'] = pd.to_numeric(df[c_actual], errors='coerce').fillna(0)
+  if c_actual_nc and c_actual_nc in df.columns:
+    df['_actual_nc'] = pd.to_numeric(
+        df[c_actual_nc], errors='coerce'
+    ).fillna(0)
+  else:
+    df['_actual_nc'] = df['_actual']
+  df['_target'] = pd.to_numeric(df[c_target], errors='coerce').fillna(0)
+  df['_loai'] = (
+      df[c_loai].astype(str).str.strip().str.upper() if c_loai else ''
+  )
+
+  thu_map = {}
+  if mcp_df is not None and not mcp_df.empty:
+    c_ma_mcp = find_col(mcp_df, ['Outlet_code', 'Outlet Code', 'Mã CH'])
+    c_thu_mcp = find_col(mcp_df, ['Thứ', 'Frequency', 'Tần suất'])
+    if c_ma_mcp and c_thu_mcp:
+      tmp = mcp_df[[c_ma_mcp, c_thu_mcp]].copy()
+      tmp['_ma'] = tmp[c_ma_mcp].astype(str).str.strip()
+      tmp['_thu'] = tmp[c_thu_mcp].astype(str).str.strip()
+      thu_map = (
+          tmp.drop_duplicates('_ma').set_index('_ma')['_thu'].to_dict()
+      )
+
+  actual_by_outlet = df.groupby('_ma')['_actual'].sum()
+  actual_nc_by_outlet = df.groupby('_ma')['_actual_nc'].sum()
+  target_by_outlet = df.groupby('_ma')['_target'].first()
+  nv_by_outlet = (
+      df.groupby('_ma')[c_nv].first() if c_nv else pd.Series(dtype=str)
+  )
+  ten_by_outlet = (
+      df.groupby('_ma')[c_ten].first() if c_ten else pd.Series(dtype=str)
+  )
+  member_by_outlet = (
+      df.groupby('_ma')[c_member].first() if c_member else pd.Series(dtype=str)
+  )
+
+  new_mask = df['_loai'].str.contains('NEW', na=False)
+  new_ok = df[new_mask & (df['_actual'] >= 200000)].groupby('_ma').size()
+  has_new_mission = set(new_ok.index.tolist())
+
+  rows = []
+  for ma in actual_by_outlet.index:
+    actual = float(actual_by_outlet.get(ma, 0) or 0)
+    actual_nc = float(actual_nc_by_outlet.get(ma, 0) or 0)
+    target = float(target_by_outlet.get(ma, 0) or 0)
+    pct = (actual / target * 100) if target > 0 else (100.0 if actual > 0 else 0.0)
+    has_mission = ma in has_new_mission
+
+    if actual <= 0:
+      nhom, nhom_name = 5, 'Nhóm 5 · Chưa phát sinh DS'
+    elif actual >= target and has_mission:
+      nhom, nhom_name = 1, 'Nhóm 1 · Đã đạt MBS'
+    elif actual >= target and not has_mission:
+      nhom, nhom_name = 2, 'Nhóm 2 · Đạt DS, thiếu nhiệm vụ'
+    elif pct >= 50 and actual < target and has_mission:
+      nhom, nhom_name = 3, 'Nhóm 3 · Đạt nhiệm vụ, DS ≥50% Target'
+    elif pct >= 60 and actual < target and not has_mission:
+      nhom, nhom_name = 4, 'Nhóm 4 · DS ≥60% Target, thiếu nhiệm vụ'
+    else:
+      nhom, nhom_name = 6, 'Nhóm 6 · Còn lại'
+
+    rows.append({
+        'Outlet Code': ma,
+        'Tên CH': ten_by_outlet.get(ma, '') if len(ten_by_outlet) else '',
+        'Tên NVBH': nv_by_outlet.get(ma, '') if len(nv_by_outlet) else '',
+        'Member type': (
+            member_by_outlet.get(ma, '') if len(member_by_outlet) else ''
+        ),
+        'Thứ VT': thu_map.get(ma, ''),
+        'Actual': actual,
+        'Actual (Not Cancel/Pending)': actual_nc,
+        'Target': target,
+        '% TH': round(pct, 1),
+        'Có nhiệm vụ NEW': 'Có' if has_mission else 'Không',
+        'Nhóm': nhom,
+        'Tên nhóm': nhom_name,
+    })
+
+  df_detail = pd.DataFrame(rows)
+  total_kh = len(df_detail)
+
+  group_meta = {
+      1: ('Nhóm 1 · Đã đạt MBS', '#c6f6d5', '#22543d'),
+      2: ('Nhóm 2 · Đạt DS, thiếu nhiệm vụ', '#edf2f7', '#2d3748'),
+      3: ('Nhóm 3 · Đạt nhiệm vụ, DS ≥50% Target', '#edf2f7', '#2d3748'),
+      4: ('Nhóm 4 · DS ≥60% Target, thiếu nhiệm vụ', '#e6fffa', '#234e52'),
+      5: ('Nhóm 5 · Chưa phát sinh DS', '#fff5f5', '#c53030'),
+      6: ('Nhóm 6 · Còn lại', '#ebf8ff', '#2b6cb0'),
+  }
+
+  groups = {}
+  for g in range(1, 7):
+    sub = (
+        df_detail[df_detail['Nhóm'] == g]
+        if not df_detail.empty
+        else pd.DataFrame()
+    )
+    kh = len(sub)
+    act = float(sub['Actual'].sum()) if kh else 0.0
+    tgt = float(sub['Target'].sum()) if kh else 0.0
+    pct_th = round(act / tgt * 100, 1) if tgt > 0 else 0.0
+    pct_kh = round(kh / total_kh * 100, 1) if total_kh else 0.0
+    name, bg, color = group_meta[g]
+    groups[g] = {
+        'name': name,
+        'kh': kh,
+        'total_kh': total_kh,
+        'pct_kh': pct_kh,
+        'actual': act,
+        'target': tgt,
+        'pct_th': pct_th,
+        'bg': bg,
+        'color': color,
+    }
+
+  return {'groups': groups, 'df_detail': df_detail, 'total_kh': total_kh}
 
 
 # ====================== GIAO DIỆN ======================
@@ -2360,13 +2753,15 @@ with f3:
       '8. BÁO CÁO DOANH SỐ TURNOVER': 'TURNOVER',
       '9. BÁO CÁO TỔNG HỢP': 'SUMMARY',
       '10. BÁO CÁO LỊCH VIẾNG THĂM': 'VISIT',
+      '11. BÁO CÁO MBS CAT': 'MBS_CAT',
+      '12. BÁO CÁO MBS BRAND': 'MBS_BRAND',
   }
   selected_name = st.selectbox(
       '', list(kpi_map.keys()), key='kpi', label_visibility='collapsed'
   )
   selected_kpi = kpi_map[selected_name]
 
-f4, f5 = st.columns([1, 1])
+f4, f5, f6 = st.columns([1, 1, 1])
 with f4:
   st.markdown('<p class="filter-label">SALE SUP</p>', unsafe_allow_html=True)
   st.selectbox(
@@ -2381,6 +2776,19 @@ with f5:
       ['Tất cả ĐDKD'] + nv_list,
       key='ddkd',
       label_visibility='collapsed',
+  )
+with f6:
+  st.markdown(
+      '<p class="filter-label">📅 Thứ VT (MBS CAT/BRAND)</p>', unsafe_allow_html=True
+  )
+  thu_opts_main = ['2', '3', '4', '5', '6', '7', '25', '36', '47']
+  f_thu_vt_main = st.multiselect(
+      '',
+      thu_opts_main,
+      default=[],
+      key='mbs_cat_thu_filter',
+      label_visibility='collapsed',
+      disabled=(selected_kpi not in ['MBS_CAT', 'MBS_BRAND']),
   )
 
 st.markdown('---')
@@ -2542,6 +2950,429 @@ with tab_kpi:
         """,
         unsafe_allow_html=True,
     )
+
+  elif selected_kpi == 'MBS_CAT':
+    result = build_mbs_cat_report(df_cat, filter_nv, mcp_df=mcp)
+    groups = result['groups']
+    df_detail = result['df_detail']
+    total_kh = result['total_kh']
+
+    st.markdown(
+        f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 4px;'
+        f' font-size: 16px; text-align: center;">BÁO CÁO TỔNG HỢP MBS CAT'
+        f' - 6 NHÓM</h3>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f'<p style="text-align: center; font-size: 12px; color: #4a5568;'
+        f' margin-bottom: 8px;">Tổng Doanh Số thực đạt / Chỉ tiêu từng KH'
+        f' | Lọc NV: {filter_nv} | Tổng KH MBS: <b>{total_kh}</b></p>',
+        unsafe_allow_html=True,
+    )
+
+    # Áp dụng lọc Thứ VT (từ bộ lọc chính phía trên) lên df_detail + tính lại 6 nhóm
+    f_thu_vt = f_thu_vt_main if selected_kpi == 'MBS_CAT' else []
+    if total_kh > 0 and f_thu_vt and 'Thứ VT' in df_detail.columns:
+      thu_s = df_detail['Thứ VT'].astype(str).str.strip()
+      mapping_rules = {
+          '2': ['2', '25'], '3': ['3', '36'], '4': ['4', '47'],
+          '5': ['5', '25'], '6': ['6', '36'], '7': ['7', '47'],
+          '25': ['25'], '36': ['36'], '47': ['47'],
+      }
+      mask = pd.Series(False, index=df_detail.index)
+      for t in f_thu_vt:
+        valid_set = mapping_rules.get(str(t).strip(), [str(t).strip()])
+        mask = mask | thu_s.isin(valid_set)
+      df_detail = df_detail[mask].copy()
+      total_kh = len(df_detail)
+      # Tính lại groups
+      group_meta = {
+          1: ('Nhóm 1 · Đã đạt MBS', '#c6f6d5', '#22543d'),
+          2: ('Nhóm 2 · Đạt DS, thiếu nhiệm vụ', '#edf2f7', '#2d3748'),
+          3: ('Nhóm 3 · Đạt nhiệm vụ, DS ≥50% Target', '#edf2f7', '#2d3748'),
+          4: ('Nhóm 4 · DS ≥60% Target, thiếu nhiệm vụ', '#e6fffa', '#234e52'),
+          5: ('Nhóm 5 · Chưa phát sinh DS', '#fff5f5', '#c53030'),
+          6: ('Nhóm 6 · Còn lại', '#ebf8ff', '#2b6cb0'),
+      }
+      groups = {}
+      for g in range(1, 7):
+        sub = df_detail[df_detail['Nhóm'] == g]
+        kh = len(sub)
+        act = float(sub['Actual'].sum()) if kh else 0.0
+        tgt = float(sub['Target'].sum()) if kh else 0.0
+        pct_th = round(act / tgt * 100, 1) if tgt > 0 else 0.0
+        pct_kh = round(kh / total_kh * 100, 1) if total_kh else 0.0
+        name, bg, color = group_meta[g]
+        groups[g] = {
+            'name': name, 'kh': kh, 'total_kh': total_kh,
+            'pct_kh': pct_kh, 'actual': act, 'target': tgt,
+            'pct_th': pct_th, 'bg': bg, 'color': color,
+        }
+
+    if total_kh == 0:
+      st.warning('Không có dữ liệu Data_Cat để chạy báo cáo MBS CAT.')
+    else:
+      def render_mbs_group_card(ginfo):
+        pct_badge_bg = (
+            '#c6f6d5'
+            if ginfo['pct_th'] >= 70
+            else ('#fefcbf' if ginfo['pct_th'] >= 50 else '#fed7d7')
+        )
+        pct_badge_color = (
+            '#22543d'
+            if ginfo['pct_th'] >= 70
+            else ('#744210' if ginfo['pct_th'] >= 50 else '#c53030')
+        )
+        html = (
+            '<div style="background:' + ginfo['bg'] + '; border:1px solid #e2e8f0;'
+            ' border-radius:10px; padding:14px 16px; margin-bottom:10px;'
+            ' box-shadow:0 1px 3px rgba(0,0,0,0.06); min-height:120px;">'
+            '<div style="font-size:12px; font-weight:700; color:' + ginfo['color'] + ';'
+            ' margin-bottom:6px;">' + ginfo['name'] + '</div>'
+            '<div style="font-size:22px; font-weight:800; color:' + ginfo['color'] + ';'
+            ' line-height:1.2;">' + str(ginfo['kh']) + ' KH'
+            '<span style="font-size:14px; font-weight:600; color:#718096;">'
+            ' / ' + str(ginfo['total_kh']) + ' KH</span></div>'
+            '<div style="font-size:11px; color:#718096; margin:4px 0 8px 0;">'
+            + str(ginfo['pct_kh']) + '% tổng KH MBS</div>'
+            '<div style="border-top:1px solid #e2e8f0; padding-top:8px;'
+            ' font-size:11.5px; color:#4a5568;">'
+            'Actual <b>' + format_trieu(ginfo['actual']) + '</b>'
+            ' / Target <b>' + format_trieu(ginfo['target']) + '</b> Tr'
+            ' / % TH'
+            '<span style="background:' + pct_badge_bg + '; color:' + pct_badge_color + ';'
+            ' font-weight:800; padding:1px 7px; border-radius:8px; margin-left:4px;">'
+            + str(ginfo['pct_th']) + '%</span></div></div>'
+        )
+        st.markdown(html, unsafe_allow_html=True)
+
+      row1 = st.columns(3)
+      for i, g in enumerate([1, 2, 3]):
+        with row1[i]:
+          render_mbs_group_card(groups[g])
+      row2 = st.columns(3)
+      for i, g in enumerate([4, 5, 6]):
+        with row2[i]:
+          render_mbs_group_card(groups[g])
+
+      st.markdown(
+          '<p style="font-weight:800; color:#034ea2; margin:12px 0 6px 0;">'
+          '📋 CHI TIẾT TỪNG KHÁCH HÀNG THEO NHÓM</p>',
+          unsafe_allow_html=True,
+      )
+
+      # Lọc nhóm (popover) — Thứ VT đã nằm phía trên 6 nhóm
+      st.markdown(
+          """
+          <style>
+          div[data-testid="stPopover"] button {
+            font-size: 12px !important;
+            padding: 0.35rem 0.8rem !important;
+            min-height: 2.4rem !important;
+            width: 100% !important;
+            justify-content: center !important;
+          }
+          </style>
+          """,
+          unsafe_allow_html=True,
+      )
+      fc1, _ = st.columns([1, 3])
+      with fc1:
+        st.markdown(
+            '<p class="filter-label" style="margin-bottom:2px;font-size:11px !important;">'
+            '👁️ Lọc nhóm</p>',
+            unsafe_allow_html=True,
+        )
+        with st.popover('Chọn nhóm hiển thị', use_container_width=True):
+          nhom_filter = st.multiselect(
+              '',
+              options=[1, 2, 3, 4, 5, 6],
+              default=[1, 2, 3, 4, 5, 6],
+              format_func=lambda x: groups[x]['name'],
+              key='mbs_cat_nhom_filter',
+              label_visibility='collapsed',
+          )
+
+      nhom_selected = st.session_state.get(
+          'mbs_cat_nhom_filter', [1, 2, 3, 4, 5, 6]
+      )
+      if not nhom_selected:
+        nhom_selected = [1, 2, 3, 4, 5, 6]
+      df_show = df_detail[df_detail['Nhóm'].isin(nhom_selected)].copy()
+
+      if not df_show.empty:
+        df_show = df_show.sort_values(
+            ['Nhóm', 'Actual'], ascending=[True, False]
+        )
+        def _fmt_num(x):
+          try:
+            return f'{float(x):,.0f}'.replace(',', '.')
+          except Exception:
+            return x
+        df_show['Actual'] = df_show['Actual'].apply(_fmt_num)
+        if 'Actual (Not Cancel/Pending)' in df_show.columns:
+          df_show['Actual (Not Cancel/Pending)'] = df_show[
+              'Actual (Not Cancel/Pending)'
+          ].apply(_fmt_num)
+        df_show['Target'] = df_show['Target'].apply(_fmt_num)
+        def _fmt_pct(x):
+          try:
+            return f"{float(str(x).replace('%','')):.1f}%"
+          except Exception:
+            return '0%'
+        df_show['% TH'] = df_show['% TH'].apply(_fmt_pct)
+        cols_show = [
+            'Nhóm',
+            'Tên nhóm',
+            'Outlet Code',
+            'Tên CH',
+            'Tên NVBH',
+            'Thứ VT',
+            'Member type',
+            'Actual',
+            'Actual (Not Cancel/Pending)',
+            'Target',
+            '% TH',
+            'Có nhiệm vụ NEW',
+        ]
+        df_html = df_show[[c for c in cols_show if c in df_show.columns]].copy()
+        st.markdown(render_html_table(df_html), unsafe_allow_html=True)
+        st.caption(f'Hiển thị: {len(df_show):,} / {total_kh:,} KH')
+        st.download_button(
+            label='⬇️ Xuất file CSV - Chi tiết MBS CAT',
+            data=df_html.to_csv(index=False).encode('utf-8-sig'),
+            file_name='MBS_CAT_ChiTiet_KH.csv',
+            mime='text/csv',
+            key='mbs_cat_export_csv',
+        )
+      else:
+        st.info('Không có KH phù hợp bộ lọc hiện tại.')
+
+      g1, g5 = groups[1], groups[5]
+      note_html = (
+          '<div class="note-box">'
+          '<div style="font-weight:800; color:#034ea2; margin-bottom:8px;'
+          ' font-size:13.5px;">NHẬN XÉT & ĐÁNH GIÁ MBS CAT:</div>'
+          '<ul style="margin:0; padding-left:18px; line-height:1.6;">'
+          '<li><b>Đã đạt MBS (Nhóm 1):</b> ' + str(g1['kh']) + ' KH ('
+          + str(g1['pct_kh']) + '% tổng) — Actual '
+          + format_trieu(g1['actual']) + ' Tr / Target '
+          + format_trieu(g1['target']) + ' Tr (' + str(g1['pct_th'])
+          + '% TH).</li>'
+          '<li><b>Chưa phát sinh DS (Nhóm 5):</b> ' + str(g5['kh'])
+          + ' KH (' + str(g5['pct_kh'])
+          + '%) — cần đôn đốc mở đơn ngay.</li>'
+          '<li><b>Đề xuất:</b> Ưu tiên đẩy nhiệm vụ Cat NEW ≥ 200.000 cho'
+          ' Nhóm 2 &amp; 4 (đã có DS nhưng thiếu nhiệm vụ); kích hoạt'
+          ' Nhóm 5 chưa phát sinh.</li>'
+          '</ul></div>'
+      )
+      st.markdown(note_html, unsafe_allow_html=True)
+
+
+  elif selected_kpi == 'MBS_BRAND':
+    result = build_mbs_brand_report(df_brand, filter_nv, mcp_df=mcp)
+    groups = result['groups']
+    df_detail = result['df_detail']
+    total_kh = result['total_kh']
+
+    st.markdown(
+        f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 4px;'
+        f' font-size: 16px; text-align: center;">BÁO CÁO TỔNG HỢP MBS BRAND'
+        f' - 6 NHÓM</h3>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f'<p style="text-align: center; font-size: 12px; color: #4a5568;'
+        f' margin-bottom: 8px;">Tổng Doanh Số thực đạt / Chỉ tiêu từng KH'
+        f' | Lọc NV: {filter_nv} | Tổng KH MBS: <b>{total_kh}</b></p>',
+        unsafe_allow_html=True,
+    )
+
+    f_thu_vt = f_thu_vt_main if selected_kpi == 'MBS_BRAND' else []
+    if total_kh > 0 and f_thu_vt and 'Thứ VT' in df_detail.columns:
+      thu_s = df_detail['Thứ VT'].astype(str).str.strip()
+      mapping_rules = {
+          '2': ['2', '25'], '3': ['3', '36'], '4': ['4', '47'],
+          '5': ['5', '25'], '6': ['6', '36'], '7': ['7', '47'],
+          '25': ['25'], '36': ['36'], '47': ['47'],
+      }
+      mask = pd.Series(False, index=df_detail.index)
+      for t in f_thu_vt:
+        valid_set = mapping_rules.get(str(t).strip(), [str(t).strip()])
+        mask = mask | thu_s.isin(valid_set)
+      df_detail = df_detail[mask].copy()
+      total_kh = len(df_detail)
+      group_meta = {
+          1: ('Nhóm 1 · Đã đạt MBS', '#c6f6d5', '#22543d'),
+          2: ('Nhóm 2 · Đạt DS, thiếu nhiệm vụ', '#edf2f7', '#2d3748'),
+          3: ('Nhóm 3 · Đạt nhiệm vụ, DS ≥50% Target', '#edf2f7', '#2d3748'),
+          4: ('Nhóm 4 · DS ≥60% Target, thiếu nhiệm vụ', '#e6fffa', '#234e52'),
+          5: ('Nhóm 5 · Chưa phát sinh DS', '#fff5f5', '#c53030'),
+          6: ('Nhóm 6 · Còn lại', '#ebf8ff', '#2b6cb0'),
+      }
+      groups = {}
+      for g in range(1, 7):
+        sub = df_detail[df_detail['Nhóm'] == g]
+        kh = len(sub)
+        act = float(sub['Actual'].sum()) if kh else 0.0
+        tgt = float(sub['Target'].sum()) if kh else 0.0
+        pct_th = round(act / tgt * 100, 1) if tgt > 0 else 0.0
+        pct_kh = round(kh / total_kh * 100, 1) if total_kh else 0.0
+        name, bg, color = group_meta[g]
+        groups[g] = {
+            'name': name, 'kh': kh, 'total_kh': total_kh,
+            'pct_kh': pct_kh, 'actual': act, 'target': tgt,
+            'pct_th': pct_th, 'bg': bg, 'color': color,
+        }
+
+    if total_kh == 0:
+      st.warning('Không có dữ liệu Data_Brand để chạy báo cáo MBS BRAND.')
+    else:
+      def render_mbs_brand_card(ginfo):
+        pct_badge_bg = (
+            '#c6f6d5' if ginfo['pct_th'] >= 70
+            else ('#fefcbf' if ginfo['pct_th'] >= 50 else '#fed7d7')
+        )
+        pct_badge_color = (
+            '#22543d' if ginfo['pct_th'] >= 70
+            else ('#744210' if ginfo['pct_th'] >= 50 else '#c53030')
+        )
+        html = (
+            '<div style="background:' + ginfo['bg'] + '; border:1px solid #e2e8f0;'
+            ' border-radius:10px; padding:14px 16px; margin-bottom:10px;'
+            ' box-shadow:0 1px 3px rgba(0,0,0,0.06); min-height:120px;">'
+            '<div style="font-size:12px; font-weight:700; color:' + ginfo['color'] + ';'
+            ' margin-bottom:6px;">' + ginfo['name'] + '</div>'
+            '<div style="font-size:22px; font-weight:800; color:' + ginfo['color'] + ';'
+            ' line-height:1.2;">' + str(ginfo['kh']) + ' KH'
+            '<span style="font-size:14px; font-weight:600; color:#718096;">'
+            ' / ' + str(ginfo['total_kh']) + ' KH</span></div>'
+            '<div style="font-size:11px; color:#718096; margin:4px 0 8px 0;">'
+            + str(ginfo['pct_kh']) + '% tổng KH MBS</div>'
+            '<div style="border-top:1px solid #e2e8f0; padding-top:8px;'
+            ' font-size:11.5px; color:#4a5568;">'
+            'Actual <b>' + format_trieu(ginfo['actual']) + '</b>'
+            ' / Target <b>' + format_trieu(ginfo['target']) + '</b> Tr'
+            ' / % TH'
+            '<span style="background:' + pct_badge_bg + '; color:' + pct_badge_color + ';'
+            ' font-weight:800; padding:1px 7px; border-radius:8px; margin-left:4px;">'
+            + str(ginfo['pct_th']) + '%</span></div></div>'
+        )
+        st.markdown(html, unsafe_allow_html=True)
+
+      row1 = st.columns(3)
+      for i, g in enumerate([1, 2, 3]):
+        with row1[i]:
+          render_mbs_brand_card(groups[g])
+      row2 = st.columns(3)
+      for i, g in enumerate([4, 5, 6]):
+        with row2[i]:
+          render_mbs_brand_card(groups[g])
+
+      st.markdown(
+          '<p style="font-weight:800; color:#034ea2; margin:12px 0 6px 0;">'
+          '📋 CHI TIẾT TỪNG KHÁCH HÀNG THEO NHÓM (BRAND)</p>',
+          unsafe_allow_html=True,
+      )
+      st.markdown(
+          """
+          <style>
+          div[data-testid="stPopover"] button {
+            font-size: 12px !important;
+            padding: 0.35rem 0.8rem !important;
+            min-height: 2.4rem !important;
+            width: 100% !important;
+            justify-content: center !important;
+          }
+          </style>
+          """,
+          unsafe_allow_html=True,
+      )
+      fc1, _ = st.columns([1, 3])
+      with fc1:
+        st.markdown(
+            '<p class="filter-label" style="margin-bottom:2px;font-size:11px !important;">'
+            '👁️ Lọc nhóm</p>',
+            unsafe_allow_html=True,
+        )
+        with st.popover('Chọn nhóm hiển thị', use_container_width=True):
+          st.multiselect(
+              '',
+              options=[1, 2, 3, 4, 5, 6],
+              default=[1, 2, 3, 4, 5, 6],
+              format_func=lambda x: groups[x]['name'],
+              key='mbs_brand_nhom_filter',
+              label_visibility='collapsed',
+          )
+
+      nhom_selected = st.session_state.get(
+          'mbs_brand_nhom_filter', [1, 2, 3, 4, 5, 6]
+      )
+      if not nhom_selected:
+        nhom_selected = [1, 2, 3, 4, 5, 6]
+      df_show = df_detail[df_detail['Nhóm'].isin(nhom_selected)].copy()
+
+      if not df_show.empty:
+        df_show = df_show.sort_values(
+            ['Nhóm', 'Actual'], ascending=[True, False]
+        )
+        def _fmt_num_b(x):
+          try:
+            return f'{float(x):,.0f}'.replace(',', '.')
+          except Exception:
+            return x
+        df_show['Actual'] = df_show['Actual'].apply(_fmt_num_b)
+        if 'Actual (Not Cancel/Pending)' in df_show.columns:
+          df_show['Actual (Not Cancel/Pending)'] = df_show[
+              'Actual (Not Cancel/Pending)'
+          ].apply(_fmt_num_b)
+        df_show['Target'] = df_show['Target'].apply(_fmt_num_b)
+        def _fmt_pct_brand(x):
+          try:
+            return f"{float(str(x).replace('%','')):.1f}%"
+          except Exception:
+            return '0%'
+        df_show['% TH'] = df_show['% TH'].apply(_fmt_pct_brand)
+        cols_show = [
+            'Nhóm', 'Tên nhóm', 'Outlet Code', 'Tên CH', 'Tên NVBH',
+            'Thứ VT', 'Member type', 'Actual',
+            'Actual (Not Cancel/Pending)', 'Target', '% TH',
+            'Có nhiệm vụ NEW',
+        ]
+        df_html = df_show[[c for c in cols_show if c in df_show.columns]].copy()
+        st.markdown(render_html_table(df_html), unsafe_allow_html=True)
+        st.caption(f'Hiển thị: {len(df_show):,} / {total_kh:,} KH')
+        st.download_button(
+            label='⬇️ Xuất file CSV - Chi tiết MBS BRAND',
+            data=df_html.to_csv(index=False).encode('utf-8-sig'),
+            file_name='MBS_BRAND_ChiTiet_KH.csv',
+            mime='text/csv',
+            key='mbs_brand_export_csv',
+        )
+      else:
+        st.info('Không có KH phù hợp bộ lọc hiện tại.')
+
+      g1, g5 = groups[1], groups[5]
+      note_html = (
+          '<div class="note-box">'
+          '<div style="font-weight:800; color:#034ea2; margin-bottom:8px;'
+          ' font-size:13.5px;">NHẬN XÉT & ĐÁNH GIÁ MBS BRAND:</div>'
+          '<ul style="margin:0; padding-left:18px; line-height:1.6;">'
+          '<li><b>Đã đạt MBS (Nhóm 1):</b> ' + str(g1['kh']) + ' KH ('
+          + str(g1['pct_kh']) + '% tổng) — Actual '
+          + format_trieu(g1['actual']) + ' Tr / Target '
+          + format_trieu(g1['target']) + ' Tr (' + str(g1['pct_th'])
+          + '% TH).</li>'
+          '<li><b>Chưa phát sinh DS (Nhóm 5):</b> ' + str(g5['kh'])
+          + ' KH (' + str(g5['pct_kh'])
+          + '%) — cần đôn đốc mở đơn ngay.</li>'
+          '<li><b>Đề xuất:</b> Ưu tiên đẩy nhiệm vụ Brand NEW ≥ 200.000 cho'
+          ' Nhóm 2 &amp; 4; kích hoạt Nhóm 5 chưa phát sinh.</li>'
+          '</ul></div>'
+      )
+      st.markdown(note_html, unsafe_allow_html=True)
+
 
   elif selected_kpi == 'VISIT':
     # ===== TỰ NHẬN THỨ + TUẦN ISO CHẴN/LẺ TỪ NGÀY CHỌN =====
