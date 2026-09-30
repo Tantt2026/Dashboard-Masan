@@ -754,6 +754,10 @@ def process_brand_sales(df_rpt, df_brand):
           'vivant' in s or 'vĩnh hảo' in s or 'vinh hao' in s
       ):
         return b
+      if b_clean == 'compact' and (
+          'compact' in s or 'lemona' in s
+      ):
+        return b
     return 'Khác'
 
   df_clean = df_rpt.copy()
