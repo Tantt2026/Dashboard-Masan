@@ -6456,6 +6456,351 @@ with tab_mcp:
     )
     st.caption(f'Hiển thị: {len(df_f):,} / {len(mcp):,} cửa hàng')
 
+
+# ====================== MBS CAT/BRAND SUMMARY ======================
+def build_mbs_data_summary(df_source, kind='CAT'):
+  """Tạo bảng Summary MBS CAT/BRAND từ Data_MBS đã được tính doanh số từ RPT_061.
+
+  - Doanh số: dùng các cột Doanh số thực đạt đã được process từ RPT_061.
+  - Số lượng ngành/nhãn hàng: count từng dòng trong Data_Cat/Data_Brand.
+  - OLD = Cũ, NEW = Mới, FOCUS = Duy trì.
+  - OLD đã mua = dòng OLD có doanh số thực đạt > 0.
+  - FOCUS cần duy trì = count tất cả dòng FOCUS (không cần DS).
+  - FOCUS đã mua (đã duy trì) = FOCUS có DS >= 200.000.
+  - NEW đã mở thêm = NEW có DS >= 200.000.
+  - Mới duy trì/mở thành công = FOCUS đạt >= 200k + NEW đạt >= 200k.
+  """
+  if df_source is None or df_source.empty:
+    return pd.DataFrame()
+
+  df_s = df_source.copy()
+  kind_u = str(kind).upper().strip()
+  if kind_u == 'BRAND':
+    col_uid = find_col(df_s, ['SM UID'])
+    col_nv = find_col(df_s, ['SM Name', 'SM name', 'Tên NVBH', 'Nhân viên'])
+    col_code = find_col(df_s, ['Outlet Code', 'Outlet_code', 'Mã CH', 'Mã khách hàng'])
+    col_name = find_col(df_s, ['Outlet Name', 'Outlet_name', 'Tên CH', 'Tên khách hàng'])
+    col_target = find_col(df_s, ['Doanh số nền tảng của OUTLET', 'Doanh so nen tang', 'Target', 'Chỉ tiêu'])
+    col_actual = find_col(df_s, ['Doanh số thực đạt của brand', 'Doanh số thực đạt BRAND'])
+    col_actual_nc = find_col(df_s, [
+        'Doanh số thực đạt của brand (Not Cancel/Pending)',
+        'Doanh số thực đạt của brand(Not Cancel/Pending)',
+    ])
+    col_type = find_col(df_s, ['Phân loại brand', 'Phan loai brand', 'Loại brand'])
+    col_bonus = find_col(df_s, ['Điểm thưởng dự kiến'])
+  else:
+    col_uid = find_col(df_s, ['SM UID'])
+    col_nv = find_col(df_s, ['Tên NVBH', 'SM Name', 'SM name', 'Nhân viên'])
+    col_code = find_col(df_s, ['Outlet Code', 'Outlet_code', 'Mã CH', 'Mã khách hàng'])
+    col_name = find_col(df_s, ['Outlet Name', 'Outlet_name', 'Tên CH', 'Tên khách hàng'])
+    col_target = find_col(df_s, ['Doanh số nền tảng của OUTLET', 'Doanh so nen tang', 'Target', 'Chỉ tiêu'])
+    col_actual = find_col(df_s, ['Doanh số thực đạt của CAT', 'Doanh số thực đạt CAT'])
+    col_actual_nc = find_col(df_s, [
+        'Doanh số thực đạt của CAT(Not Cancel/Pending)',
+        'Doanh số thực đạt của CAT (Not Cancel/Pending)',
+    ])
+    col_type = find_col(df_s, ['Phân loại cat', 'Phan loai cat', 'Loại cat'])
+    col_bonus = find_col(df_s, ['Điểm thưởng dự kiến của OUTLET', 'Điểm thưởng dự kiến'])
+
+  if not col_code:
+    return pd.DataFrame()
+
+  df_s['_summary_code'] = df_s[col_code].astype(str).str.strip()
+  df_s['_summary_actual'] = (
+      pd.to_numeric(df_s[col_actual], errors='coerce').fillna(0.0)
+      if col_actual else 0.0
+  )
+  df_s['_summary_actual_nc'] = (
+      pd.to_numeric(df_s[col_actual_nc], errors='coerce').fillna(0.0)
+      if col_actual_nc else df_s['_summary_actual']
+  )
+  df_s['_summary_target'] = (
+      pd.to_numeric(df_s[col_target], errors='coerce').fillna(0.0)
+      if col_target else 0.0
+  )
+  df_s['_summary_type'] = (
+      df_s[col_type].astype(str).str.strip().str.upper()
+      if col_type else ''
+  )
+  df_s['_summary_bought'] = df_s['_summary_actual'] > 0
+
+  rows = []
+  for code, sub in df_s.groupby('_summary_code', sort=False):
+    if not str(code).strip() or str(code).lower() in ('nan', 'none'):
+      continue
+
+    first = sub.iloc[0]
+    old_mask = sub['_summary_type'].eq('OLD')
+    new_mask = sub['_summary_type'].eq('NEW')
+    focus_mask = sub['_summary_type'].eq('FOCUS')
+
+    # OLD: cần mua = tất cả OLD; đã mua = OLD có DS > 0
+    # FOCUS: cần duy trì = tất cả FOCUS; đã mua = FOCUS có DS >= 200.000
+    # NEW: đã mở thêm = NEW có DS >= 200.000
+    mbs_200k = sub['_summary_actual'] >= 200000
+    new_qualified = new_mask & mbs_200k
+    focus_qualified = focus_mask & mbs_200k
+
+    old_need = int(old_mask.sum())
+    old_bought = int((old_mask & sub['_summary_bought']).sum())
+    focus_need = int(focus_mask.sum())          # tất cả FOCUS cần duy trì
+    focus_bought = int(focus_qualified.sum())   # FOCUS đã đạt >= 200k
+    new_opened = int(new_qualified.sum())
+    successful_new = focus_bought + new_opened
+    total_bought = old_bought + focus_bought + new_opened
+
+    target = float(sub['_summary_target'].iloc[0] or 0)
+    actual = float(sub['_summary_actual'].sum() or 0)
+    actual_nc = float(sub['_summary_actual_nc'].sum() or 0)
+    pct = round(actual / target * 100, 1) if target else 0.0
+
+    rows.append({
+        'SM UID': first[col_uid] if col_uid else '',
+        'SM Name': first[col_nv] if col_nv else '',
+        'Outlet Code': code,
+        'Outlet Name': first[col_name] if col_name else '',
+        'Chỉ tiêu doanh số': target,
+        'Doanh số thực hiện (Paid & Invoiced)': actual,
+        'Doanh số thực hiện ( Not Cancel/Pending)': actual_nc,
+        '% Th/CT (Paid & Invoiced)': pct,
+        'SL ngành/nhãn hàng cũ cần mua/đã mua': f'{old_need}/{old_bought}',
+        'SL ngành/nhãn hàng mới cần duy trì/đã mua': f'{focus_need}/{focus_bought}',
+        'SL ngành/nhãn hàng mới đã mở thêm': new_opened,
+        'Tổng SL ngành/nhãn hàng mới duy trì/mở thành công': successful_new,
+        'Tổng SL ngành/nhãn hàng đã mua': total_bought,
+        'Điểm thưởng dự kiến': (
+            float(pd.to_numeric(sub[col_bonus], errors='coerce').dropna().iloc[0])
+            if col_bonus and not pd.to_numeric(sub[col_bonus], errors='coerce').dropna().empty
+            else 0.0
+        ),
+    })
+
+  out = pd.DataFrame(rows)
+  if out.empty:
+    return out
+  return out.sort_values(['SM Name', 'Outlet Code'], kind='stable').reset_index(drop=True)
+
+
+def render_mbs_data_table(df_show, selected_cols):
+  """Bảng Data MBS CAT/BRAND: cuộn ngang + dọc, tối đa ~15 dòng."""
+  if df_show is None or df_show.empty or not selected_cols:
+    return
+
+  html = [
+      '<div class="mbs-data-scroll">',
+      '<table class="mbs-data-table">',
+      '<thead><tr>',
+  ]
+  for col in selected_cols:
+    html.append(f'<th>{col}</th>')
+  html.append('</tr></thead><tbody>')
+
+  for _, row in df_show[selected_cols].iterrows():
+    html.append('<tr>')
+    for col in selected_cols:
+      val = row.get(col, '')
+      if pd.isna(val):
+        val = ''
+      sval = str(val)
+      col_lower = str(col).lower()
+
+      if '%' in str(col):
+        cls = color_pct_class(sval)
+        style = color_pct_bg(sval)
+        html.append(
+            f'<td data-colored="1" class="{cls}" style="{style}'
+            'text-align:center !important;white-space:nowrap;">'
+            f'{sval}</td>'
+        )
+      elif any(x in col_lower for x in [
+          'phân loại cat', 'phan loai cat', 'loại cat',
+          'phân loại brand', 'phan loai brand', 'loại brand'
+      ]):
+        t = sval.strip().upper()
+        if t == 'OLD':
+          style = 'background:#edf2f7 !important;color:#4a5568 !important;font-weight:700 !important;'
+        elif t == 'NEW':
+          style = 'background:#fefcbf !important;color:#744210 !important;font-weight:800 !important;'
+        elif t == 'FOCUS':
+          style = 'background:#c6f6d5 !important;color:#22543d !important;font-weight:800 !important;'
+        else:
+          style = ''
+        html.append(
+            f'<td data-colored="1" style="{style}text-align:center !important;white-space:nowrap;">'
+            f'{sval}</td>'
+        )
+      else:
+        align = 'left' if any(x in col_lower for x in ['name', 'tên', 'sm name']) else 'center'
+        if 'doanh số' in col_lower or 'doanhso' in col_lower.replace(' ', '') or 'điểm thưởng' in col_lower:
+          align = 'right'
+        html.append(
+            f'<td style="text-align:{align} !important;white-space:nowrap;">{sval}</td>'
+        )
+    html.append('</tr>')
+
+  html.append('</tbody></table></div>')
+  st.markdown(''.join(html), unsafe_allow_html=True)
+
+
+
+st.markdown(
+    """
+    <style>
+    /* MBS CAT / BRAND: chỉ format màu, giữ nguyên scroll/kích thước */
+    .mbs-summary-scroll,
+    .mbs-data-scroll {
+      width: 100%;
+      /* Tối đa ~15 dòng: vẫn giữ cuộn dọc + cuộn ngang */
+      max-height: 480px;
+      overflow-x: auto !important;
+      overflow-y: auto !important;
+      -webkit-overflow-scrolling: touch;
+      border: 1px solid #9ca3af;
+    }
+    .mbs-summary-table,
+    .mbs-data-table {
+      border-collapse: collapse !important;
+      font-size: 11px !important;
+      border: 1px solid #9ca3af !important;
+      /* Tự scale theo khung: ít cột thì full khung, nhiều cột thì tự rộng để cuộn ngang */
+      width: max-content !important;
+      min-width: 100% !important;
+      table-layout: auto !important;
+      margin: 0 !important;
+    }
+    .mbs-summary-table thead th,
+    .mbs-data-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    .mbs-summary-table th,
+    .mbs-data-table th {
+      background: #034ea2 !important;
+      color: #ffffff !important;
+      font-weight: 800 !important;
+      text-align: center !important;
+      border: 1px solid #ffffff !important;
+      padding: 5px 7px !important;
+      white-space: nowrap !important;
+    }
+    .mbs-summary-table td,
+    .mbs-data-table td {
+      border: 1px solid #d1d5db !important;
+      padding: 4px 7px !important;
+      white-space: nowrap !important;
+    }
+    .mbs-summary-table tbody tr:nth-child(even),
+    .mbs-data-table tbody tr:nth-child(even) {
+      background: #f7fbff !important;
+    }
+    .mbs-summary-table tbody tr:nth-child(odd),
+    .mbs-data-table tbody tr:nth-child(odd) {
+      background: #ffffff !important;
+    }
+    .mbs-summary-table tbody tr:hover,
+    .mbs-data-table tbody tr:hover {
+      background: #eaf3ff !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+def render_mbs_data_summary(df_summary, title):
+  """Render bảng Summary MBS: format màu + cuộn ngang/dọc, tối đa ~15 dòng."""
+  if df_summary is None or df_summary.empty:
+    st.info(f'Không có dữ liệu {title} phù hợp bộ lọc hiện tại.')
+    return
+
+  df_show = df_summary.copy()
+  money_cols = [
+      'Chỉ tiêu doanh số',
+      'Doanh số thực hiện (Paid & Invoiced)',
+      'Doanh số thực hiện ( Not Cancel/Pending)',
+  ]
+  for c in money_cols:
+    if c in df_show.columns:
+      df_show[c] = pd.to_numeric(df_show[c], errors='coerce').fillna(0).apply(format_number_vn)
+  if '% Th/CT (Paid & Invoiced)' in df_show.columns:
+    df_show['% Th/CT (Paid & Invoiced)'] = df_show['% Th/CT (Paid & Invoiced)'].apply(
+        lambda x: f'{float(x):.1f}%'
+    )
+  if 'Điểm thưởng dự kiến' in df_show.columns:
+    df_show['Điểm thưởng dự kiến'] = pd.to_numeric(
+        df_show['Điểm thưởng dự kiến'], errors='coerce'
+    ).fillna(0).apply(lambda x: f'{float(x):,.0f}'.replace(',', '.'))
+
+  st.markdown(
+      f'<p style="font-weight:800; color:#034ea2; margin:14px 0 6px 0;">'
+      f'📊 {title}</p>',
+      unsafe_allow_html=True,
+  )
+  st.markdown(
+      '<p style="font-size:11.5px; color:#4a5568; margin:0 0 6px 0;">'
+      'OLD = Cũ &nbsp;|&nbsp; NEW = Mới &nbsp;|&nbsp; FOCUS = Duy trì &nbsp;|&nbsp; '
+      'Cần duy trì = tất cả FOCUS &nbsp;|&nbsp; Đã mua = FOCUS/NEW có DS ≥ 200.000 &nbsp;|&nbsp; '
+      'Doanh số lấy từ RPT_061.</p>',
+      unsafe_allow_html=True,
+  )
+
+  # Render HTML để format màu giống bảng KPI, đồng thời giữ cuộn ngang + dọc.
+  html = [
+      '<div class="mbs-summary-scroll">',
+      '<table class="mbs-summary-table">',
+      '<thead><tr>',
+  ]
+  for col in df_show.columns:
+    html.append(f'<th>{col}</th>')
+  html.append('</tr></thead><tbody>')
+
+  for _, row in df_show.iterrows():
+    html.append('<tr>')
+    for col in df_show.columns:
+      val = row.get(col, '')
+      if pd.isna(val):
+        val = ''
+      sval = str(val)
+      col_lower = str(col).lower()
+
+      if '%' in str(col):
+        cls = color_pct_class(sval)
+        style = color_pct_bg(sval)
+        html.append(
+            f'<td data-colored="1" class="{cls}" style="{style}'
+            'text-align:center !important;white-space:nowrap;">'
+            f'{sval}</td>'
+        )
+      elif 'điểm thưởng dự kiến' in col_lower:
+        html.append(
+            '<td style="text-align:center !important;'
+            'background:#fff7ed !important;color:#9a3412 !important;'
+            'font-weight:800 !important;white-space:nowrap;">'
+            f'{sval}</td>'
+        )
+      elif any(x in col_lower for x in ['doanh số', 'doanhso', 'chỉ tiêu']):
+        html.append(
+            '<td style="text-align:right !important;white-space:nowrap;">'
+            f'{sval}</td>'
+        )
+      elif any(x in col_lower for x in ['sm name', 'sm uid', 'outlet name', 'outlet code']):
+        align = 'left' if 'name' in col_lower else 'center'
+        html.append(
+            f'<td style="text-align:{align} !important;white-space:nowrap;">'
+            f'{sval}</td>'
+        )
+      else:
+        html.append(
+            '<td style="text-align:center !important;white-space:nowrap;">'
+            f'{sval}</td>'
+        )
+    html.append('</tr>')
+
+  html.append('</tbody></table></div>')
+  st.markdown(''.join(html), unsafe_allow_html=True)
+  st.caption(f'Tổng: {len(df_show):,} cửa hàng | Hiển thị theo bộ lọc hiện tại')
+
+
 # ----- TAB CAT -----
 with tab_cat:
   st.markdown(
@@ -6575,6 +6920,7 @@ with tab_cat:
           df_f[col_ten].astype(str).str.contains(f_ten, case=False, na=False)
       ]
     df_f = filter_by_thu_multi(df_f, col_thu, f_thu)
+    df_cat_summary = build_mbs_data_summary(df_f, 'CAT')
     for col in df_f.columns:
       if 'doanh số' in col.lower() or 'doanhso' in col.lower().replace(
           ' ', ''
@@ -6608,10 +6954,10 @@ with tab_cat:
       )
     st.query_params['cat_cols'] = ','.join(selected_cat_cols)
 
-    st.dataframe(
-        df_f[selected_cat_cols], use_container_width=True, height=450, hide_index=True
-    )
+    render_mbs_data_table(df_f, selected_cat_cols)
     st.caption(f'Hiển thị: {len(df_f):,} / {len(df_cat):,} dòng')
+
+    render_mbs_data_summary(df_cat_summary, 'DATA_CAT SUMMARY')
 
 # ----- TAB BRAND -----
 with tab_brand:
@@ -6732,6 +7078,7 @@ with tab_brand:
           df_f[col_ten].astype(str).str.contains(f_ten, case=False, na=False)
       ]
     df_f = filter_by_thu_multi(df_f, col_thu, f_thu)
+    df_brand_summary = build_mbs_data_summary(df_f, 'BRAND')
     for col in df_f.columns:
       if 'doanh số' in col.lower() or 'doanhso' in col.lower().replace(
           ' ', ''
@@ -6765,10 +7112,10 @@ with tab_brand:
       )
     st.query_params['brand_cols'] = ','.join(selected_brand_cols)
 
-    st.dataframe(
-        df_f[selected_brand_cols], use_container_width=True, height=450, hide_index=True
-    )
+    render_mbs_data_table(df_f, selected_brand_cols)
     st.caption(f'Hiển thị: {len(df_f):,} / {len(df_brand):,} dòng')
+
+    render_mbs_data_summary(df_brand_summary, 'DATA_BRAND SUMMARY')
 
 # ----- TAB DSKH_Combo OFF -----
 with tab_dskh_off:
