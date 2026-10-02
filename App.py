@@ -2468,9 +2468,10 @@ def render_visit_html_table(df):
             else ('center' if col in ['STT', 'Mã NVBH'] or is_pct else 'right')
         )
         if is_pct:
+          cls = color_pct_class(val)
           html.append(
-              f'<td style="{style_bg} text-align: center; font-weight: 900'
-              f' !important;">{val}</td>'
+              f'<td align="center" data-colored="1" class="{cls}" '
+              f'style="{style_bg} text-align:center !important;font-weight:900 !important;">{val}</td>'
           )
         else:
           html.append(
@@ -2485,7 +2486,11 @@ def render_visit_html_table(df):
             else ('center' if col in ['STT', 'Mã NVBH'] or is_pct else 'right')
         )
         if is_pct:
-          html.append(f'<td style="{style_bg} text-align: center;">{val}</td>')
+          cls = color_pct_class(val)
+          html.append(
+              f'<td align="center" data-colored="1" class="{cls}" '
+              f'style="{style_bg} text-align:center !important;">{val}</td>'
+          )
         else:
           html.append(
               f'<td style="text-align: {align}; white-space: nowrap;">{val}</td>'
@@ -3308,9 +3313,10 @@ def render_summary_html_table(df, selected_metrics):
               f' white-space: nowrap;">{val}</td>'
           )
         elif is_pct:
+          cls = color_pct_class(val)
           html.append(
-              f'<td style="{style_bg} text-align: center; font-weight: 900'
-              f' !important;">{val}</td>'
+              f'<td align="center" data-colored="1" class="{cls}" '
+              f'style="{style_bg} text-align:center !important;font-weight:900 !important;">{val}</td>'
           )
         else:
           align = 'left' if col == 'Tên NV' else 'center'
@@ -3325,8 +3331,10 @@ def render_summary_html_table(df, selected_metrics):
               f'<td style="text-align: right; white-space: nowrap;">{val}</td>'
           )
         elif is_pct:
+          cls = color_pct_class(val)
           html.append(
-              f'<td style="{style_bg} text-align: center;">{val}</td>'
+              f'<td align="center" data-colored="1" class="{cls}" '
+              f'style="{style_bg} text-align:center !important;">{val}</td>'
           )
         else:
           align = 'left' if col == 'Tên NV' else 'center'
@@ -3361,17 +3369,18 @@ def render_html_table(df):
       if pd.isna(val):
         val = ''
 
-      if col in ['% MTD', '% MTD (OFF)', '% MTD (ON)', '% MTD OFF', '% MTD ON', '% Hoàn Thành', '% TH']:
+      if col in [
+          '% MTD', '% MTD (OFF)', '% MTD (ON)', '% MTD OFF', '% MTD ON',
+          '% Hoàn Thành', '% TH', '% PC/VT OFF', '% PC/Plan ON', '% TH SO',
+          '% TH Xanh', '% TH Vàng', '% Active',
+      ] or (isinstance(col, str) and col.strip().startswith('%')):
         style_bg = color_pct_bg(val)
-        if is_total:
-          html.append(
-              f'<td style="{style_bg} text-align: center; font-weight: 900'
-              f' !important;">{val}</td>'
-          )
-        else:
-          html.append(
-              f'<td style="{style_bg} text-align: center;">{val}</td>'
-          )
+        cls = color_pct_class(val)
+        html.append(
+            f'<td align="center" data-colored="1" class="{cls}" '
+            f'style="{style_bg} text-align:center !important;font-weight:700 !important;">'
+            f'{val}</td>'
+        )
       elif is_total:
         align = (
             'left'
