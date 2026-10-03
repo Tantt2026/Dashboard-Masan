@@ -4747,77 +4747,188 @@ def _perf_table_html(df, section='call'):
 
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def load_dskh_trai_tuyen():
-  """Load sheet F4 & F2 từ DSKH_Trái Tuyến.xlsx."""
+  """Load F4 & F2 từ DSKH_Trái Tuyến.xlsx — xử lý Unicode NFC/NFD + tìm file linh hoạt."""
+  import unicodedata
   empty = pd.DataFrame()
-  path = globals().get('DSKH_TRAI_PATH') or os.path.join(DATA_DIR, 'DSKH_Trái Tuyến.xlsx')
-  # try multiple names
-  candidates = [path]
-  if os.path.isdir(DATA_DIR):
-    for fn in os.listdir(DATA_DIR):
-      low = fn.lower()
-      if 'dskh' in low and ('trai' in low or 'trái' in low or 'tuyen' in low or 'tuyến' in low):
-        candidates.append(os.path.join(DATA_DIR, fn))
+
+  def _nfc(s):
+    try:
+      return unicodedata.normalize('NFC', str(s))
+    except Exception:
+      return str(s)
+
+  def _fold(s):
+    """Bỏ dấu + lower để so tên file."""
+    s = _nfc(s).lower()
+    repl = {
+        'á':'a','à':'a','ả':'a','ã':'a','ạ':'a','ă':'a','ắ':'a','ằ':'a','ẳ':'a','ẵ':'a','ặ':'a',
+        'â':'a','ấ':'a','ầ':'a','ẩ':'a','ẫ':'a','ậ':'a',
+        'é':'e','è':'e','ẻ':'e','ẽ':'e','ẹ':'e','ê':'e','ế':'e','ề':'e','ể':'e','ễ':'e','ệ':'e',
+        'í':'i','ì':'i','ỉ':'i','ĩ':'i','ị':'i',
+        'ó':'o','ò':'o','ỏ':'o','õ':'o','ọ':'o','ô':'o','ố':'o','ồ':'o','ổ':'o','ỗ':'o','ộ':'o',
+        'ơ':'o','ớ':'o','ờ':'o','ở':'o','ỡ':'o','ợ':'o',
+        'ú':'u','ù':'u','ủ':'u','ũ':'u','ụ':'u','ư':'u','ứ':'u','ừ':'u','ử':'u','ữ':'u','ự':'u',
+        'ý':'y','ỳ':'y','ỷ':'y','ỹ':'y','ỵ':'y','đ':'d',
+    }
+    for a, b in repl.items():
+      s = s.replace(a, b)
+    return s
+
   path_use = None
+  candidates = []
+
+  # Quét data/ — match mọi file có "dskh"
+  search_dirs = []
+  for d in [DATA_DIR, 'data', '.', '/mount/src']:
+    if os.path.isdir(d):
+      search_dirs.append(d)
+    # streamlit cloud đôi khi mount khác
+    try:
+      for root, dirs, files in os.walk(d if os.path.isdir(d) else '.'):
+        if 'data' in dirs:
+          search_dirs.append(os.path.join(root, 'data'))
+        break
+    except Exception:
+      pass
+
+  seen = set()
+  for d in search_dirs:
+    try:
+      for fn in os.listdir(d):
+        full = os.path.join(d, fn)
+        if full in seen:
+          continue
+        seen.add(full)
+        if not fn.lower().endswith(('.xlsx', '.xls', '.xlsm')):
+          continue
+        folded = _fold(fn)
+        if 'dskh' in folded:
+          candidates.append(full)
+    except Exception:
+      continue
+
+  # Thêm path cố định
+  for name in [
+      'DSKH_Trái Tuyến.xlsx', 'DSKH_Trai Tuyen.xlsx',
+      'DSKH_Trái_Tuyến.xlsx', 'DSKH Trai Tuyen.xlsx',
+  ]:
+    candidates.insert(0, os.path.join(DATA_DIR, name))
+
   for p in candidates:
-    if os.path.exists(p):
-      path_use = p
-      break
+    try:
+      if os.path.isfile(p):
+        path_use = p
+        break
+    except Exception:
+      continue
+
   if not path_use:
     return empty, empty
-  try:
-    xl = pd.ExcelFile(path_use)
-    sheets = {s.lower().strip(): s for s in xl.sheet_names}
-    s_f4 = sheets.get('f4') or next((sheets[k] for k in sheets if 'f4' in k), None)
-    s_f2 = sheets.get('f2') or next((sheets[k] for k in sheets if 'f2' in k), None)
-    df_f4 = pd.read_excel(path_use, sheet_name=s_f4) if s_f4 else empty
-    df_f2 = pd.read_excel(path_use, sheet_name=s_f2) if s_f2 else empty
+
+  def _read_sheets(p):
+    xl = pd.ExcelFile(p)
+    names = list(xl.sheet_names)
+    s_f4 = s_f2 = None
+    for s in names:
+      su = str(s).strip().upper()
+      if su == 'F4' or su.startswith('F4'):
+        s_f4 = s
+      if su == 'F2' or su.startswith('F2'):
+        s_f2 = s
+    df_f4 = pd.read_excel(p, sheet_name=s_f4) if s_f4 else empty
+    df_f2 = pd.read_excel(p, sheet_name=s_f2) if s_f2 else empty
+    if not df_f4.empty:
+      df_f4.columns = [str(c).strip() for c in df_f4.columns]
+    if not df_f2.empty:
+      df_f2.columns = [str(c).strip() for c in df_f2.columns]
     return df_f4, df_f2
+
+  try:
+    return _read_sheets(path_use)
   except Exception:
-    return empty, empty
+    try:
+      return _read_sheets(path_use)
+    except Exception:
+      return empty, empty
+
 
 
 def _norm_ma_kh(x):
+  """Chuẩn hoá Mã KH: bỏ .0, khoảng trắng, leading zeros không bắt buộc."""
+  if x is None or (isinstance(x, float) and pd.isna(x)):
+    return ''
+  try:
+    if isinstance(x, (int, float)) and float(x) == int(float(x)):
+      return str(int(float(x)))
+  except Exception:
+    pass
   s = str(x).strip()
+  if s.lower() in ('nan', 'none', ''):
+    return ''
   if s.endswith('.0'):
     s = s[:-2]
+  # bỏ dấu phẩy ngăn cách
+  s = s.replace(',', '').replace(' ', '')
+  try:
+    if float(s) == int(float(s)):
+      return str(int(float(s)))
+  except Exception:
+    pass
   return s
 
 
 def _parse_weekday_codes(raw):
-  """Parse NGÀY KO TÍNH TRÁI TUYẾN → set weekday Python (Mon=0..Sun=6).
-  T2=0 ... T7=5; 25→{0,3}; 36→{1,4}; 47→{2,5}.
+  """
+  Map NGÀY VT KO TÍNH TRÁI TUYẾN → weekday Python (Mon=0 .. Sun=6).
+
+  Rule cứng theo nghiệp vụ:
+    25 → Thứ 2 & Thứ 5  → {0, 3}
+    36 → Thứ 3 & Thứ 6  → {1, 4}
+    47 → Thứ 4 & Thứ 7  → {2, 5}
+  Ngoài ra: T2..T7, 2..7
   """
   if raw is None or (isinstance(raw, float) and pd.isna(raw)):
     return set()
-  s = str(raw).strip().upper().replace(' ', '')
+  # Excel số 25 / 25.0 / "25"
+  try:
+    if isinstance(raw, (int, float)):
+      n = int(float(raw))
+      if n == 25:
+        return {0, 3}
+      if n == 36:
+        return {1, 4}
+      if n == 47:
+        return {2, 5}
+      if n in (2, 3, 4, 5, 6, 7):
+        return {n - 2}  # T2→0 ... T7→5
+  except Exception:
+    pass
+
+  s = str(raw).strip().upper().replace(' ', '').replace('.0', '')
+  if s in ('25', '2&5', '2-5', '2/5'):
+    return {0, 3}
+  if s in ('36', '3&6', '3-6', '3/6'):
+    return {1, 4}
+  if s in ('47', '4&7', '4-7', '4/7'):
+    return {2, 5}
+
   mapping = {
       'T2': 0, 'T3': 1, 'T4': 2, 'T5': 3, 'T6': 4, 'T7': 5,
       '2': 0, '3': 1, '4': 2, '5': 3, '6': 4, '7': 5,
   }
-  # compound codes
-  if s in ('25', '2&5', '2-5'):
-    return {0, 3}
-  if s in ('36', '3&6', '3-6'):
-    return {1, 4}
-  if s in ('47', '4&7', '4-7'):
-    return {2, 5}
-  out = set()
-  # T2, T5 patterns
+  if s in mapping:
+    return {mapping[s]}
   import re as _re
+  out = set()
   for m in _re.findall(r'T([2-7])', s):
-    out.add(mapping.get(f'T{m}'))
-  if not out and s in mapping:
-    out.add(mapping[s])
-  # pure number like 5
-  if not out and s.isdigit() and s in mapping:
-    out.add(mapping[s])
-  return {x for x in out if x is not None}
+    out.add(int(m) - 2)
+  return out
 
 
 def _week_ok(tuan_hien_tai, report_date):
-  """Even Week / Odd Week / Both."""
+  """Even Week / Odd Week / Both — mặc định True nếu không rõ."""
   if tuan_hien_tai is None or (isinstance(tuan_hien_tai, float) and pd.isna(tuan_hien_tai)):
     return True
   s = str(tuan_hien_tai).strip().lower()
@@ -4826,9 +4937,12 @@ def _week_ok(tuan_hien_tai, report_date):
   try:
     iso = report_date.isocalendar()[1]
   except Exception:
-    return True
+    try:
+      iso = pd.Timestamp(report_date).isocalendar()[1]
+    except Exception:
+      return True
   is_even = iso % 2 == 0
-  if 'even' in s or 'chẵn' in s:
+  if 'even' in s or 'chẵn' in s or 'chan' in s:
     return is_even
   if 'odd' in s or 'lẻ' in s:
     return not is_even
@@ -4836,26 +4950,83 @@ def _week_ok(tuan_hien_tai, report_date):
 
 
 def build_dskh_exempt_lookup(df_f4, df_f2):
-  """Map Mã KH → list rules {days:set, week:str, sheet:str}."""
+  """Map Mã KH → list {days, week, sheet}.
+
+  CHỈ lấy cột NGÀY VT KO TÍNH TRÁI TUYẾN (không lấy Ngày VT bổ sung).
+  """
   rules = {}
+
+  def _find_exact(df, *cands):
+    cols = {str(c).strip(): c for c in df.columns}
+    cols_l = {str(c).strip().lower(): c for c in df.columns}
+    for cand in cands:
+      if cand in cols:
+        return cols[cand]
+      cl = cand.lower()
+      if cl in cols_l:
+        return cols_l[cl]
+    # partial: phải chứa đủ cụm "ko tính trái" hoặc "ko tinh trai"
+    for k, orig in cols_l.items():
+      k2 = (
+          k.replace('ế', 'e').replace('é', 'e').replace('á', 'a')
+          .replace('à', 'a').replace('ả', 'a').replace('ã', 'a')
+          .replace('ạ', 'a').replace('í', 'i').replace('ì', 'i')
+          .replace('ỉ', 'i').replace('ĩ', 'i').replace('ị', 'i')
+          .replace('ú', 'u').replace('ù', 'u').replace('ủ', 'u')
+          .replace('ũ', 'u').replace('ụ', 'u').replace('ư', 'u')
+          .replace('ớ', 'o').replace('ờ', 'o').replace('ở', 'o')
+          .replace('ỡ', 'o').replace('ợ', 'o').replace('ố', 'o')
+          .replace('ồ', 'o').replace('ổ', 'o').replace('ỗ', 'o')
+          .replace('ộ', 'o').replace('ó', 'o').replace('ò', 'o')
+          .replace('ỏ', 'o').replace('õ', 'o').replace('ọ', 'o')
+          .replace('đ', 'd')
+      )
+      if 'ko tinh trai' in k2 or 'khong tinh trai' in k2:
+        return orig
+    return None
+
+  def _find_ma(df):
+    for cand in ['Mã KH', 'Ma KH', 'Mã CH', 'Ma CH', 'Outlet Code']:
+      for c in df.columns:
+        if str(c).strip().lower() == cand.lower():
+          return c
+    for c in df.columns:
+      cl = str(c).strip().lower()
+      if 'ma' in cl and ('kh' in cl or 'ch' in cl or 'outlet' in cl):
+        return c
+    return None
+
   for sheet_name, df in [('F4', df_f4), ('F2', df_f2)]:
     if df is None or df.empty:
       continue
-    c_ma = find_col(df, ['Mã KH', 'Ma KH', 'Outlet Code', 'Mã CH'])
-    c_ngay = find_col(df, ['NGÀY KO TÍNH TRÁI TUYẾN', 'Ngày KO TÍNH TRÁI TUYẾN', 'NGAY KO TINH TRAI TUYEN'])
-    c_tuan = find_col(df, ['Tuần hiện tại', 'Tuan hien tai', 'Tuần'])
-    c_bo_sung = find_col(df, ['Ngày VT bổ sung T+3', 'Ngay VT bo sung', 'Ngày VT bổ sung'])
-    if not c_ma:
+    df = df.copy()
+    df.columns = [str(c).strip() for c in df.columns]
+    c_ma = _find_ma(df)
+    c_ngay = _find_exact(
+        df,
+        'NGÀY VT KO TÍNH TRÁI TUYẾN',
+        'NGÀY KO TÍNH TRÁI TUYẾN',
+        'Ngày VT KO TÍNH TRÁI TUYẾN',
+        'Ngày KO TÍNH TRÁI TUYẾN',
+    )
+    c_tuan = None
+    for c in df.columns:
+      cl = str(c).strip().lower()
+      if 'tuần hiện tại' in cl or 'tuan hien tai' in cl:
+        c_tuan = c
+        break
+
+    if not c_ma or not c_ngay:
       continue
+
     for _, r in df.iterrows():
       ma = _norm_ma_kh(r[c_ma])
-      if not ma or ma.lower() in ('nan', 'none'):
+      if not ma:
         continue
-      days = _parse_weekday_codes(r[c_ngay] if c_ngay else None)
-      # fallback: Ngày VT bổ sung T+3
-      if not days and c_bo_sung:
-        days = _parse_weekday_codes(r[c_bo_sung])
-      tuan = r[c_tuan] if c_tuan else 'Both'
+      days = _parse_weekday_codes(r[c_ngay])
+      if not days:
+        continue
+      tuan = r[c_tuan] if c_tuan is not None else 'Both'
       rules.setdefault(ma, []).append({
           'days': days,
           'week': tuan,
@@ -4865,22 +5036,40 @@ def build_dskh_exempt_lookup(df_f4, df_f2):
 
 
 def check_dskh_bo_sung(ma_kh, report_date, rules_lookup):
-  """True nếu CH nằm list F4/F2 và ngày ĐH đúng lịch VT bổ sung (không tính trái tuyến)."""
-  ma = _norm_ma_kh(ma_kh)
-  if ma not in rules_lookup:
+  """✓ nếu Mã KH trong DSKH và thứ của ngày BC nằm trong NGÀY VT KO TÍNH TRÁI TUYẾN.
+
+  Ví dụ: ngày BC = Thứ 7 → chỉ tick CH có mã 47 (T4 & T7).
+  """
+  if not rules_lookup:
     return False
+  ma = _norm_ma_kh(ma_kh)
+  if not ma:
+    return False
+  candidates = {ma}
   try:
-    wd = report_date.weekday()  # Mon=0
+    candidates.add(str(int(float(ma))))
+  except Exception:
+    pass
+
+  matched = None
+  for c in candidates:
+    if c in rules_lookup:
+      matched = rules_lookup[c]
+      break
+  if not matched:
+    return False
+
+  try:
+    wd = pd.Timestamp(report_date).weekday()  # Mon=0 .. Sat=5
   except Exception:
     return False
-  for rule in rules_lookup[ma]:
-    if not rule['days']:
-      continue
-    if wd not in rule['days']:
-      continue
-    if not _week_ok(rule['week'], report_date):
-      continue
-    return True
+
+  for rule in matched:
+    days = rule.get('days') or set()
+    if wd in days:
+      # week: Both / Even / Odd
+      if _week_ok(rule.get('week'), report_date):
+        return True
   return False
 
 
@@ -4896,7 +5085,7 @@ def build_trai_tuyen_orders(df_rpt, df_visit, df_mcp, report_date, filter_nv=Non
   empty = pd.DataFrame(columns=[
       'STT', 'Tên NVBH', 'Mã KH', 'Tên KH', 'Mã ĐH',
       'Giá trị ĐH [Doanh Số]', 'Ngày ĐH', 'LPPC',
-      'Check Danh Sách Import', 'Check Danh Sách bổ sung',
+      'Check Lịch VT', 'Check Danh Sách bổ sung',
   ])
   if df_visit is None or df_visit.empty:
     return empty
@@ -5004,7 +5193,7 @@ def build_trai_tuyen_orders(df_rpt, df_visit, df_mcp, report_date, filter_nv=Non
           'Giá trị ĐH [Doanh Số]': '',
           'Ngày ĐH': rd.strftime('%d/%m/%Y') if hasattr(rd, 'strftime') else str(rd),
           'LPPC': '',
-          'Check Danh Sách Import': 'Trái tuyến - Không có trên lịch VT',
+          'Check Lịch VT': 'Không có trên lịch VT',
                 })
     out = pd.DataFrame(rows)
     if not out.empty and 'Mã KH' in out.columns:
@@ -5033,7 +5222,7 @@ def build_trai_tuyen_orders(df_rpt, df_visit, df_mcp, report_date, filter_nv=Non
           'Giá trị ĐH [Doanh Số]': '',
           'Ngày ĐH': rd.strftime('%d/%m/%Y') if hasattr(rd, 'strftime') else str(rd),
           'LPPC': '',
-          'Check Danh Sách Import': 'Trái tuyến - Không có trên lịch VT',
+          'Check Lịch VT': 'Không có trên lịch VT',
                 })
     out = pd.DataFrame(rows)
     if not out.empty and 'Mã KH' in out.columns:
@@ -5075,7 +5264,7 @@ def build_trai_tuyen_orders(df_rpt, df_visit, df_mcp, report_date, filter_nv=Non
           'Giá trị ĐH [Doanh Số]': int(round(sales, 0)),
           'Ngày ĐH': ngay_s,
           'LPPC': n_lines,
-          'Check Danh Sách Import': 'Trái tuyến - Không có trên lịch VT',
+          'Check Lịch VT': 'Không có trên lịch VT',
                 })
   else:
     for ma_kh, g in d.groupby('_ma'):
@@ -5091,7 +5280,7 @@ def build_trai_tuyen_orders(df_rpt, df_visit, df_mcp, report_date, filter_nv=Non
           'Giá trị ĐH [Doanh Số]': int(round(sales, 0)),
           'Ngày ĐH': rd.strftime('%d/%m/%Y') if hasattr(rd, 'strftime') else str(rd),
           'LPPC': len(g),
-          'Check Danh Sách Import': 'Trái tuyến - Không có trên lịch VT',
+          'Check Lịch VT': 'Không có trên lịch VT',
                 })
 
   if not rows:
@@ -5106,9 +5295,44 @@ def build_trai_tuyen_orders(df_rpt, df_visit, df_mcp, report_date, filter_nv=Non
   out['Giá trị ĐH [Doanh Số]'] = out['Giá trị ĐH [Doanh Số]'].apply(
       lambda x: f'{int(x):,}'.replace(',', '.') if isinstance(x, (int, float)) else x
   )
-  # Check Danh Sách bổ sung (F4/F2)
+  # Check Danh Sách bổ sung (F4/F2) — luôn reload để tránh cache rỗng
+  try:
+    try:
+      load_dskh_trai_tuyen.clear()
+    except Exception:
+      pass
+    _df_f4, _df_f2 = load_dskh_trai_tuyen()
+    _dskh_rules = build_dskh_exempt_lookup(_df_f4, _df_f2)
+  except Exception:
+    _dskh_rules = _dskh_rules if _dskh_rules else {}
+
+  # Precompute set Mã KH được tick hôm nay (thứ khớp 25/36/47)
+  try:
+    _wd = pd.Timestamp(rd).weekday()  # Mon=0 .. Sat=5
+  except Exception:
+    _wd = -1
+  _tick_mas = set()
+  for _ma, _rules in (_dskh_rules or {}).items():
+    for _r in _rules:
+      if _wd in (_r.get('days') or set()) and _week_ok(_r.get('week'), rd):
+        _tick_mas.add(str(_ma))
+        try:
+          _tick_mas.add(str(int(float(_ma))))
+        except Exception:
+          pass
+
   def _chk_bs(ma):
-    return '✓' if check_dskh_bo_sung(ma, rd, _dskh_rules) else ''
+    s = str(ma).strip()
+    if s.endswith('.0'):
+      s = s[:-2]
+    if s in _tick_mas:
+      return '✓'
+    try:
+      if str(int(float(s))) in _tick_mas:
+        return '✓'
+    except Exception:
+      pass
+    return ''
   out['Check Danh Sách bổ sung'] = out['Mã KH'].map(_chk_bs)
   return out
 
@@ -5120,7 +5344,7 @@ def render_trai_tuyen_html(df):
   cols = [
       'STT', 'Tên NVBH', 'Mã KH', 'Tên KH', 'Mã ĐH',
       'Giá trị ĐH [Doanh Số]', 'Ngày ĐH', 'LPPC',
-      'Check Danh Sách Import', 'Check Danh Sách bổ sung',
+      'Check Lịch VT', 'Check Danh Sách bổ sung',
   ]
   for c in cols:
     if c not in df.columns:
@@ -5165,7 +5389,7 @@ def render_trai_tuyen_html(df):
             f'font-size:16px;">✓</td>'
         )
       else:
-        al = 'left' if c in ('Tên NVBH', 'Tên KH', 'Check Danh Sách Import') else 'center'
+        al = 'left' if c in ('Tên NVBH', 'Tên KH', 'Check Lịch VT') else 'center'
         cell = (
             f'<td style="{td_base}background-color:{bg} !important;'
             f'text-align:{al} !important;">{val}</td>'
