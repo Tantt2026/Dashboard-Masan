@@ -161,6 +161,17 @@ st.markdown(
     .custom-kpi-table tbody tr:nth-child(odd) td:not([data-colored="1"]) {
         background-color: #ffffff !important;
     }
+    .custom-kpi-table tbody tr.row-total td.row-total-cell,
+    .custom-kpi-table tbody tr.row-total td:not([data-colored="1"]) {
+        background-color: #1a365d !important;
+        color: #ffffff !important;
+        font-weight: 900 !important;
+        border-color: #2b6cb0 !important;
+    }
+    .custom-kpi-table tbody tr.row-total td {
+        font-weight: 900 !important;
+    }
+
     .custom-kpi-table td {
         text-align: center !important;
     }
@@ -303,6 +314,15 @@ KPI_PATH = os.path.join(DATA_DIR, 'Target_KPI.xlsx')
 CAT_PATH = 'Data_Cat.xlsx'
 BRAND_PATH = 'Data_Brand.xlsx'
 VISIT_SCHED_PATH = os.path.join(DATA_DIR, 'DanhSachLichViengTham.xlsx')
+# File DSKH được bán trái tuyến (sheet F4 / F2) — ngoại lệ lịch VT bổ sung
+DSKH_TRAI_PATH = os.path.join(DATA_DIR, 'DSKH_Trái Tuyến.xlsx')
+if not os.path.exists(DSKH_TRAI_PATH):
+  # fallback tên không dấu / biến thể
+  for _fn in os.listdir(DATA_DIR) if os.path.isdir(DATA_DIR) else []:
+    if 'trai' in _fn.lower().replace('ế', 'e') or 'trái tuyến' in _fn.lower() or 'Trai Tuyen' in _fn:
+      DSKH_TRAI_PATH = os.path.join(DATA_DIR, _fn)
+      break
+
 
 combo_off_files = [f for f in os.listdir(DATA_DIR) if 'Combo' in f and 'OFF' in f]
 combo_on_files = [f for f in os.listdir(DATA_DIR) if 'Combo' in f and 'On' in f]
@@ -752,11 +772,11 @@ def color_pct_class(val, moc=None):
 
 
 def salary_metric_style(kpi_key, col, val):
-  """Màu riêng cho LPPC/LPPC_Meat theo đúng mốc tính lương trong công văn.
+  """Chỉ tô màu cột % MTD cho LPPC / LPPC_Meat.
 
-  LPPC: <4.3 đỏ; từ 4.3 đến <4.7 xanh (đạt mức 1); >=4.7 tím (đạt/vượt mức 2).
-  LPPC_Meat: <3.8 đỏ; =3.8 xanh (đạt mức); >3.8 tím (vượt mức).
-  Cột % MTD dùng tỷ lệ tương ứng: LPPC 91.5% và 100%; LPPC_Meat 100%.
+  LPPC % MTD: <91.5 đỏ; 91.5–<100 xanh; >=100 tím.
+  LPPC_Meat % MTD: <100 đỏ; =100 xanh; >100 tím.
+  Cột Thực Hiện Ngày / MTD: KHÔNG tô màu.
   """
   key = str(kpi_key or '').upper()
   c = str(col or '').strip().upper()
@@ -769,37 +789,26 @@ def salary_metric_style(kpi_key, col, val):
   green = 'background-color:#c6f6d5 !important;color:#22543d !important;font-weight:800 !important;'
   purple = 'background-color:#e9d8fd !important;color:#553c9a !important;font-weight:800 !important;'
 
+  # Chỉ áp dụng cho cột %
+  if '%' not in c:
+    return '', ''
+
   if key == 'LPPC':
-    if '%' in c:
-      if v < 91.5:
-        return 'pct-red', red
-      if v < 100:
-        return 'pct-green', green
-      return 'pct-purple', purple
-    if c == 'MTD' or c == 'THỰC HIỆN NGÀY' or 'CHỈ TIÊU KPI' in c:
-      if c == 'CHỈ TIÊU KPI':
-        return '', ''
-      if v < 4.3:
-        return 'pct-red', red
-      if v < 4.7:
-        return 'pct-green', green
-      return 'pct-purple', purple
+    if v < 91.5:
+      return 'pct-red', red
+    if v < 100:
+      return 'pct-green', green
+    return 'pct-purple', purple
 
   if key == 'LPPC_MEAT':
-    if '%' in c:
-      if v < 100:
-        return 'pct-red', red
-      if v == 100:
-        return 'pct-green', green
-      return 'pct-purple', purple
-    if c == 'MTD' or c == 'THỰC HIỆN NGÀY':
-      if v < 3.8:
-        return 'pct-red', red
-      if v == 3.8:
-        return 'pct-green', green
-      return 'pct-purple', purple
+    if v < 100:
+      return 'pct-red', red
+    if v == 100:
+      return 'pct-green', green
+    return 'pct-purple', purple
 
   return '', ''
+
 
 
 def vip_ko_bg(val):
@@ -2029,13 +2038,13 @@ def build_report(
     # Không có NV / dữ liệu → trả bảng rỗng an toàn
     empty_cols = (
         [
-            'STT', 'Mã NVBH', 'Tên NVBH', 'Chỉ Tiêu MCP', 'Thực Hiện Ngày',
+            'STT', 'Tên NVBH', 'Chỉ Tiêu MCP', 'Thực Hiện Ngày',
             'MTD', '% MTD', 'MCP OFF', 'Thực hiện ngày OFF', 'MTD OFF',
             '% MTD OFF', 'MCP ON', 'Thực hiện ngày ON', 'MTD ON', '% MTD ON',
         ]
         if report_type == 'ASO_ALL'
         else [
-            'STT', 'Mã NVBH', 'Tên NVBH', 'Chỉ Tiêu KPI',
+            'STT', 'Tên NVBH', 'Chỉ Tiêu KPI',
             'Thực Hiện Ngày', 'MTD', '% MTD',
         ]
     )
@@ -2130,7 +2139,7 @@ def build_turnover_report(df, report_date, turnover_targets, filter_nv=None):
   title = 'TURNOVER - Tổng doanh số bán ra'
   if df is None or df.empty:
     return pd.DataFrame(columns=[
-        'STT', 'Mã NVBH', 'Tên NVBH', 'Chỉ Tiêu Doanh Số',
+        'STT', 'Tên NVBH', 'Chỉ Tiêu Doanh Số',
         'Thực Hiện Ngày', 'Doanh Số MTD', '% MTD',
     ]), 0.0, title
 
@@ -2452,6 +2461,8 @@ def build_visit_report(
 
 
 def render_visit_html_table(df):
+  df = df.drop(columns=['Mã NVBH'], errors='ignore')
+
   html = [
       '<div style="overflow-x: auto; -webkit-overflow-scrolling: touch;"><table'
       ' class="custom-kpi-table">'
@@ -2463,10 +2474,7 @@ def render_visit_html_table(df):
       '<th rowspan="2" style="vertical-align: middle; text-align:'
       ' center;">STT</th>'
   )
-  html.append(
-      '<th rowspan="2" style="vertical-align: middle; text-align:'
-      ' center;">Mã NVBH</th>'
-  )
+
   html.append(
       '<th rowspan="2" style="vertical-align: middle; text-align:'
       ' center;">Tên NVBH</th>'
@@ -2531,12 +2539,11 @@ def render_visit_html_table(df):
 
   html.append('<tbody>')
   for _, row in df.iterrows():
-    is_total = str(row.get('Tên NVBH', '')).strip() == 'TỔNG CỘNG'
+    is_total = (str(row.get('Tên NVBH', '')).strip() == 'TỔNG CỘNG' or 'TOTAL' in str(row.get('Tên NVBH', '')).upper() or 'TỔNG' in str(row.get('Tên NVBH', '')).upper())
     html.append('<tr>')
 
     cols_order = [
         'STT',
-        'Mã NVBH',
         'Tên NVBH',
         'Tổng KH',
         'Đã Mua',
@@ -2570,7 +2577,7 @@ def render_visit_html_table(df):
         align = (
             'left'
             if col == 'Tên NVBH'
-            else ('center' if col in ['STT', 'Mã NVBH'] or is_pct else 'right')
+            else ('center' if col in ['STT'] or is_pct else 'right')
         )
         if is_pct:
           cls = color_pct_class(val)
@@ -2580,7 +2587,7 @@ def render_visit_html_table(df):
           )
         else:
           html.append(
-              f'<td style="background-color: #fff5f5; color: #c53030 !important;'
+              f'<td style="background-color:#1a365d !important; color:#ffffff !important;'
               f' font-weight: 900 !important; text-align: {align}; white-space:'
               f' nowrap;">{val}</td>'
           )
@@ -2588,7 +2595,7 @@ def render_visit_html_table(df):
         align = (
             'left'
             if col == 'Tên NVBH'
-            else ('center' if col in ['STT', 'Mã NVBH'] or is_pct else 'right')
+            else ('center' if col in ['STT'] or is_pct else 'right')
         )
         if is_pct:
           cls = color_pct_class(val)
@@ -3305,6 +3312,8 @@ def build_summary_report(
 
 
 def render_summary_html_table(df, selected_metrics):
+  df = df.drop(columns=['Mã NVBH'], errors='ignore')
+
   has_vip = 'VIP MCH' in selected_metrics
   has_off = 'KH Combo OFF' in selected_metrics
   has_on = 'KH Combo ON' in selected_metrics
@@ -3370,7 +3379,7 @@ def render_summary_html_table(df, selected_metrics):
 
   html.append('<tbody>')
   for _, row in df.iterrows():
-    is_total = str(row.get('Tên NV', '')).strip() == 'TỔNG CỘNG'
+    is_total = (str(row.get('Tên NV', '')).strip() == 'TỔNG CỘNG' or 'TOTAL' in str(row.get('Tên NV', '')).upper() or 'TỔNG' in str(row.get('Tên NV', '')).upper())
     html.append('<tr>')
 
     cols_order = ['STT', 'Tên NV']
@@ -3413,7 +3422,7 @@ def render_summary_html_table(df, selected_metrics):
       if is_total:
         if col in ['CT DS (Cat)', 'MTD (Cat)', 'CT DS (Brand)', 'MTD (Brand)']:
           html.append(
-              f'<td style="background-color: #fff5f5; color: #c53030'
+              f'<td style="background-color:#1a365d !important; color:#ffffff'
               ' !important; font-weight: 900 !important; text-align: right;'
               f' white-space: nowrap;">{val}</td>'
           )
@@ -3426,7 +3435,7 @@ def render_summary_html_table(df, selected_metrics):
         else:
           align = 'left' if col == 'Tên NV' else 'center'
           html.append(
-              f'<td style="background-color: #fff5f5; color: #c53030'
+              f'<td style="background-color:#1a365d !important; color:#ffffff'
               ' !important; font-weight: 900 !important; text-align:'
               f' {align}; white-space: nowrap;">{val}</td>'
           )
@@ -3453,6 +3462,7 @@ def render_summary_html_table(df, selected_metrics):
 
 
 def render_html_table(df):
+  df = df.drop(columns=['Mã NVBH'], errors='ignore')
   html = [
       '<div style="overflow-x: auto; -webkit-overflow-scrolling:'
       ' touch;"><table class="custom-kpi-table">'
@@ -3465,8 +3475,8 @@ def render_html_table(df):
   html.append('<tbody>')
   for _, row in df.iterrows():
     is_total = (
-        str(row.get('Tên NVBH', '')).strip() == 'TỔNG CỘNG'
-        or str(row.get('Tên NV', '')).strip() == 'TỔNG CỘNG'
+        (str(row.get('Tên NVBH', '')).strip() == 'TỔNG CỘNG' or 'TOTAL' in str(row.get('Tên NVBH', '')).upper() or 'TỔNG' in str(row.get('Tên NVBH', '')).upper())
+        or (str(row.get('Tên NV', '')).strip() == 'TỔNG CỘNG' or 'TOTAL' in str(row.get('Tên NV', '')).upper() or 'TỔNG' in str(row.get('Tên NV', '')).upper())
     )
     html.append('<tr>')
     for col in df.columns:
@@ -3494,20 +3504,28 @@ def render_html_table(df):
             f'{val}</td>'
         )
       elif is_total:
+        # Format giống dòng Tổng Cộng Báo Cáo Hiệu Suất: xanh đậm + chữ trắng
         align = (
             'left'
             if col in ['Tên NVBH', 'Tên NV']
-            else (
-                'center'
-                if col in ['STT', 'Mã NVBH']
-                else 'right'
-            )
+            else ('center' if col in ['STT'] or '%' in str(col) else 'right')
         )
-        html.append(
-            f'<td style="background-color: #fff5f5; color: #c53030'
-            ' !important; font-weight: 900 !important; text-align:'
-            f' {align}; white-space: nowrap;">{val}</td>'
-        )
+        # Cột % vẫn tô màu theo rule KPI
+        if '%' in str(col) or (isinstance(val, str) and '%' in str(val)):
+          style_bg = color_pct_bg(val)
+          cls = color_pct_class(val)
+          html.append(
+              f'<td align="center" data-colored="1" class="{cls}" '
+              f'style="{style_bg} font-weight:900 !important;'
+              f'text-align:center !important;">{val}</td>'
+          )
+        else:
+          html.append(
+              f'<td data-colored="1" class="row-total-cell" '
+              f'style="background-color:#1a365d !important;color:#ffffff !important;'
+              f'font-weight:900 !important;text-align:{align} !important;'
+              f'white-space:nowrap;border-color:#2b6cb0 !important;">{val}</td>'
+          )
       elif col in ['Tên NVBH', 'Tên NV']:
         html.append(
             f'<td style="color: #1a365d; text-align: left; white-space:'
@@ -3518,8 +3536,7 @@ def render_html_table(df):
             'center'
             if col in [
                 'STT',
-                'Mã NVBH',
-                'Lịch Viếng Thăm Hôm Nay',
+                                'Lịch Viếng Thăm Hôm Nay',
                 'Nhóm KH VIP3',
                 'Nhóm KH VIP5',
                 'Nhóm KH VIPSI',
@@ -3992,6 +4009,11 @@ def build_performance_report(
   """Báo cáo Hiệu suất bán hàng — logic theo công thức cột (Call Plan / Fundamental)."""
   title = 'BÁO CÁO HIỆU SUẤT BÁN HÀNG'
   empty = pd.DataFrame()
+  try:
+    _f4, _f2 = load_dskh_trai_tuyen()
+    _perf_dskh_rules = build_dskh_exempt_lookup(_f4, _f2)
+  except Exception:
+    _perf_dskh_rules = {}
 
   # MCP: L1 + VIP
   ch_l1, ch_vip = {}, {}
@@ -4201,8 +4223,12 @@ def build_performance_report(
 
         if co_dh:
           # Trái tuyến: không nằm lịch VT ngày BC, hoặc cờ YES
+          # Ngoại lệ: CH trong DSKH F4/F2 đúng lịch VT bổ sung → KHÔNG tính trái tuyến
           if (not on_plan) or is_trai_flag:
-            (trai_on if is_on else trai_off).add(ma)
+            if check_dskh_bo_sung(ma, rd, _perf_dskh_rules):
+              (pc_on if is_on else pc_off).add(ma)  # coi như đúng tuyến bổ sung
+            else:
+              (trai_on if is_on else trai_off).add(ma)
           else:
             # PC đúng tuyến: có ĐH + nằm trong lịch VT ngày BC
             (pc_on if is_on else pc_off).add(ma)
@@ -4217,6 +4243,8 @@ def build_performance_report(
           if not ma:
             continue
           if ma not in plan_set_all:
+            if check_dskh_bo_sung(ma, rd, _perf_dskh_rules):
+              continue  # ngoại lệ DSKH bổ sung
             is_on = _is_on(ma)
             (trai_on if is_on else trai_off).add(ma)
 
@@ -4269,40 +4297,119 @@ def build_performance_report(
     aso_v_mid = _count_aso_dh(d_mid, pat_v)
     ct_x, ct_v = 5, 3
 
-    # Đề xuất giữa ngày < 50% CT
+    # ----- Chỉ số giữa ngày (RPT < 13h) -----
+    d_mid_off = (
+        d_mid[d_mid['_ma'].map(lambda m: not _is_on(m))]
+        if (not d_mid.empty and '_ma' in d_mid.columns) else pd.DataFrame()
+    )
+    d_mid_on = (
+        d_mid[d_mid['_ma'].map(lambda m: _is_on(m))]
+        if (not d_mid.empty and '_ma' in d_mid.columns) else pd.DataFrame()
+    )
+    pc_off_mid = set(d_mid_off['_ma'].unique()) if not d_mid_off.empty else set()
+    pc_on_mid = set(d_mid_on['_ma'].unique()) if not d_mid_on.empty else set()
+    pc_off_mid = pc_off_mid & (plan_off | da_off)
+    pc_on_mid = pc_on_mid & (plan_on | da_on)
+    pct_off_mid = round(len(pc_off_mid) / len(da_off) * 100, 1) if da_off else 0.0
+    pct_on_mid = round(len(pc_on_mid) / len(da_on) * 100, 1) if da_on else 0.0
+    n_dh_off_mid = (
+        int(d_mid_off['Mã đơn hàng'].nunique())
+        if (not d_mid_off.empty and 'Mã đơn hàng' in d_mid_off.columns) else 0
+    )
+    lppc_off_mid = (
+        round(len(d_mid_off) / n_dh_off_mid, 2) if n_dh_off_mid else 0.0
+    )
+    ko_off_mid = max(len(da_off) - len(pc_off_mid), 0) if da_off else 0
+    ko_on_mid = max(len(da_on) - len(pc_on_mid), 0) if da_on else 0
+    pct_x_mid = round(aso_x_mid / ct_x * 100, 1) if ct_x else 0.0
+    pct_v_mid = round(aso_v_mid / ct_v * 100, 1) if ct_v else 0.0
+    pct_x = round(aso_x / ct_x * 100, 1) if ct_x else 0.0
+    pct_v = round(aso_v / ct_v * 100, 1) if ct_v else 0.0
+
     de_xuat = []
     if ct_ngay and pct_so_mid < 50:
       de_xuat.append('SellOut')
-    if aso_x_mid / ct_x * 100 < 50:
+    if pct_x_mid < 50:
       de_xuat.append('ASO Xanh')
-    if aso_v_mid / ct_v * 100 < 50:
+    if pct_v_mid < 50:
       de_xuat.append('ASO Vàng')
+    if da_off and pct_off_mid < 50:
+      de_xuat.append('VT OFF')
+    if da_on and pct_on_mid < 50:
+      de_xuat.append('VT ON')
+    if n_dh_off_mid and lppc_off_mid < 4.3:
+      de_xuat.append('LPPC')
+    if ko_off_mid > 0:
+      de_xuat.append('KO ĐH OFF')
+    if ko_on_mid > 0:
+      de_xuat.append('KO ĐH ON')
     de_xuat_str = ', '.join(de_xuat) if de_xuat else 'OK'
 
-    def _trend(a, b):
-      return 'Tăng' if a > b else ('Giảm' if a < b else 'Ổn định')
-
     def _trend_tag(a, b):
+      try:
+        a, b = float(a), float(b)
+      except Exception:
+        return '→Ổn định'
       if a > b:
         return '↑Tăng'
       if a < b:
         return '↓Giảm'
       return '→Ổn định'
 
-    danh_gia = (
-        f'SO:{_trend_tag(th_so, th_so_mid)} | '
-        f'Xanh:{_trend_tag(aso_x, aso_x_mid)} | '
-        f'Vàng:{_trend_tag(aso_v, aso_v_mid)}'
+    # Gom nhóm: Tăng (chữ xanh đậm) / Ko Tăng|Giảm (chữ đỏ đậm)
+    def _tag3(a, b):
+      try:
+        a, b = float(a), float(b)
+      except Exception:
+        return 'Ko Tăng'
+      if a > b:
+        return 'Tăng'
+      if a < b:
+        return 'Giảm'
+      return 'Ko Tăng'
+
+    _pairs = [
+        ('SO', _tag3(th_so, th_so_mid)),
+        ('VT-OFF', _tag3(pct_off, pct_off_mid)),
+        ('VT-ON', _tag3(pct_on, pct_on_mid)),
+        ('LPPC', _tag3(lppc_off, lppc_off_mid)),
+        ('Xanh', _tag3(aso_x, aso_x_mid)),
+        ('Vàng', _tag3(aso_v, aso_v_mid)),
+    ]
+    _grp = {'Tăng': [], 'Ko Tăng': [], 'Giảm': []}
+    for _name, _tg in _pairs:
+      _grp[_tg].append(_name)
+    _parts = []
+    if _grp['Tăng']:
+      _parts.append(
+          '<span style="color:#228b22;font-weight:800;">'
+          + ', '.join(_grp['Tăng']) + ' => Tăng</span>'
+      )
+    for _lab in ('Ko Tăng', 'Giảm'):
+      if _grp[_lab]:
+        _parts.append(
+            '<span style="color:#c53030;font-weight:800;">'
+            + ', '.join(_grp[_lab]) + f' => {_lab}</span>'
+        )
+    danh_gia = ' | '.join(_parts) if _parts else (
+        '<span style="color:#c53030;font-weight:800;">Ko Tăng</span>'
     )
     _delta_so = float(th_so) - float(th_so_mid)
     _delta_x = int(aso_x) - int(aso_x_mid)
     _delta_v = int(aso_v) - int(aso_v_mid)
+    _delta_lppc = float(lppc_off) - float(lppc_off_mid)
+    _delta_pct_off = float(pct_off) - float(pct_off_mid)
+    _delta_pct_on = float(pct_on) - float(pct_on_mid)
     _n_trai = len(trai_off) + len(trai_on)
     _n_vip_ko = len(vip_ko)
     _pct_vt_dh = (
         round(len(pc_off | pc_on) / max(len(da_off | da_on), 1) * 100, 1)
         if (da_off or da_on) else 0.0
     )
+    _pct_so = pct_so
+    _pct_x = pct_x
+    _pct_v = pct_v
+    _lppc = float(lppc_off)
 
     rows.append({
         'Mã NVBH': sm_code,
@@ -4336,9 +4443,16 @@ def build_performance_report(
         '_delta_so': _delta_so,
         '_delta_x': _delta_x,
         '_delta_v': _delta_v,
+        '_delta_lppc': _delta_lppc,
+        '_delta_pct_off': _delta_pct_off,
+        '_delta_pct_on': _delta_pct_on,
         '_n_trai': _n_trai,
         '_n_vip_ko': _n_vip_ko,
         '_pct_vt_dh': _pct_vt_dh,
+        '_pct_so': _pct_so,
+        '_pct_x': _pct_x,
+        '_pct_v': _pct_v,
+        '_lppc': _lppc,
         '_sort': pct_so,
     })
 
@@ -4408,7 +4522,7 @@ def _perf_table_html(df, section='call'):
   if df is None or df.empty:
     return '<p>Không có dữ liệu.</p>'
 
-  col_info = ['STT', 'Mã NVBH', 'Tên NVBH']
+  col_info = ['STT', 'Tên NVBH']
   if section == 'call':
     groups = [
         ('Kênh OFF', [
@@ -4498,7 +4612,6 @@ def _perf_table_html(df, section='call'):
   # Row 1: STT/Mã/Tên rowspan=3 merged + top group titles
   html.append('<tr>')
   html.append(f'<th rowspan="3" style="{th}">STT</th>')
-  html.append(f'<th rowspan="3" style="{th}">Mã NVBH</th>')
   html.append(f'<th rowspan="3" style="{th}">Tên NVBH</th>')
   if section == 'call':
     html.append(f'<th colspan="{n_data}" style="{th_top}">Call Plan</th>')
@@ -4522,13 +4635,19 @@ def _perf_table_html(df, section='call'):
   html.append('</tr></thead><tbody>')
 
   # Cột số liệu cần canh giữa
-  _center_cols = set(data_cols) | {'STT', 'Mã NVBH'}
+  _center_cols = set(data_cols) | {'STT'}
 
   n_rows = len(df)
   for pos, (idx, row) in enumerate(df.iterrows()):
-    is_tot = (pos == n_rows - 1) or (
-        'TỔNG' in str(row.get('Mã NVBH', '')).upper()
-        or 'TOTAL' in str(row.get('Tên NVBH', '')).upper()
+    _ma_nv = str(row.get('Mã NVBH', '')).upper()
+    _ten_nv = str(row.get('Tên NVBH', '')).upper()
+    _stt = str(row.get('STT', '')).strip()
+    is_tot = (
+        pos == n_rows - 1
+        or _stt in ('-', 'TOTAL')
+        or 'TỔNG' in _ma_nv
+        or 'TOTAL' in _ten_nv
+        or 'TỔNG CỘNG' in _ma_nv
     )
     row_bg = ''
     if not is_tot:
@@ -4541,8 +4660,12 @@ def _perf_table_html(df, section='call'):
       # Total: nền xanh đậm
       row_bg = 'background-color:#1a365d !important;color:#ffffff !important;'
 
-    tr_cls = ' class="row-total"' if is_tot else ''
-    html.append(f'<tr{tr_cls}>')
+    if is_tot:
+      html.append(
+          '<tr class="row-total" style="background-color:#1a365d !important;">'
+      )
+    else:
+      html.append('<tr>')
     for c in all_cols:
       val = row.get(c, '')
       if pd.isna(val):
@@ -4565,48 +4688,33 @@ def _perf_table_html(df, section='call'):
       )
       is_de_xuat = c == 'Đề xuất cải thiện'
 
-      # Dòng TOTAL: cột thường xanh đậm chữ trắng; cột % vẫn tô màu theo rule KPI
+      # Dòng TOTAL: nền xanh đậm + chữ trắng (giống header); cột % vẫn tô màu rule KPI
       if is_tot and is_pct:
-        cls = color_pct_class(val)
         html.append(
-            f'<td align="center" data-colored="1" class="{cls}" '
+            f'<td align="center" data-colored="1" class="{color_pct_class(val)}" '
             f'style="{td}{color_pct_bg(val)}font-weight:900 !important;'
-            f'text-align:center !important;">{val}</td>'
-        )
-      elif is_tot and is_vip_col:
-        cls = vip_ko_class(val)
-        attr = ' data-colored="1"' if cls else ''
-        cls_attr = f' class="{cls}"' if cls else ''
-        html.append(
-            f'<td align="center"{attr}{cls_attr} '
-            f'style="{td}{vip_ko_bg(val)}font-weight:900 !important;'
             f'text-align:center !important;">{val}</td>'
         )
       elif is_tot:
         html.append(
-            f'<td align="center" data-colored="1" '
+            f'<td align="center" data-colored="1" class="row-total-cell" '
             f'style="{td}background-color:#1a365d !important;color:#ffffff !important;'
-            f'font-weight:900 !important;text-align:center !important;">'
-            f'{val if val != "" else "&nbsp;"}</td>'
+            f'font-weight:900 !important;text-align:center !important;'
+            f'border-color:#1a365d !important;">'
+            f'{val if str(val).strip() not in ("", "nan", "None") else "&nbsp;"}</td>'
         )
       elif is_danh_gia:
-        # Tăng → xanh; Giảm / Không tăng (Ổn định) → đỏ
-        s = str(val)
-        has_up = ('↑' in s) or ('Tăng' in s)
-        has_down = ('↓' in s) or ('Giảm' in s)
-        has_flat = ('→' in s) or ('Ổn định' in s)
-        if has_down or has_flat or (not has_up):
-          html.append(
-              f'<td align="center" data-colored="1" class="pct-red" '
-              f'style="{td}background-color:#fed7d7 !important;color:#742a2a !important;'
-              f'font-weight:800 !important;text-align:center !important;">{val}</td>'
-          )
-        else:
-          html.append(
-              f'<td align="center" data-colored="1" class="pct-green" '
-              f'style="{td}background-color:#c6f6d5 !important;color:#22543d !important;'
-              f'font-weight:800 !important;text-align:center !important;">{val}</td>'
-          )
+        # Zebra xanh/trắng như các cột khác; chữ xanh/đỏ đậm trong HTML
+        # Không dùng data-colored để CSS zebra :not([data-colored]) vẫn áp dụng
+        zebra_bg = '#e6f4fc' if (pos % 2 == 1) else '#ffffff'
+        if is_tot:
+          zebra_bg = '#1a365d'
+        html.append(
+            f'<td align="center" '
+            f'style="{td}background-color:{zebra_bg} !important;'
+            f'text-align:center !important;font-size:11px;'
+            f'{"color:#fff !important;" if is_tot else ""}">{val}</td>'
+        )
       elif is_pct:
         cls = color_pct_class(val)
         html.append(
@@ -4638,6 +4746,144 @@ def _perf_table_html(df, section='call'):
 
 
 
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_dskh_trai_tuyen():
+  """Load sheet F4 & F2 từ DSKH_Trái Tuyến.xlsx."""
+  empty = pd.DataFrame()
+  path = globals().get('DSKH_TRAI_PATH') or os.path.join(DATA_DIR, 'DSKH_Trái Tuyến.xlsx')
+  # try multiple names
+  candidates = [path]
+  if os.path.isdir(DATA_DIR):
+    for fn in os.listdir(DATA_DIR):
+      low = fn.lower()
+      if 'dskh' in low and ('trai' in low or 'trái' in low or 'tuyen' in low or 'tuyến' in low):
+        candidates.append(os.path.join(DATA_DIR, fn))
+  path_use = None
+  for p in candidates:
+    if os.path.exists(p):
+      path_use = p
+      break
+  if not path_use:
+    return empty, empty
+  try:
+    xl = pd.ExcelFile(path_use)
+    sheets = {s.lower().strip(): s for s in xl.sheet_names}
+    s_f4 = sheets.get('f4') or next((sheets[k] for k in sheets if 'f4' in k), None)
+    s_f2 = sheets.get('f2') or next((sheets[k] for k in sheets if 'f2' in k), None)
+    df_f4 = pd.read_excel(path_use, sheet_name=s_f4) if s_f4 else empty
+    df_f2 = pd.read_excel(path_use, sheet_name=s_f2) if s_f2 else empty
+    return df_f4, df_f2
+  except Exception:
+    return empty, empty
+
+
+def _norm_ma_kh(x):
+  s = str(x).strip()
+  if s.endswith('.0'):
+    s = s[:-2]
+  return s
+
+
+def _parse_weekday_codes(raw):
+  """Parse NGÀY KO TÍNH TRÁI TUYẾN → set weekday Python (Mon=0..Sun=6).
+  T2=0 ... T7=5; 25→{0,3}; 36→{1,4}; 47→{2,5}.
+  """
+  if raw is None or (isinstance(raw, float) and pd.isna(raw)):
+    return set()
+  s = str(raw).strip().upper().replace(' ', '')
+  mapping = {
+      'T2': 0, 'T3': 1, 'T4': 2, 'T5': 3, 'T6': 4, 'T7': 5,
+      '2': 0, '3': 1, '4': 2, '5': 3, '6': 4, '7': 5,
+  }
+  # compound codes
+  if s in ('25', '2&5', '2-5'):
+    return {0, 3}
+  if s in ('36', '3&6', '3-6'):
+    return {1, 4}
+  if s in ('47', '4&7', '4-7'):
+    return {2, 5}
+  out = set()
+  # T2, T5 patterns
+  import re as _re
+  for m in _re.findall(r'T([2-7])', s):
+    out.add(mapping.get(f'T{m}'))
+  if not out and s in mapping:
+    out.add(mapping[s])
+  # pure number like 5
+  if not out and s.isdigit() and s in mapping:
+    out.add(mapping[s])
+  return {x for x in out if x is not None}
+
+
+def _week_ok(tuan_hien_tai, report_date):
+  """Even Week / Odd Week / Both."""
+  if tuan_hien_tai is None or (isinstance(tuan_hien_tai, float) and pd.isna(tuan_hien_tai)):
+    return True
+  s = str(tuan_hien_tai).strip().lower()
+  if not s or 'both' in s or 'cả' in s:
+    return True
+  try:
+    iso = report_date.isocalendar()[1]
+  except Exception:
+    return True
+  is_even = iso % 2 == 0
+  if 'even' in s or 'chẵn' in s:
+    return is_even
+  if 'odd' in s or 'lẻ' in s:
+    return not is_even
+  return True
+
+
+def build_dskh_exempt_lookup(df_f4, df_f2):
+  """Map Mã KH → list rules {days:set, week:str, sheet:str}."""
+  rules = {}
+  for sheet_name, df in [('F4', df_f4), ('F2', df_f2)]:
+    if df is None or df.empty:
+      continue
+    c_ma = find_col(df, ['Mã KH', 'Ma KH', 'Outlet Code', 'Mã CH'])
+    c_ngay = find_col(df, ['NGÀY KO TÍNH TRÁI TUYẾN', 'Ngày KO TÍNH TRÁI TUYẾN', 'NGAY KO TINH TRAI TUYEN'])
+    c_tuan = find_col(df, ['Tuần hiện tại', 'Tuan hien tai', 'Tuần'])
+    c_bo_sung = find_col(df, ['Ngày VT bổ sung T+3', 'Ngay VT bo sung', 'Ngày VT bổ sung'])
+    if not c_ma:
+      continue
+    for _, r in df.iterrows():
+      ma = _norm_ma_kh(r[c_ma])
+      if not ma or ma.lower() in ('nan', 'none'):
+        continue
+      days = _parse_weekday_codes(r[c_ngay] if c_ngay else None)
+      # fallback: Ngày VT bổ sung T+3
+      if not days and c_bo_sung:
+        days = _parse_weekday_codes(r[c_bo_sung])
+      tuan = r[c_tuan] if c_tuan else 'Both'
+      rules.setdefault(ma, []).append({
+          'days': days,
+          'week': tuan,
+          'sheet': sheet_name,
+      })
+  return rules
+
+
+def check_dskh_bo_sung(ma_kh, report_date, rules_lookup):
+  """True nếu CH nằm list F4/F2 và ngày ĐH đúng lịch VT bổ sung (không tính trái tuyến)."""
+  ma = _norm_ma_kh(ma_kh)
+  if ma not in rules_lookup:
+    return False
+  try:
+    wd = report_date.weekday()  # Mon=0
+  except Exception:
+    return False
+  for rule in rules_lookup[ma]:
+    if not rule['days']:
+      continue
+    if wd not in rule['days']:
+      continue
+    if not _week_ok(rule['week'], report_date):
+      continue
+    return True
+  return False
+
+
 def build_trai_tuyen_orders(df_rpt, df_visit, df_mcp, report_date, filter_nv=None):
   """Chi tiết ĐH Trái Tuyến.
 
@@ -4649,10 +4895,18 @@ def build_trai_tuyen_orders(df_rpt, df_visit, df_mcp, report_date, filter_nv=Non
   """
   empty = pd.DataFrame(columns=[
       'STT', 'Tên NVBH', 'Mã KH', 'Tên KH', 'Mã ĐH',
-      'Giá trị ĐH [Doanh Số]', 'Ngày ĐH', 'LPPC', 'Check Danh Sách Import',
+      'Giá trị ĐH [Doanh Số]', 'Ngày ĐH', 'LPPC',
+      'Check Danh Sách Import', 'Check Danh Sách bổ sung',
   ])
   if df_visit is None or df_visit.empty:
     return empty
+
+  # Load DSKH F4/F2 — ngoại lệ trái tuyến
+  try:
+    _df_f4, _df_f2 = load_dskh_trai_tuyen()
+    _dskh_rules = build_dskh_exempt_lookup(_df_f4, _df_f2)
+  except Exception:
+    _dskh_rules = {}
 
   rd = report_date.date() if hasattr(report_date, 'date') else report_date
   vis = df_visit.copy()
@@ -4751,8 +5005,12 @@ def build_trai_tuyen_orders(df_rpt, df_visit, df_mcp, report_date, filter_nv=Non
           'Ngày ĐH': rd.strftime('%d/%m/%Y') if hasattr(rd, 'strftime') else str(rd),
           'LPPC': '',
           'Check Danh Sách Import': 'Trái tuyến - Không có trên lịch VT',
-      })
+                })
     out = pd.DataFrame(rows)
+    if not out.empty and 'Mã KH' in out.columns:
+      out['Check Danh Sách bổ sung'] = out['Mã KH'].map(
+          lambda m: '✓' if check_dskh_bo_sung(m, rd, _dskh_rules) else ''
+      )
     if nv_selected(filter_nv):
       vals = [str(v).strip() for v in (filter_nv if isinstance(filter_nv, list) else [filter_nv])]
       out = out[out['Tên NVBH'].isin(vals)]
@@ -4776,8 +5034,12 @@ def build_trai_tuyen_orders(df_rpt, df_visit, df_mcp, report_date, filter_nv=Non
           'Ngày ĐH': rd.strftime('%d/%m/%Y') if hasattr(rd, 'strftime') else str(rd),
           'LPPC': '',
           'Check Danh Sách Import': 'Trái tuyến - Không có trên lịch VT',
-      })
+                })
     out = pd.DataFrame(rows)
+    if not out.empty and 'Mã KH' in out.columns:
+      out['Check Danh Sách bổ sung'] = out['Mã KH'].map(
+          lambda m: '✓' if check_dskh_bo_sung(m, rd, _dskh_rules) else ''
+      )
     if nv_selected(filter_nv):
       vals = [str(v).strip() for v in (filter_nv if isinstance(filter_nv, list) else [filter_nv])]
       out = out[out['Tên NVBH'].isin(vals)]
@@ -4814,7 +5076,7 @@ def build_trai_tuyen_orders(df_rpt, df_visit, df_mcp, report_date, filter_nv=Non
           'Ngày ĐH': ngay_s,
           'LPPC': n_lines,
           'Check Danh Sách Import': 'Trái tuyến - Không có trên lịch VT',
-      })
+                })
   else:
     for ma_kh, g in d.groupby('_ma'):
       sales = float(g['_sales'].sum())
@@ -4830,7 +5092,7 @@ def build_trai_tuyen_orders(df_rpt, df_visit, df_mcp, report_date, filter_nv=Non
           'Ngày ĐH': rd.strftime('%d/%m/%Y') if hasattr(rd, 'strftime') else str(rd),
           'LPPC': len(g),
           'Check Danh Sách Import': 'Trái tuyến - Không có trên lịch VT',
-      })
+                })
 
   if not rows:
     return empty
@@ -4844,55 +5106,76 @@ def build_trai_tuyen_orders(df_rpt, df_visit, df_mcp, report_date, filter_nv=Non
   out['Giá trị ĐH [Doanh Số]'] = out['Giá trị ĐH [Doanh Số]'].apply(
       lambda x: f'{int(x):,}'.replace(',', '.') if isinstance(x, (int, float)) else x
   )
+  # Check Danh Sách bổ sung (F4/F2)
+  def _chk_bs(ma):
+    return '✓' if check_dskh_bo_sung(ma, rd, _dskh_rules) else ''
+  out['Check Danh Sách bổ sung'] = out['Mã KH'].map(_chk_bs)
   return out
 
 
 def render_trai_tuyen_html(df):
-  """Bảng chi tiết ĐH Trái Tuyến — header vàng chữ đỏ theo mẫu.
-  Không có data → trả chuỗi rỗng (không lỗi, không dòng chữ)."""
+  """Bảng chi tiết ĐH Trái Tuyến — format giống bảng Hiệu Suất (header xanh đậm, chữ trắng)."""
   if df is None or df.empty:
     return ''
   cols = [
       'STT', 'Tên NVBH', 'Mã KH', 'Tên KH', 'Mã ĐH',
-      'Giá trị ĐH [Doanh Số]', 'Ngày ĐH', 'LPPC', 'Check Danh Sách Import',
+      'Giá trị ĐH [Doanh Số]', 'Ngày ĐH', 'LPPC',
+      'Check Danh Sách Import', 'Check Danh Sách bổ sung',
   ]
   for c in cols:
     if c not in df.columns:
       df[c] = ''
 
   th = (
-      'background-color:#f6e05e !important;color:#e53e3e !important;'
+      'background-color:#1a365d !important;color:#ffffff !important;'
       'font-weight:800 !important;text-align:center !important;'
-      'border:1px solid #000 !important;padding:8px 6px;font-size:12px;'
+      'border:1px solid #2b6cb0 !important;padding:8px 6px;font-size:12px;'
       'white-space:nowrap;'
   )
-  td = (
-      'border:1px solid #000 !important;padding:6px 5px;font-size:12px;'
-      'text-align:center !important;white-space:nowrap;background:#fff;'
+  td_base = (
+      'border:1px solid #bce2f5 !important;padding:6px 5px;font-size:12px;'
+      'text-align:center !important;white-space:nowrap;'
   )
   html = [
       '<div style="margin-top:20px;">',
-      '<h4 style="color:#c53030;font-weight:800;margin:8px 0 6px 0;">'
+      '<h4 style="color:#1a365d;font-weight:800;margin:8px 0 6px 0;">'
       '📋 CHI TIẾT ĐƠN HÀNG TRÁI TUYẾN</h4>',
       '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">',
-      '<table style="border-collapse:collapse;width:100%;min-width:900px;'
-      'font-family:Arial,sans-serif;">',
+      '<table class="custom-kpi-table" style="border-collapse:collapse;width:100%;'
+      'min-width:900px;font-family:Arial,sans-serif;">',
       '<thead><tr>',
   ]
   for c in cols:
     html.append(f'<th style="{th}">{c}</th>')
   html.append('</tr></thead><tbody>')
-  for _, row in df.iterrows():
+
+  n = len(df)
+  for pos, (_, row) in enumerate(df.iterrows()):
+    bg = '#e6f4fc' if pos % 2 == 0 else '#ffffff'
     html.append('<tr>')
     for c in cols:
       val = row.get(c, '')
       if pd.isna(val):
         val = ''
-      al = 'left' if c in ('Tên NVBH', 'Tên KH') else 'center'
-      html.append(f'<td style="{td}text-align:{al} !important;">{val}</td>')
+      # Check bổ sung: tick xanh đậm
+      if c == 'Check Danh Sách bổ sung' and str(val).strip() in ('✓', '✔', '☑'):
+        cell = (
+            f'<td style="{td_base}background-color:{bg} !important;'
+            f'color:#228b22 !important;font-weight:900 !important;'
+            f'font-size:16px;">✓</td>'
+        )
+      else:
+        al = 'left' if c in ('Tên NVBH', 'Tên KH', 'Check Danh Sách Import') else 'center'
+        cell = (
+            f'<td style="{td_base}background-color:{bg} !important;'
+            f'text-align:{al} !important;">{val}</td>'
+        )
+      html.append(cell)
     html.append('</tr>')
+
   html.append('</tbody></table></div></div>')
   return ''.join(html)
+
 
 
 def build_combo_orders_detail(df_rpt, report_date, filter_nv=None, mcp_df=None):
@@ -5023,6 +5306,7 @@ def build_combo_orders_detail(df_rpt, report_date, filter_nv=None, mcp_df=None):
 
 
 def render_combo_orders_html(df):
+  df = df.drop(columns=['Mã NVBH'], errors='ignore')
   """Bảng chi tiết ĐH Combo — format giống bảng chi tiết ĐH Trái Tuyến."""
   if df is None or df.empty:
     return ''
@@ -5071,8 +5355,9 @@ def render_combo_orders_html(df):
 
 
 
+
 def build_performance_comments(df):
-  """Nhận xét cuối báo cáo Hiệu suất."""
+  """Nhận xét 5 chỉ số: SO, VT KO ĐH, ASO Xanh, ASO Vàng, Trái tuyến & VIP."""
   if df is None or df.empty:
     return ''
   d = df.copy()
@@ -5085,46 +5370,93 @@ def build_performance_comments(df):
   if d.empty:
     return ''
 
-  for col in ['_delta_so', '_delta_x', '_delta_v', '_n_trai', '_n_vip_ko', '_pct_vt_dh']:
+  for col in ['_delta_so', '_delta_x', '_delta_v', '_n_trai', '_n_vip_ko',
+              '_pct_vt_dh', '_pct_so', '_pct_x', '_pct_v']:
     if col not in d.columns:
       d[col] = 0
     d[col] = pd.to_numeric(d[col], errors='coerce').fillna(0)
 
+  d['_pct_ko_dh'] = (100.0 - d['_pct_vt_dh']).clip(lower=0)
+
+  def _top3(col, fmt='pct', higher_better=True):
+    asc = not higher_better
+    top = d.sort_values(col, ascending=asc).head(3)
+    bot = d.sort_values(col, ascending=not asc).head(3)
+
+    def _f(r):
+      v = r[col]
+      if fmt == 'pct':
+        return f"{r['Tên NVBH']} ({v:.1f}%)"
+      if fmt == 'money':
+        return f"{r['Tên NVBH']} ({int(v):+,}đ)".replace(',', '.')
+      if fmt == 'int':
+        return f"{r['Tên NVBH']} ({int(v)})"
+      return f"{r['Tên NVBH']} ({v})"
+
+    return (
+        ', '.join(_f(r) for _, r in top.iterrows()) or 'Không có',
+        ', '.join(_f(r) for _, r in bot.iterrows()) or 'Không có',
+    )
+
   lines = []
   lines.append('<div class="note-box" style="margin-top:14px;">')
-  lines.append('<b>📝 NHẬN XÉT HIỆU SUẤT BÁN HÀNG</b><br/>')
-  lines.append(
-      '<span style="font-size:12px;color:#4a5568;">'
-      'Đánh giá cuối ngày so với kết quả giữa ngày (trước 13h). '
-      '↑ Tăng = xanh, ↓ Giảm = đỏ.</span><br/><br/>'
-  )
+  lines.append('<b>📝 NHẬN XÉT HIỆU SUẤT BÁN HÀNG</b><br/><br/>')
 
-  top_up = d.sort_values('_delta_so', ascending=False).head(3)
-  top_down = d.sort_values('_delta_so', ascending=True).head(3)
-  up_names = [
+  # 1. Doanh Số
+  lines.append('<b style="color:#034ea2;">1. Doanh Số</b><br/>')
+  up = d[d['_delta_so'] > 0].sort_values('_delta_so', ascending=False).head(3)
+  down = d[d['_delta_so'] < 0].sort_values('_delta_so', ascending=True).head(3)
+  up_s = ', '.join(
       f"{r['Tên NVBH']} ({int(r['_delta_so']):+,}đ)".replace(',', '.')
-      for _, r in top_up.iterrows() if r['_delta_so'] > 0
-  ]
-  down_names = [
+      for _, r in up.iterrows()
+  ) or 'Không có'
+  down_s = ', '.join(
       f"{r['Tên NVBH']} ({int(r['_delta_so']):+,}đ)".replace(',', '.')
-      for _, r in top_down.iterrows() if r['_delta_so'] < 0
-  ]
-  lines.append(
-      f"• <b>Tăng SO nhiều nhất vs giữa ngày:</b> "
-      f"{', '.join(up_names) if up_names else 'Không có'}<br/>"
-  )
-  lines.append(
-      f"• <b>Giảm SO nhiều nhất vs giữa ngày:</b> "
-      f"{', '.join(down_names) if down_names else 'Không có'}<br/>"
-  )
+      for _, r in down.iterrows()
+  ) or 'Không có'
+  t3, b3 = _top3('_pct_so', fmt='pct', higher_better=True)
+  lines.append(f"• <b>Top 3 tăng SO vs giữa ngày:</b> {up_s}<br/>")
+  lines.append(f"• <b>Bottom 3 giảm SO vs giữa ngày:</b> {down_s}<br/>")
+  lines.append(f"• <b>Top 3 % TH SO / CT ngày:</b> {t3}<br/>")
+  lines.append(f"• <b>Bottom 3 % TH SO / CT ngày:</b> {b3}<br/>")
 
+  # 2. Tỷ lệ VT không có ĐH
+  lines.append('<b style="color:#034ea2;">2. Tỷ lệ VT không có ĐH</b><br/>')
+  t3, b3 = _top3('_pct_ko_dh', fmt='pct', higher_better=False)
+  # higher_better=False → top = lowest KO ĐH (tốt), bot = highest KO ĐH (xấu)
+  lines.append(f"• <b>Top 3 tỷ lệ VT KO ĐH thấp nhất (tốt):</b> {t3}<br/>")
+  lines.append(f"• <b>Bottom 3 tỷ lệ VT KO ĐH cao nhất:</b> {b3}<br/>")
+
+  # 3. ASO Trận Xanh
+  lines.append('<b style="color:#034ea2;">3. ASO Trận Xanh</b><br/>')
+  t3, b3 = _top3('_pct_x', fmt='pct', higher_better=True)
+  lines.append(f"• <b>Top 3 % TH ASO Xanh:</b> {t3}<br/>")
+  lines.append(f"• <b>Bottom 3 % TH ASO Xanh:</b> {b3}<br/>")
+  upx = d[d['_delta_x'] > 0].sort_values('_delta_x', ascending=False).head(3)
+  upx_s = ', '.join(
+      f"{r['Tên NVBH']} (+{int(r['_delta_x'])})" for _, r in upx.iterrows()
+  ) or 'Không có'
+  lines.append(f"• <b>Top 3 tăng ASO Xanh vs giữa ngày:</b> {upx_s}<br/>")
+
+  # 4. ASO Trận Vàng
+  lines.append('<b style="color:#034ea2;">4. ASO Trận Vàng</b><br/>')
+  t3, b3 = _top3('_pct_v', fmt='pct', higher_better=True)
+  lines.append(f"• <b>Top 3 % TH ASO Vàng:</b> {t3}<br/>")
+  lines.append(f"• <b>Bottom 3 % TH ASO Vàng:</b> {b3}<br/>")
+  upv = d[d['_delta_v'] > 0].sort_values('_delta_v', ascending=False).head(3)
+  upv_s = ', '.join(
+      f"{r['Tên NVBH']} (+{int(r['_delta_v'])})" for _, r in upv.iterrows()
+  ) or 'Không có'
+  lines.append(f"• <b>Top 3 tăng ASO Vàng vs giữa ngày:</b> {upv_s}<br/>")
+
+  # 5. Trái tuyến & VIP KO ĐH
+  lines.append('<b style="color:#034ea2;">5. Trái Tuyến & VIP KO ĐH</b><br/>')
   trai = d[d['_n_trai'] > 0].sort_values('_n_trai', ascending=False)
   if trai.empty:
     lines.append('• <b>Bán trái tuyến:</b> Không có<br/>')
   else:
     names = [f"{r['Tên NVBH']} ({int(r['_n_trai'])} CH)" for _, r in trai.iterrows()]
     lines.append(f"• <b>Bán trái tuyến:</b> {', '.join(names)}<br/>")
-
   vip = d[d['_n_vip_ko'] > 0].sort_values('_n_vip_ko', ascending=False)
   if vip.empty:
     lines.append('• <b>KH VIP không mua hàng:</b> Không có<br/>')
@@ -5132,27 +5464,9 @@ def build_performance_comments(df):
     names = [f"{r['Tên NVBH']} ({int(r['_n_vip_ko'])} VIP)" for _, r in vip.iterrows()]
     lines.append(f"• <b>KH VIP không mua hàng:</b> {', '.join(names)}<br/>")
 
-  top_vt = d.sort_values('_pct_vt_dh', ascending=False).head(3)
-  names = [f"{r['Tên NVBH']} ({r['_pct_vt_dh']}%)" for _, r in top_vt.iterrows()]
-  lines.append(
-      f"• <b>Top 3 tỷ lệ VT có ĐH theo lịch VT:</b> "
-      f"{', '.join(names) if names else 'Không có'}<br/>"
-  )
-
-  # Bottom 3: tỷ lệ VT KHÔNG có ĐH = 100 - % VT có ĐH (cao nhất = kém nhất)
-  d = d.copy()
-  d['_pct_vt_ko_dh'] = (100.0 - d['_pct_vt_dh']).clip(lower=0)
-  bot_vt = d.sort_values('_pct_vt_ko_dh', ascending=False).head(3)
-  bot_names = [
-      f"{r['Tên NVBH']} (KO ĐH {r['_pct_vt_ko_dh']:.1f}%)"
-      for _, r in bot_vt.iterrows()
-  ]
-  lines.append(
-      f"• <b>Bottom 3 tỷ lệ VT không có ĐH theo lịch VT:</b> "
-      f"{', '.join(bot_names) if bot_names else 'Không có'}<br/>"
-  )
   lines.append('</div>')
   return ''.join(lines)
+
 
 
 def render_performance_html(df):
