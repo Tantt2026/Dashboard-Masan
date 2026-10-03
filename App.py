@@ -537,6 +537,22 @@ def get_turnover_targets():
 
 # Mốc tô màu % theo từng báo cáo Tab KPI
 _CURRENT_COLOR_MOC = 100.0
+# % Timegone hiện tại của ngày báo cáo; chỉ dùng cho các KPI có lương thưởng.
+_CURRENT_TIMEGONE = 100.0
+_CURRENT_SALARY_KPI = ''
+
+# KPI có lương thưởng theo Công văn T10/2026 và mốc tối thiểu để được tính lương.
+# Khi % KPI đạt mốc tối thiểu này thì được xem là "kịp Timegone" để tô màu.
+KPI_SALARY_MIN_PCT = {
+    'TURNOVER': 95.0,
+    'PC_BT': 100.0,
+    'LPPC': 91.5,         # 4.3 / target 4.7 × 100
+    'ASO_ALL': 100.0,
+    'ASO_FOCUS': 90.0,
+    'ASO_FOCUS_2': 90.0,
+    'PC_ON': 100.0,
+    'LPPC_MEAT': 100.0,
+}
 
 # Mốc mặc định (%). LPPC/LPPC_Meat: mốc tuyệt đối (4.3 / 3.8) — xử lý riêng khi set.
 KPI_COLOR_MOC = {
@@ -658,12 +674,41 @@ def set_color_moc(moc):
     _CURRENT_COLOR_MOC = 100.0
 
 
+def set_timegone_color_context(pct_timegone):
+  """Cập nhật % Timegone của ngày báo cáo để tô màu KPI có lương thưởng."""
+  global _CURRENT_TIMEGONE
+  try:
+    _CURRENT_TIMEGONE = float(pct_timegone)
+  except Exception:
+    _CURRENT_TIMEGONE = 100.0
+
+
 def set_color_moc_for_kpi(kpi_key, total_pct=None):
-  """Gán mốc tô màu theo loại báo cáo. Combo: dùng % MTD dòng Total nếu có."""
+  """
+  Gán mốc tô màu theo loại báo cáo.
+  Với 8 KPI có lương thưởng: màu % bám theo Timegone; đồng thời
+  nếu đạt mốc tối thiểu tính lương thì được xem như đã kịp Timegone.
+  Riêng LPPC/LPPC_Meat, bảng sẽ có thêm màu theo đúng mốc lương tuyệt đối.
+  Combo: dùng % MTD dòng Total nếu có.
+  """
+  global _CURRENT_SALARY_KPI
+  _CURRENT_SALARY_KPI = str(kpi_key)
   if kpi_key == 'COMBO' and total_pct is not None:
     set_color_moc(total_pct)
     return
-  moc = KPI_COLOR_MOC.get(str(kpi_key), 100.0)
+
+  kpi_key = str(kpi_key)
+  if kpi_key in KPI_SALARY_MIN_PCT:
+    # OR logic: đạt Timegone HOẶC đạt mốc tối thiểu tính lương => được xem là kịp.
+    # Dùng mốc thấp hơn để vùng xanh bắt đầu từ ngưỡng sớm hơn trong hai điều kiện.
+    effective_moc = min(
+        float(_CURRENT_TIMEGONE),
+        float(KPI_SALARY_MIN_PCT[kpi_key]),
+    )
+    set_color_moc(effective_moc)
+    return
+
+  moc = KPI_COLOR_MOC.get(kpi_key, 100.0)
   set_color_moc(moc)
 
 
@@ -704,6 +749,57 @@ def color_pct_class(val, moc=None):
       return 'pct-purple'
   except Exception:
     return ''
+
+
+def salary_metric_style(kpi_key, col, val):
+  """Màu riêng cho LPPC/LPPC_Meat theo đúng mốc tính lương trong công văn.
+
+  LPPC: <4.3 đỏ; từ 4.3 đến <4.7 xanh (đạt mức 1); >=4.7 tím (đạt/vượt mức 2).
+  LPPC_Meat: <3.8 đỏ; =3.8 xanh (đạt mức); >3.8 tím (vượt mức).
+  Cột % MTD dùng tỷ lệ tương ứng: LPPC 91.5% và 100%; LPPC_Meat 100%.
+  """
+  key = str(kpi_key or '').upper()
+  c = str(col or '').strip().upper()
+  try:
+    v = float(str(val).replace('%', '').replace(',', '').strip())
+  except Exception:
+    return '', ''
+
+  red = 'background-color:#fed7d7 !important;color:#742a2a !important;font-weight:800 !important;'
+  green = 'background-color:#c6f6d5 !important;color:#22543d !important;font-weight:800 !important;'
+  purple = 'background-color:#e9d8fd !important;color:#553c9a !important;font-weight:800 !important;'
+
+  if key == 'LPPC':
+    if '%' in c:
+      if v < 91.5:
+        return 'pct-red', red
+      if v < 100:
+        return 'pct-green', green
+      return 'pct-purple', purple
+    if c == 'MTD' or c == 'THỰC HIỆN NGÀY' or 'CHỈ TIÊU KPI' in c:
+      if c == 'CHỈ TIÊU KPI':
+        return '', ''
+      if v < 4.3:
+        return 'pct-red', red
+      if v < 4.7:
+        return 'pct-green', green
+      return 'pct-purple', purple
+
+  if key == 'LPPC_MEAT':
+    if '%' in c:
+      if v < 100:
+        return 'pct-red', red
+      if v == 100:
+        return 'pct-green', green
+      return 'pct-purple', purple
+    if c == 'MTD' or c == 'THỰC HIỆN NGÀY':
+      if v < 3.8:
+        return 'pct-red', red
+      if v == 3.8:
+        return 'pct-green', green
+      return 'pct-purple', purple
+
+  return '', ''
 
 
 def vip_ko_bg(val):
@@ -1728,7 +1824,7 @@ def build_report(
               all_sms.append(k)
         all_sms = sorted(set(all_sms))
 
-    key, title = 'ASO_ALL', '4. ASO_ALL - Bao phủ tổng SP Masan (OFF & ON)'
+    key, title = 'ASO_ALL', 'ASO_ALL - Bao phủ tổng SP Masan (OFF & ON)'
 
   elif report_type == 'PC_BT':
     # L1 OFF, >=4 line đạt MOQ từng SKU, max 1 PC/CH/ngày, Target từ Target_KPI
@@ -1740,7 +1836,7 @@ def build_report(
     ok_day = pick_best_pc_per_outlet_day(ok)
     mtd = ok_day.groupby('Mã NVBH').size()
     ngay = ok_day[ok_day['date'] == report_date].groupby('Mã NVBH').size()
-    key, title = 'PC_BT', '2. PC_BT - Đơn hàng ≥4 line MOQ (L1 OFF)'
+    key, title = 'PC_BT', 'PC_BT - Đơn hàng ≥4 line MOQ (L1 OFF)'
 
   elif report_type == 'PC_ON':
     # L1 ON, >=1 line đạt MOQ, max 1 PC/CH/ngày
@@ -1765,7 +1861,7 @@ def build_report(
         # fallback: 50% * số outlet ON
         outlet_cnt = on_mcp.groupby(c_nv_mcp)[c_ma].nunique().to_dict()
         on_targets = {k: int(v * 0.5) for k, v in outlet_cnt.items()}
-    key, title = 'PC_ON', '7. PC_ON - Đơn hàng ≥1 line MOQ (L1 ON)'
+    key, title = 'PC_ON', 'PC_ON - Đơn hàng ≥1 line MOQ (L1 ON)'
 
   elif report_type == 'ASO_FOCUS':
     # Trận Xanh: Trà Búp Non Tea 365 — mặc định target 72
@@ -1775,7 +1871,7 @@ def build_report(
         r'búp non|bup non|tea\s*365|tea365|trà.*365',
         min_qty=1,
     )
-    key, title = 'ASO_FOCUS', '5. ASO_Focus - Trận Xanh (Tea 365)'
+    key, title = 'ASO_FOCUS', 'ASO_Focus - Trận Xanh (Tea 365)'
 
   elif report_type == 'ASO_FOCUS_2':
     # Trận Vàng: Nước giặt xả Homey hương hoa trà Jeju tinh tế túi 2.9kg — target 26
@@ -1784,7 +1880,7 @@ def build_report(
         r'homey.*2\.9|homey.*2,9|giặt xả homey|giat xa homey|homey.*jeju',
         min_qty=1,
     )
-    key, title = 'ASO_FOCUS_2', '6. ASO_Focus_2 - Trận Vàng (Homey 2.9kg)'
+    key, title = 'ASO_FOCUS_2', 'ASO_Focus_2 - Trận Vàng (Homey 2.9kg)'
 
   elif report_type == 'LPPC':
     # Trừ Meat & Beer; line đạt MOQ; PC = đơn ≥4 line MOQ; LPPC = Total line / Tổng PC
@@ -1818,7 +1914,7 @@ def build_report(
       tl = today.groupby('Mã NVBH')['n_moq_lines'].sum()
       tp = today.groupby('Mã NVBH').size()
       ngay = (tl / tp).replace([float('inf')], 0).fillna(0)
-    key, title = 'LPPC', '3. LPPC - Bình quân line/PC (trừ Meat & Beer)'
+    key, title = 'LPPC', 'LPPC - Bình quân line/PC (trừ Meat & Beer)'
 
   elif report_type == 'LPPC_MEAT':
     d = df_mtd.copy()
@@ -1850,7 +1946,7 @@ def build_report(
       tl = today.groupby('Mã NVBH')['n_moq_lines'].sum()
       tp = today.groupby('Mã NVBH').size()
       ngay = (tl / tp).replace([float('inf')], 0).fillna(0)
-    key, title = 'LPPC_MEAT', '8. LPPC_Meat - Bình quân line/PC (Processed Meats)'
+    key, title = 'LPPC_MEAT', 'LPPC_Meat - Bình quân line/PC (Processed Meats)'
 
   else:
     return pd.DataFrame(), 0, ''
@@ -2031,7 +2127,7 @@ def build_report(
 
 
 def build_turnover_report(df, report_date, turnover_targets, filter_nv=None):
-  title = '1. TURNOVER - Tổng doanh số bán ra'
+  title = 'TURNOVER - Tổng doanh số bán ra'
   if df is None or df.empty:
     return pd.DataFrame(columns=[
         'STT', 'Mã NVBH', 'Tên NVBH', 'Chỉ Tiêu Doanh Số',
@@ -3378,7 +3474,14 @@ def render_html_table(df):
       if pd.isna(val):
         val = ''
 
-      if col in [
+      salary_cls, salary_style = salary_metric_style(_CURRENT_SALARY_KPI, col, val)
+      if salary_cls or salary_style:
+        align_salary = 'center' if ('%' in str(col) or col in ['MTD', 'Thực Hiện Ngày']) else 'right'
+        html.append(
+            f'<td align="{align_salary}" data-colored="1" class="{salary_cls}" '
+            f'style="{salary_style} text-align:{align_salary} !important;">{val}</td>'
+        )
+      elif col in [
           '% MTD', '% MTD (OFF)', '% MTD (ON)', '% MTD OFF', '% MTD ON',
           '% Hoàn Thành', '% TH', '% PC/VT OFF', '% PC/Plan ON', '% TH SO',
           '% TH Xanh', '% TH Vàng', '% Active',
@@ -4723,6 +4826,181 @@ def render_trai_tuyen_html(df):
   return ''.join(html)
 
 
+def build_combo_orders_detail(df_rpt, report_date, filter_nv=None, mcp_df=None):
+  """Danh sách đơn hàng Combo theo đúng ngày báo cáo.
+  Giữ cùng cấu trúc hiển thị với chi tiết ĐH Trái Tuyến của Báo Cáo Hiệu Suất,
+  thay 2 cột cuối thành Loại Hình L1 và Sản Phẩm Khuyến Mãi.
+  """
+  empty = pd.DataFrame(columns=[
+      'STT', 'Tên NVBH', 'Mã KH', 'Tên KH', 'Mã ĐH',
+      'Giá trị ĐH [Doanh Số]', 'Ngày ĐH', 'Loại Hình L1',
+      'Sản Phẩm Khuyến Mãi',
+  ])
+  if df_rpt is None or df_rpt.empty or 'date' not in df_rpt.columns:
+    return empty
+
+  rd = report_date.date() if hasattr(report_date, 'date') else report_date
+  d = df_rpt[df_rpt['date'] == rd].copy()
+  if d.empty:
+    return empty
+
+  if nv_selected(filter_nv) and 'Tên NVBH' in d.columns:
+    vals = [str(v).strip() for v in (filter_nv if isinstance(filter_nv, list) else [filter_nv])]
+    d = d[d['Tên NVBH'].astype(str).str.strip().isin(vals)].copy()
+  if d.empty:
+    return empty
+
+  # Dùng đúng rule nhận diện Combo đang chạy trong Báo Cáo ĐH Combo.
+  combo = tag_combo_orders_t10(d, mcp_df=mcp_df)
+  if combo is None or combo.empty:
+    return empty
+
+  val_col = find_col(
+      combo, ['Thành tiền trước CK', 'Thành tiền trước chiết khấu']
+  ) or 'Thành tiền trước CK'
+  if val_col in combo.columns:
+    combo['_sales'] = pd.to_numeric(combo[val_col], errors='coerce').fillna(0)
+  else:
+    combo['_sales'] = 0
+
+  if 'Mã đơn hàng' not in combo.columns:
+    return empty
+
+  ma_kh_col = find_col(combo, ['Mã CH', 'Mã KH', 'Outlet_code', 'Outlet Code'])
+  ten_kh_col = find_col(combo, ['Tên CH', 'Tên khách hàng', 'Tên Cửa hàng'])
+  nv_col = find_col(combo, ['Tên NVBH', 'Tên NV', 'SM name', 'Nhân viên'])
+  l1_col = find_col(combo, ['L1', 'Channel', 'Loại Hình Kinh Doanh', 'Loại hình kinh doanh'])
+  km_col = find_col(combo, ['Hàng KM', 'Hang KM', 'Hàng khuyến mãi'])
+  sp_col = find_col(combo, ['Tên sản phẩm', 'Tên SP', 'Sản phẩm'])
+
+  rows = []
+  for ma_dh, g in combo.groupby('Mã đơn hàng', sort=False):
+    g = g.copy()
+    ma_kh = ''
+    if ma_kh_col:
+      vals_kh = g[ma_kh_col].dropna().astype(str).str.strip()
+      if not vals_kh.empty:
+        ma_kh = vals_kh.iloc[0]
+
+    ten_kh = ''
+    if ten_kh_col:
+      vals_ten = g[ten_kh_col].dropna().astype(str).str.strip()
+      if not vals_ten.empty:
+        ten_kh = vals_ten.iloc[0]
+
+    nv = ''
+    if nv_col:
+      vals_nv = g[nv_col].dropna().astype(str).str.strip()
+      if not vals_nv.empty:
+        nv = vals_nv.iloc[0]
+
+    # Ưu tiên L1 thực tế trong RPT (đã map từ Data_MCP); fallback channel ON/OFF.
+    l1 = ''
+    if l1_col:
+      vals_l1 = g[l1_col].dropna().astype(str).str.strip()
+      vals_l1 = vals_l1[~vals_l1.str.lower().isin(['', 'nan', 'none'])]
+      if not vals_l1.empty:
+        l1 = vals_l1.iloc[0]
+    if not l1:
+      vals_ch = g.get('channel', pd.Series(dtype=object)).dropna().astype(str).str.strip()
+      if not vals_ch.empty:
+        l1 = vals_ch.iloc[0]
+
+    # Chỉ lấy các dòng Hàng KM để tạo danh sách Sản Phẩm Khuyến Mãi.
+    promo_names = []
+    if sp_col:
+      if km_col:
+        km_mask = g[km_col].astype(str).str.strip().str.upper().isin(
+            ['Y', 'YES', '1', 'TRUE']
+        )
+        promo_series = g.loc[km_mask, sp_col]
+      else:
+        promo_series = g.loc[g['_line_combo'].fillna(False), sp_col]
+      for x in promo_series.dropna().astype(str).str.strip().tolist():
+        if x and x.lower() not in ('nan', 'none') and x not in promo_names:
+          promo_names.append(x)
+
+    ngay_s = ''
+    if 'Ngày tạo đơn hàng' in g.columns:
+      ngay = pd.to_datetime(g['Ngày tạo đơn hàng'].iloc[0], errors='coerce')
+      if pd.notna(ngay):
+        ngay_s = ngay.strftime('%d/%m/%Y %H:%M')
+    if not ngay_s:
+      ngay_s = rd.strftime('%d/%m/%Y') if hasattr(rd, 'strftime') else str(rd)
+
+    rows.append({
+        'STT': 0,
+        'Tên NVBH': nv,
+        'Mã KH': ma_kh,
+        'Tên KH': ten_kh,
+        'Mã ĐH': str(ma_dh).strip(),
+        'Giá trị ĐH [Doanh Số]': int(round(float(g['_sales'].sum()), 0)),
+        'Ngày ĐH': ngay_s,
+        'Loại Hình L1': l1,
+        'Sản Phẩm Khuyến Mãi': ' | '.join(promo_names),
+    })
+
+  if not rows:
+    return empty
+
+  out = pd.DataFrame(rows).sort_values(
+      ['Tên NVBH', 'Mã KH', 'Mã ĐH']
+  ).reset_index(drop=True)
+  out['STT'] = range(1, len(out) + 1)
+  out['Giá trị ĐH [Doanh Số]'] = out['Giá trị ĐH [Doanh Số]'].apply(
+      lambda x: f'{int(x):,}'.replace(',', '.') if isinstance(x, (int, float)) else x
+  )
+  return out
+
+
+def render_combo_orders_html(df):
+  """Bảng chi tiết ĐH Combo — format giống bảng chi tiết ĐH Trái Tuyến."""
+  if df is None or df.empty:
+    return ''
+  cols = [
+      'STT', 'Tên NVBH', 'Mã KH', 'Tên KH', 'Mã ĐH',
+      'Giá trị ĐH [Doanh Số]', 'Ngày ĐH', 'Loại Hình L1',
+      'Sản Phẩm Khuyến Mãi',
+  ]
+  for c in cols:
+    if c not in df.columns:
+      df[c] = ''
+
+  th = (
+      'background-color:#f6e05e !important;color:#e53e3e !important;'
+      'font-weight:800 !important;text-align:center !important;'
+      'border:1px solid #000 !important;padding:8px 6px;font-size:12px;'
+      'white-space:nowrap;'
+  )
+  td = (
+      'border:1px solid #000 !important;padding:6px 5px;font-size:12px;'
+      'text-align:center !important;white-space:nowrap;background:#fff;'
+  )
+  html = [
+      '<div style="margin-top:20px;">',
+      '<h4 style="color:#c53030;font-weight:800;margin:8px 0 6px 0;">'
+      '📋 DANH SÁCH ĐƠN HÀNG COMBO</h4>',
+      '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">',
+      '<table style="border-collapse:collapse;width:100%;min-width:1000px;'
+      'font-family:Arial,sans-serif;">',
+      '<thead><tr>',
+  ]
+  for c in cols:
+    html.append(f'<th style="{th}">{c}</th>')
+  html.append('</tr></thead><tbody>')
+  for _, row in df.iterrows():
+    html.append('<tr>')
+    for c in cols:
+      val = row.get(c, '')
+      if pd.isna(val):
+        val = ''
+      al = 'left' if c in ('Tên NVBH', 'Tên KH', 'Sản Phẩm Khuyến Mãi') else 'center'
+      html.append(f'<td style="{td}text-align:{al} !important;">{val}</td>')
+    html.append('</tr>')
+  html.append('</tbody></table></div></div>')
+  return ''.join(html)
+
+
 def render_performance_html(df):
   if df is None or df.empty:
     return '<p>Không có dữ liệu hiệu suất.</p>'
@@ -4905,25 +5183,37 @@ with f1:
       label_visibility='collapsed',
   )
   tot_days, elapsed_days, remain_days, pct_tg = get_timegone_stats(report_date)
+  set_timegone_color_context(pct_tg)
 with f2:
   st.markdown('<p class="filter-label">KPI NAME</p>', unsafe_allow_html=True)
+  # Mức lương KPI theo Công văn số 22–011026/INC-KD-MSC-NET-MBD-CDGT, áp dụng T10/2026.
+  KPI_SALARY_LABEL = {
+      'TURNOVER': '95%: 4.508.000đ | 100%: 6.440.000đ',
+      'PC_BT': '100%: 2.400.000đ',
+      'LPPC': 'Mức 1 (4,3): 1.980.000đ | Mức 2 (4,7): 2.200.000đ',
+      'ASO_ALL': '100%: 1.100.000đ',
+      'ASO_FOCUS': '90%: 880.000đ | 100%: 1.100.000đ',
+      'ASO_FOCUS_2': '90%: 720.000đ | 100%: 900.000đ',
+      'PC_ON': '100%: 1.500.000đ',
+      'LPPC_MEAT': '100%: 400.000đ',
+  }
   kpi_map = {
       # ===== 8 KPI THÁNG 10 (theo Công văn 22-011026) =====
-      '1. TURNOVER - Tổng doanh số bán ra': 'TURNOVER',
-      '2. PC_BT - Đơn hàng ≥4 line MOQ (L1 OFF)': 'PC_BT',
-      '3. LPPC - Bình quân line/PC (trừ Meat & Beer)': 'LPPC',
-      '4. ASO_ALL - Bao phủ tổng SP Masan (OFF & ON)': 'ASO_ALL',
-      '5. ASO_Focus - Trận Xanh (Tea 365)': 'ASO_FOCUS',
-      '6. ASO_Focus_2 - Trận Vàng (Homey 2.9kg)': 'ASO_FOCUS_2',
-      '7. PC_ON - Đơn hàng ≥1 line MOQ (L1 ON)': 'PC_ON',
-      '8. LPPC_Meat - Bình quân line/PC (Processed Meats)': 'LPPC_MEAT',
+      'TURNOVER - Tổng doanh số bán ra': 'TURNOVER',
+      'PC_BT - Đơn hàng ≥4 line MOQ (L1 OFF)': 'PC_BT',
+      'LPPC - Bình quân line/PC (trừ Meat & Beer)': 'LPPC',
+      'ASO_ALL - Bao phủ tổng SP Masan (OFF & ON)': 'ASO_ALL',
+      'ASO_Focus - Trận Xanh (Tea 365)': 'ASO_FOCUS',
+      'ASO_Focus_2 - Trận Vàng (Homey 2.9kg)': 'ASO_FOCUS_2',
+      'PC_ON - Đơn hàng ≥1 line MOQ (L1 ON)': 'PC_ON',
+      'LPPC_Meat - Bình quân line/PC (Processed Meats)': 'LPPC_MEAT',
       # ===== Báo cáo giữ logic Tháng 9 =====
-      '9. BÁO CÁO ĐH COMBO': 'COMBO',
-      '10. BÁO CÁO TỔNG HỢP': 'SUMMARY',
-      '11. BÁO CÁO LỊCH VIẾNG THĂM': 'VISIT',
-      '12. BÁO CÁO MBS CAT': 'MBS_CAT',
-      '13. BÁO CÁO MBS BRAND': 'MBS_BRAND',
-      '14. BÁO CÁO HIỆU SUẤT BÁN HÀNG': 'PERFORMANCE',
+      'BÁO CÁO ĐH COMBO': 'COMBO',
+      'BÁO CÁO TỔNG HỢP': 'SUMMARY',
+      'BÁO CÁO LỊCH VIẾNG THĂM': 'VISIT',
+      'BÁO CÁO MBS CAT': 'MBS_CAT',
+      'BÁO CÁO MBS BRAND': 'MBS_BRAND',
+      'BÁO CÁO HIỆU SUẤT BÁN HÀNG': 'PERFORMANCE',
   }
   selected_name = st.selectbox(
       '', list(kpi_map.keys()), key='kpi', label_visibility='collapsed'
@@ -5236,7 +5526,7 @@ with tab_kpi:
 
     st.markdown(
         f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
-        f' font-size: 15px; text-align: center;">9. BÁO CÁO TỔNG HỢP - THÁNG'
+        f' font-size: 16px; text-align: center;">BÁO CÁO TỔNG HỢP - THÁNG'
         f' {report_date.strftime("%m/%Y")}</h3>',
         unsafe_allow_html=True,
     )
@@ -5839,12 +6129,16 @@ with tab_kpi:
 
     st.markdown(
         f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
-        f' font-size: 15px; text-align: center;">{title} - THÁNG'
+        f' font-size: 16px; text-align: center;">{title} - THÁNG'
         f' {report_date.strftime("%m/%Y")}</h3>',
         unsafe_allow_html=True,
     )
     st.caption(
         f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc: {nv_label(filter_nv)}"
+    )
+    st.markdown(
+        f'<div style="text-align:center; font-size:12px; color:#7a1f1f; font-weight:700; margin:2px 0 8px;">💰 Mức lương KPI: {KPI_SALARY_LABEL.get("TURNOVER", "")}</div>',
+        unsafe_allow_html=True,
     )
 
     c1, c2, c3, c4 = st.columns(4)
@@ -5963,12 +6257,16 @@ with tab_kpi:
     pct_team = total_row[pct_col]
     st.markdown(
         f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
-        f' font-size: 15px; text-align: center;">{title} - THÁNG'
+        f' font-size: 16px; text-align: center;">{title} - THÁNG'
         f' {report_date.strftime("%m/%Y")}</h3>',
         unsafe_allow_html=True,
     )
     st.caption(
         f"⚡ Ngày: {report_date.strftime('%d/%m/%Y')} | Lọc: {nv_label(filter_nv)}"
+    )
+    st.markdown(
+        f'<div style="text-align:center; font-size:12px; color:#7a1f1f; font-weight:700; margin:2px 0 8px;">💰 Mức lương KPI: {KPI_SALARY_LABEL.get(selected_kpi, "")}</div>',
+        unsafe_allow_html=True,
     )
     if selected_kpi == 'ASO_ALL':
       c1, c2, c3, c4, c5, c6 = st.columns(6)
@@ -6058,7 +6356,7 @@ with tab_kpi:
 
     st.markdown(
         f'<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
-        f' font-size: 15px; text-align: center;">7. BÁO CÁO ĐH COMBO (MATRIX OFF/ON) - THÁNG'
+        f' font-size: 16px; text-align: center;">BÁO CÁO ĐH COMBO (MATRIX OFF/ON) - THÁNG'
         f' {report_date.strftime("%m/%Y")}</h3>',
         unsafe_allow_html=True,
     )
@@ -6104,6 +6402,13 @@ with tab_kpi:
     )
 
     st.markdown(render_html_table(df_combo), unsafe_allow_html=True)
+
+    # Chi tiết đơn hàng Combo phát sinh đúng ngày đang chọn, format giống Báo Cáo Hiệu Suất.
+    df_combo_orders = build_combo_orders_detail(
+        df, report_date, filter_nv, mcp_df=mcp
+    )
+    st.markdown(render_combo_orders_html(df_combo_orders), unsafe_allow_html=True)
+
     st.markdown(
         f"""
         <div class="note-box">
