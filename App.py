@@ -4956,89 +4956,66 @@ def _perf_table_html(df, section='call'):
 
 
 
-@st.cache_data(ttl=60, show_spinner=False)
 def load_dskh_trai_tuyen():
-  """Load F4 & F2 từ DSKH_Trái Tuyến.xlsx — xử lý Unicode NFC/NFD + tìm file linh hoạt."""
+  """Load DSKH Trái Tuyến — hỗ trợ sheet Import / F4 / F2 / sheet đầu."""
   import unicodedata
   empty = pd.DataFrame()
 
-  def _nfc(s):
-    try:
-      return unicodedata.normalize('NFC', str(s))
-    except Exception:
-      return str(s)
-
   def _fold(s):
-    """Bỏ dấu + lower để so tên file."""
-    s = _nfc(s).lower()
-    repl = {
-        'á':'a','à':'a','ả':'a','ã':'a','ạ':'a','ă':'a','ắ':'a','ằ':'a','ẳ':'a','ẵ':'a','ặ':'a',
-        'â':'a','ấ':'a','ầ':'a','ẩ':'a','ẫ':'a','ậ':'a',
-        'é':'e','è':'e','ẻ':'e','ẽ':'e','ẹ':'e','ê':'e','ế':'e','ề':'e','ể':'e','ễ':'e','ệ':'e',
-        'í':'i','ì':'i','ỉ':'i','ĩ':'i','ị':'i',
-        'ó':'o','ò':'o','ỏ':'o','õ':'o','ọ':'o','ô':'o','ố':'o','ồ':'o','ổ':'o','ỗ':'o','ộ':'o',
-        'ơ':'o','ớ':'o','ờ':'o','ở':'o','ỡ':'o','ợ':'o',
-        'ú':'u','ù':'u','ủ':'u','ũ':'u','ụ':'u','ư':'u','ứ':'u','ừ':'u','ử':'u','ữ':'u','ự':'u',
-        'ý':'y','ỳ':'y','ỷ':'y','ỹ':'y','ỵ':'y','đ':'d',
-    }
-    for a, b in repl.items():
-      s = s.replace(a, b)
+    s = unicodedata.normalize('NFKD', str(s))
+    s = ''.join(c for c in s if not unicodedata.combining(c))
+    s = s.lower().replace('đ', 'd')
     return s
 
-  path_use = None
   candidates = []
+  search_roots = []
+  for d in [DATA_DIR, 'data', '.', '/mount/src', '/mount/src/dashboard-test',
+            '/mount/src/dashboard-test/data']:
+    if os.path.isdir(d) and d not in search_roots:
+      search_roots.append(d)
 
-  # Quét data/ — match mọi file có "dskh"
-  search_dirs = []
-  for d in [DATA_DIR, 'data', '.', '/mount/src']:
-    if os.path.isdir(d):
-      search_dirs.append(d)
-    # streamlit cloud đôi khi mount khác
+  for root in search_roots:
     try:
-      for root, dirs, files in os.walk(d if os.path.isdir(d) else '.'):
-        if 'data' in dirs:
-          search_dirs.append(os.path.join(root, 'data'))
-        break
-    except Exception:
-      pass
-
-  seen = set()
-  for d in search_dirs:
-    try:
-      for fn in os.listdir(d):
-        full = os.path.join(d, fn)
-        if full in seen:
+      for dirpath, _, files in os.walk(root):
+        if dirpath[len(root):].count(os.sep) > 2:
           continue
-        seen.add(full)
-        if not fn.lower().endswith(('.xlsx', '.xls', '.xlsm')):
-          continue
-        folded = _fold(fn)
-        if 'dskh' in folded:
-          candidates.append(full)
+        for fn in files:
+          if not fn.lower().endswith(('.xlsx', '.xls', '.xlsm')):
+            continue
+          if 'dskh' in _fold(fn):
+            candidates.append(os.path.join(dirpath, fn))
     except Exception:
       continue
 
-  # Thêm path cố định
-  for name in [
-      'DSKH_Trái Tuyến.xlsx', 'DSKH_Trai Tuyen.xlsx',
-      'DSKH_Trái_Tuyến.xlsx', 'DSKH Trai Tuyen.xlsx',
-  ]:
-    candidates.insert(0, os.path.join(DATA_DIR, name))
-
+  preferred, other = [], []
   for p in candidates:
-    try:
-      if os.path.isfile(p):
-        path_use = p
-        break
-    except Exception:
-      continue
+    f = _fold(os.path.basename(p))
+    (preferred if ('trai' in f or 'tuyen' in f) else other).append(p)
+  ordered = preferred + other
 
+  path_use = next((p for p in ordered if os.path.isfile(p)), None)
   if not path_use:
     return empty, empty
 
-  def _read_sheets(p):
-    xl = pd.ExcelFile(p)
+  try:
+    xl = pd.ExcelFile(path_use)
     names = list(xl.sheet_names)
+    # Ưu tiên: Import → F4 → F2 → sheet đầu
+    pick = None
+    for prefer in ['IMPORT', 'F4', 'F2']:
+      for s in names:
+        if str(s).strip().upper().startswith(prefer):
+          pick = s
+          break
+      if pick:
+        break
+    if pick is None and names:
+      pick = names[0]
+
+    df_all = pd.read_excel(path_use, sheet_name=pick)
+    df_all.columns = [str(c).strip() for c in df_all.columns]
+
+    # Tách F4/F2 nếu có 2 sheet riêng; không thì dùng chung 1 df
     s_f4 = s_f2 = None
     for s in names:
       su = str(s).strip().upper()
@@ -5046,21 +5023,20 @@ def load_dskh_trai_tuyen():
         s_f4 = s
       if su == 'F2' or su.startswith('F2'):
         s_f2 = s
-    df_f4 = pd.read_excel(p, sheet_name=s_f4) if s_f4 else empty
-    df_f2 = pd.read_excel(p, sheet_name=s_f2) if s_f2 else empty
-    if not df_f4.empty:
-      df_f4.columns = [str(c).strip() for c in df_f4.columns]
-    if not df_f2.empty:
-      df_f2.columns = [str(c).strip() for c in df_f2.columns]
-    return df_f4, df_f2
 
-  try:
-    return _read_sheets(path_use)
+    if s_f4 or s_f2:
+      df_f4 = pd.read_excel(path_use, sheet_name=s_f4) if s_f4 else empty
+      df_f2 = pd.read_excel(path_use, sheet_name=s_f2) if s_f2 else empty
+      if not df_f4.empty:
+        df_f4.columns = [str(c).strip() for c in df_f4.columns]
+      if not df_f2.empty:
+        df_f2.columns = [str(c).strip() for c in df_f2.columns]
+      return df_f4, df_f2
+
+    # 1 sheet (Import): trả về (df, empty) — build_lookup đọc cả 2
+    return df_all, empty
   except Exception:
-    try:
-      return _read_sheets(path_use)
-    except Exception:
-      return empty, empty
+    return empty, empty
 
 
 
@@ -5217,7 +5193,15 @@ def build_dskh_exempt_lookup(df_f4, df_f2):
         'NGÀY KO TÍNH TRÁI TUYẾN',
         'Ngày VT KO TÍNH TRÁI TUYẾN',
         'Ngày KO TÍNH TRÁI TUYẾN',
+        'NGAY VT KO TINH TRAI TUYEN',
     )
+    if c_ngay is None:
+      # fallback: cột chứa "trai tuyen" hoặc đúng 1 cột số thứ
+      for c in df.columns:
+        cl = str(c).strip().lower()
+        if 'trai' in cl and ('vt' in cl or 'ngay' in cl or 'ngày' in cl):
+          c_ngay = c
+          break
     c_tuan = None
     for c in df.columns:
       cl = str(c).strip().lower()
@@ -5234,52 +5218,70 @@ def build_dskh_exempt_lookup(df_f4, df_f2):
         continue
       days = _parse_weekday_codes(r[c_ngay])
       if not days:
+        # thử parse lại từ string thô
+        days = _parse_weekday_codes(str(r[c_ngay]).strip())
+      if not days:
         continue
       tuan = r[c_tuan] if c_tuan is not None else 'Both'
-      rules.setdefault(ma, []).append({
+      entry = {
           'days': days,
           'week': tuan,
           'sheet': sheet_name,
-      })
+      }
+      rules.setdefault(ma, []).append(entry)
+      # alias key dạng raw
+      raw = str(r[c_ma]).strip()
+      if raw.endswith('.0'):
+        raw = raw[:-2]
+      if raw and raw != ma:
+        rules.setdefault(raw, []).append(entry)
   return rules
 
 
 def check_dskh_bo_sung(ma_kh, report_date, rules_lookup):
-  """✓ nếu Mã KH trong DSKH và thứ của ngày BC nằm trong NGÀY VT KO TÍNH TRÁI TUYẾN.
+  """✓ nếu Mã KH trong DSKH và thứ ngày BC khớp NGÀY VT KO TÍNH TRÁI TUYẾN.
 
-  Ví dụ: ngày BC = Thứ 7 → chỉ tick CH có mã 47 (T4 & T7).
+  Chỉ check THỨ (25/36/47/2-7). Không filter Even/Odd Week.
   """
   if not rules_lookup:
     return False
   ma = _norm_ma_kh(ma_kh)
   if not ma:
     return False
+
   candidates = {ma}
   try:
     candidates.add(str(int(float(ma))))
   except Exception:
     pass
+  if ma.lstrip('0') and ma.lstrip('0') != ma:
+    candidates.add(ma.lstrip('0'))
 
   matched = None
   for c in candidates:
     if c in rules_lookup:
       matched = rules_lookup[c]
       break
+  # fallback: so khớp mọi key đã normalize
+  if not matched:
+    for k, v in rules_lookup.items():
+      if _norm_ma_kh(k) in candidates:
+        matched = v
+        break
   if not matched:
     return False
 
   try:
-    wd = pd.Timestamp(report_date).weekday()  # Mon=0 .. Sat=5
+    wd = pd.Timestamp(report_date).weekday()  # Mon=0
   except Exception:
     return False
 
   for rule in matched:
     days = rule.get('days') or set()
     if wd in days:
-      # week: Both / Even / Odd
-      if _week_ok(rule.get('week'), report_date):
-        return True
+      return True
   return False
+
 
 
 def build_trai_tuyen_orders(df_rpt, df_visit, df_mcp, report_date, filter_nv=None):
@@ -5300,6 +5302,7 @@ def build_trai_tuyen_orders(df_rpt, df_visit, df_mcp, report_date, filter_nv=Non
     return empty
 
   # Load DSKH F4/F2 — ngoại lệ trái tuyến
+  _dskh_rules = {}
   try:
     _df_f4, _df_f2 = load_dskh_trai_tuyen()
     _dskh_rules = build_dskh_exempt_lookup(_df_f4, _df_f2)
@@ -6283,47 +6286,105 @@ def render_perf_table_html(df, month_label, use_timegone=False):
 
 
 def render_perf_chart(df, month_label):
-  """Bar chart Target (xanh) vs SellOut (cam) theo CAT."""
+  """Horizontal grouped bar: TARGET (cam) + SO (xanh) — không chồng lấn."""
   if df is None or df.empty:
     return
-  d = df[~df['CAT'].astype(str).str.lower().isin(['grand total', 'tổng cộng', 'total'])].copy()
+  d = df[~df['CAT'].astype(str).str.lower().isin(
+      ['grand total', 'tổng cộng', 'total']
+  )].copy()
   if d.empty:
     return
-  import altair as alt
+
   d = d.copy()
-  d['Target'] = pd.to_numeric(d['Target'], errors='coerce').fillna(0) / 1_000_000.0
   d['SellOut'] = pd.to_numeric(d['SellOut'], errors='coerce').fillna(0) / 1_000_000.0
-  plot = d.melt(
-      id_vars=['CAT'],
-      value_vars=['Target', 'SellOut'],
-      var_name='Chỉ số',
-      value_name='Giá trị',
-  )
+  d['Target'] = pd.to_numeric(d['Target'], errors='coerce').fillna(0) / 1_000_000.0
+  cats = [str(c) for c in d['CAT'].tolist()]
+  # Đảo thứ tự để CAT đầu hiện trên cùng (giống mẫu)
+  cats_plot = list(reversed(cats))
+  so_vals = [float(d.loc[d['CAT'].astype(str) == c, 'SellOut'].iloc[0]) if len(d.loc[d['CAT'].astype(str) == c]) else 0.0 for c in cats_plot]
+  tg_vals = [float(d.loc[d['CAT'].astype(str) == c, 'Target'].iloc[0]) if len(d.loc[d['CAT'].astype(str) == c]) else 0.0 for c in cats_plot]
+
+  try:
+    import plotly.graph_objects as go
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        y=cats_plot,
+        x=tg_vals,
+        name='Sum of TARGET SO',
+        orientation='h',
+        marker_color='#ED7D31',
+        hovertemplate='<b>%{y}</b><br>TARGET: %{x:,.1f} triệu<extra></extra>',
+    ))
+    fig.add_trace(go.Bar(
+        y=cats_plot,
+        x=so_vals,
+        name='Sum of SO',
+        orientation='h',
+        marker_color='#4472C4',
+        hovertemplate='<b>%{y}</b><br>SO: %{x:,.1f} triệu<extra></extra>',
+    ))
+    fig.update_layout(
+        barmode='group',  # cạnh nhau, không chồng
+        bargap=0.25,
+        bargroupgap=0.08,
+        title_text=f'📅 Tháng {month_label}',
+        title_x=0.5,
+        title_font_size=16,
+        title_font_color='#1a365d',
+        height=max(360, 36 * len(cats) + 80),
+        margin=dict(l=10, r=20, t=50, b=40),
+        paper_bgcolor='white',
+        plot_bgcolor='white',
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=-0.18,
+            xanchor='center',
+            x=0.5,
+            font_size=12,
+        ),
+        xaxis=dict(
+            gridcolor='#e2e8f0',
+            zeroline=False,
+            tickfont=dict(size=11, color='#334155'),
+        ),
+        yaxis=dict(
+            tickfont=dict(size=12, color='#334155'),
+            automargin=True,
+        ),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    return
+  except ImportError:
+    pass
+
+  # Fallback Altair nếu không có plotly
+  import altair as alt
+  plot = pd.DataFrame({
+      'CAT': cats_plot * 2,
+      'Chỉ số': ['Sum of TARGET SO'] * len(cats_plot) + ['Sum of SO'] * len(cats_plot),
+      'Giá trị': tg_vals + so_vals,
+  })
   chart = (
       alt.Chart(plot)
       .mark_bar()
       .encode(
-          x=alt.X('CAT:N', title=None, sort=list(d['CAT'].tolist()),
-                  axis=alt.Axis(labelAngle=-30, labelFontSize=11)),
-          y=alt.Y('Giá trị:Q', title=None, axis=alt.Axis(format='~s')),
+          y=alt.Y('CAT:N', sort=cats_plot, title=None),
+          x=alt.X('Giá trị:Q', title=None),
           color=alt.Color(
               'Chỉ số:N',
               scale=alt.Scale(
-                  domain=['Target', 'SellOut'],
-                  range=['#5b9bd5', '#ed7d31'],
+                  domain=['Sum of TARGET SO', 'Sum of SO'],
+                  range=['#ED7D31', '#4472C4'],
               ),
-              legend=alt.Legend(title=None, orient='top'),
+              legend=alt.Legend(title=None, orient='bottom'),
           ),
-          xOffset='Chỉ số:N',
-          tooltip=[
-              alt.Tooltip('CAT:N', title='CAT'),
-              alt.Tooltip('Chỉ số:N'),
-              alt.Tooltip('Giá trị:Q', format=',.0f'),
-          ],
+          yOffset='Chỉ số:N',
+          tooltip=['CAT:N', 'Chỉ số:N', alt.Tooltip('Giá trị:Q', format=',.1f')],
       )
-      .properties(height=300, title=f'Target vs SellOut (triệu) — {month_label}')
-      .configure_title(fontSize=14, fontWeight='bold', color='#1a365d')
-      .configure_view(strokeWidth=0)
+      .properties(height=max(320, 28 * len(cats) + 60), title=f'📅 Tháng {month_label}')
+      .configure_title(fontSize=16, fontWeight='bold', color='#1a365d', anchor='middle')
   )
   st.altair_chart(chart, use_container_width=True)
 
@@ -6423,6 +6484,173 @@ def build_perf_nv_matrix(df_raw, month, filter_nv=None, df_rpt=None, report_date
       str(i + 1) if i < len(out) - 1 else '' for i in range(len(out))
   ])
   return out, cats
+
+
+
+def render_perf_subdiv_charts(df_mat, cats):
+  """8 chart SUB DIV — modebar fullsize từng chart + Ẩn/Hiện + màu tên NV."""
+  if df_mat is None or df_mat.empty or not cats:
+    return
+
+  d = df_mat.copy()
+  if 'Tên NVBH' not in d.columns:
+    return
+  mask_tot = d['Tên NVBH'].astype(str).str.upper().str.contains(
+      'TỔNG|TOTAL|SS ', na=False
+  )
+  d = d[~mask_tot].copy()
+  if d.empty:
+    return
+
+  nvs = [str(x) for x in d['Tên NVBH'].tolist()]
+  cats_show = [c for c in cats if c][:8]
+  while len(cats_show) < 8:
+    cats_show.append(None)
+
+  try:
+    import plotly.graph_objects as go
+  except ImportError:
+    st.caption('Cần plotly để xem chart SUB DIV.')
+    return
+
+  try:
+    moc = float(_CURRENT_TIMEGONE)
+  except Exception:
+    moc = 100.0
+
+  # Tiêu đề + nút Ẩn/Hiện ngay sau
+  st.markdown(
+      '<h4 style="color:#1a365d;font-weight:800;margin:16px 0 2px 0;">'
+      '📊 CHART THEO TỪNG NGÀNH HÀNG (SUB DIV)</h4>',
+      unsafe_allow_html=True,
+  )
+  show_charts = st.toggle(
+      '👁️ Hiện / Ẩn toàn bộ Chart',
+      value=True,
+      key='perf_subdiv_show_hide',
+  )
+  if not show_charts:
+    st.caption('Chart đang ẩn — bật toggle phía trên để hiện lại.')
+    return
+
+  st.markdown(
+      '<p style="font-size:12px;color:#64748b;margin:4px 0 8px 0;">'
+      '🟠 TARGET &nbsp;|&nbsp; 🔵 SO'
+      ' &nbsp;·&nbsp; Tên <b style="color:#c53030;">đỏ đậm</b> = dưới Timegone'
+      ' &nbsp;·&nbsp; Tên <b style="color:#0b1f4a;">xanh dương đậm</b> = kịp / vượt'
+      f' ({moc:.0f}%)'
+      ' &nbsp;·&nbsp; Bấm icon <b>⛶</b> trên từng chart để xem fullsize</p>',
+      unsafe_allow_html=True,
+  )
+
+  def _build_fig(cat):
+    col_tg = f'{cat}|TARGET'
+    col_so = f'{cat}|SELL OUT'
+    tg, so, pcts = [], [], []
+    for _, r in d.iterrows():
+      try:
+        v_tg = float(r.get(col_tg, 0) or 0) / 1_000_000.0
+      except Exception:
+        v_tg = 0.0
+      try:
+        v_so = float(r.get(col_so, 0) or 0) / 1_000_000.0
+      except Exception:
+        v_so = 0.0
+      tg.append(v_tg)
+      so.append(v_so)
+      pcts.append(round(v_so / v_tg * 100, 1) if v_tg > 0 else 0.0)
+
+    nvs_p = list(reversed(nvs))
+    tg_p = list(reversed(tg))
+    so_p = list(reversed(so))
+    pct_p = list(reversed(pcts))
+
+    ticktext = []
+    for i, name in enumerate(nvs_p):
+      if pct_p[i] < moc:
+        ticktext.append(
+            f'<span style="color:#c53030;font-weight:700">{name}</span>'
+        )
+      else:
+        # Kịp / vượt Timegone → xanh dương đậm
+        ticktext.append(
+            f'<span style="color:#0b1f4a;font-weight:700">{name}</span>'
+        )
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        y=nvs_p, x=tg_p, name='TARGET', orientation='h',
+        marker_color='#ED7D31',
+        hovertemplate='<b>%{y}</b><br>TARGET: %{x:,.1f} tr'
+                      '<br>%: %{customdata:.1f}%<extra></extra>',
+        customdata=pct_p,
+    ))
+    fig.add_trace(go.Bar(
+        y=nvs_p, x=so_p, name='SO', orientation='h',
+        marker_color='#4472C4',
+        hovertemplate='<b>%{y}</b><br>SO: %{x:,.1f} tr<extra></extra>',
+    ))
+    fig.update_layout(
+        barmode='group',
+        bargap=0.2,
+        bargroupgap=0.05,
+        title=dict(
+            text=f'<b>{cat}</b>',
+            font=dict(size=13, color='#1a365d'),
+            x=0.5, xanchor='center', y=0.98, yanchor='top',
+        ),
+        height=max(280, 24 * len(nvs) + 50),
+        margin=dict(l=4, r=8, t=40, b=8),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='white',
+        showlegend=False,
+        xaxis=dict(
+            gridcolor='#e2e8f0', zeroline=False,
+            tickfont=dict(size=9),
+        ),
+        yaxis=dict(
+            tickmode='array',
+            tickvals=nvs_p,
+            ticktext=ticktext,
+            tickfont=dict(size=10),
+            automargin=True,
+        ),
+    )
+    return fig
+
+  # Modebar chỉ hiện khi hover/click — giống chart tháng bên dưới
+  plot_cfg = {
+      'displayModeBar': 'hover',
+      'displaylogo': False,
+      'modeBarButtonsToRemove': [
+          'select2d', 'lasso2d', 'autoScale2d',
+          'hoverClosestCartesian', 'hoverCompareCartesian',
+      ],
+      'toImageButtonOptions': {
+          'format': 'png',
+          'filename': 'perf_subdiv',
+      },
+  }
+
+  for row_i in range(2):
+    cols = st.columns(4)
+    for col_i in range(4):
+      cat = cats_show[row_i * 4 + col_i]
+      with cols[col_i]:
+        if not cat:
+          st.empty()
+          continue
+        try:
+          box = st.container(border=True)
+        except TypeError:
+          box = st.container()
+        with box:
+          st.plotly_chart(
+              _build_fig(cat),
+              use_container_width=True,
+              config=plot_cfg,
+          )
+
 
 
 def render_perf_nv_matrix_html(df, cats, month_label, use_timegone=True):
@@ -10075,6 +10303,8 @@ with tab_kpi:
               ),
               unsafe_allow_html=True,
           )
+          # 8 chart SUB DIV ngay dưới bảng tổng hợp (2×4)
+          render_perf_subdiv_charts(df_mat, cats_union)
         elif use_months:
           st.info('Không có dữ liệu tổng hợp với bộ lọc hiện tại.')
 
