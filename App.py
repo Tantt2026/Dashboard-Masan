@@ -6818,13 +6818,13 @@ def build_tb_discipline_maps(df_disp, df_bohinh, df_visit_day, report_date, df_m
   """Maps NV → so_ch_tb_per, chup_hinh_ddkd.
 
   Số CH TB PER:
-    CH đăng ký TB (trừ Sampling, TBTN & Tích Lũy) ∩
+    CH đăng ký TB chỉ 6 CT permanent Đại sứ (Hóa mỹ phẩm, Gia Vị, Mì, Nước giải khát, Thịt chế biến, Cà phê) ∩
     (lịch VT ngày BC của NV  ∪  CH có Thứ VT 25/36/47 khớp ngày BC trên MCP).
 
   Chụp hình bởi ĐDKD:
     - Ngày đăng hình = ngày BC
     - Người đăng hình trùng đúng Tên NVBH (không khớp → bỏ, = 0)
-    - Tên CT không Sampling / TBTN / Tích Lũy
+    - Tên CT thuộc 6 CT permanent Đại sứ
     - Mã CH ∈ ĐK TB và ∈ lịch VT ngày (gồm 25/36/47)
     → đếm unique Mã CH
   """
@@ -6842,18 +6842,62 @@ def build_tb_discipline_maps(df_disp, df_bohinh, df_visit_day, report_date, df_m
     except Exception:
       return s
 
+  def _is_allowed_ct(ct):
+    """Chỉ đếm đúng 6 CT permanent Đại sứ ngành hàng (whitelist chặt).
+
+    1. MSC_Cuộc thi ảnh Đại sứ Ngành hàng Hóa mỹ phẩm
+    2. MSC_Cuộc thi ảnh Đại sứ Ngành hàng Gia Vị
+    3. MSC_Cuộc thi ảnh Đại sứ Ngành hàng Mì
+    4. MSC_BEV_Cuộc thi ảnh Đại sứ ngành hàng Nước giải khát
+    5. MSJ_Cuộc thi ảnh Đại sứ Ngành hàng Thịt chế biến
+    6. MSC_POW_Cuộc thi ảnh Đại sứ Ngành hàng Cà phê
+
+    Loại: Sampling, Tích Lũy, TBTN, Khách hàng trọng điểm, và mọi CT khác.
+    """
+    s = str(ct or '').lower().replace('_', ' ')
+    s = ' '.join(s.split())  # normalize spaces
+
+    # Loại rõ ràng
+    deny = [
+        'trọng điểm', 'trong diem',
+        'sampling', 'tbtn',
+        'tích lũy', 'tich luy', 'tichluy', 'tích luỹ',
+    ]
+    for d in deny:
+      if d in s:
+        return False
+
+    # Bắt buộc có "đại sứ" (không chỉ "cuộc thi ảnh")
+    if 'đại sứ' not in s and 'dai su' not in s:
+      return False
+
+    # Phải khớp 1 trong 6 ngành
+    industries = [
+        ('hóa mỹ phẩm', 'hoa my pham'),
+        ('gia vị', 'gia vi'),
+        ('nước giải khát', 'nuoc giai khat'),
+        ('thịt chế biến', 'thit che bien'),
+        ('cà phê', 'ca phe'),
+        # Mì: tránh match nhầm — yêu cầu "mì" gần "ngành hàng" hoặc đứng sau đại sứ
+        ('ngành hàng mì', 'nganh hang mi'),
+        ('đại sứ ngành hàng mì', 'dai su nganh hang mi'),
+    ]
+    for pair in industries:
+      for kw in pair:
+        if kw in s:
+          return True
+
+    # Fallback riêng cho Mì: "đại sứ" + " mì" / " mi " (word boundary-ish)
+    if (' mì' in s or s.endswith(' mì') or ' mi ' in s or s.endswith(' mi')
+            or 'hàng mì' in s or 'hang mi' in s):
+      if 'đại sứ' in s or 'dai su' in s:
+        return True
+
+    return False
+
   def _is_excluded_ct(ct):
-    s = str(ct or '').lower()
-    # Loại Sampling, TBTN, Tích Lũy (mọi biến thể)
-    return (
-        ('sampling' in s)
-        or ('tbtn' in s)
-        or ('tích lũy' in s)
-        or ('tich luy' in s)
-        or ('tichluy' in s)
-        or ('tíchluỹ' in s)
-        or ('tích luỹ' in s)
-    )
+    # True = loại bỏ (không thuộc 6 CT whitelist)
+    return not _is_allowed_ct(ct)
 
   # Thứ trong tuần: Mon=2 ... Sat=7 (CN bỏ)
   try:
