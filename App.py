@@ -1,4 +1,5 @@
 import datetime as dt
+import calendar
 from datetime import date, timedelta
 import os
 import re
@@ -14,6 +15,14 @@ st.set_page_config(
     layout='wide',
     initial_sidebar_state='collapsed',
 )
+
+
+# Streamlit fragment (1.33+): bọc phần báo cáo để widget trong report ít rerun toàn trang
+def _maybe_fragment(fn):
+  try:
+    return st.fragment(fn)
+  except Exception:
+    return fn
 
 # ====================== LOGO ======================
 logo_svg = """
@@ -718,24 +727,68 @@ def load_brand_data():
 
 
 @st.cache_data(ttl=600)
-def load_visit_schedule():
-  """File Danh sách lịch viếng thăm (upload lên data/)."""
-  candidates = [
-      VISIT_SCHED_PATH,
-      os.path.join(get_data_dir(), 'DanhSachLichViengTham.xlsx'),
-      os.path.join(get_data_dir(), 'DanhSachLichViengTham.xls'),
-      'DanhSachLichViengTham.xlsx',
-  ]
-  # Tìm file gần đúng tên
-  if os.path.isdir(get_data_dir()):
-    for f in os.listdir(get_data_dir()):
-      fl = f.lower().replace(' ', '')
-      if 'lichviengtham' in fl or 'viengtham' in fl or 'danhsachlich' in fl:
-        candidates.insert(0, os.path.join(get_data_dir(), f))
+@st.cache_data(ttl=600, show_spinner=False)
+def load_visit_schedule(_month_key='Thang10'):
+  """Tìm lịch VT ở data/ThangXX và fallback data/ root."""
+  try:
+    _refresh_paths()
+  except Exception:
+    pass
+
+  def _match_name(fn):
+    fl = str(fn).lower().replace(' ', '').replace('_', '')
+    for a, b in [
+        ('ế', 'e'), ('ễ', 'e'), ('ẹ', 'e'), ('è', 'e'), ('é', 'e'),
+        ('à', 'a'), ('á', 'a'), ('ả', 'a'), ('ã', 'a'), ('ạ', 'a'),
+        ('ư', 'u'), ('ơ', 'o'), ('ô', 'o'),
+    ]:
+      fl = fl.replace(a, b)
+    keys = ['lichviengtham', 'viengtham', 'danhsachlich', 'lichvt']
+    return any(k in fl for k in keys) and fl.endswith(('.xlsx', '.xls', '.xlsm'))
+
+  search_dirs = []
+  try:
+    ddir = get_data_dir()
+    if ddir:
+      search_dirs.append(ddir)
+  except Exception:
+    pass
+  if os.path.isdir('data') and 'data' not in search_dirs:
+    search_dirs.append('data')
+  search_dirs.append('.')
+
+  candidates = []
+  for d in search_dirs:
+    if not os.path.isdir(d):
+      continue
+    for name in [
+        'DanhSachLichViengTham.xlsx',
+        'DanhSachLichViengTham.xls',
+        'DanhSachLichViengTham.xlsm',
+    ]:
+      candidates.append(os.path.join(d, name))
+    try:
+      for f in os.listdir(d):
+        if _match_name(f):
+          candidates.insert(0, os.path.join(d, f))
+    except Exception:
+      pass
+
+  seen = set()
+  uniq = []
   for p in candidates:
-    if os.path.exists(p):
+    if p not in seen:
+      seen.add(p)
+      uniq.append(p)
+
+  for p in uniq:
+    if not os.path.isfile(p):
+      continue
+    for hdr in (2, 0, 1):
       try:
-        df = pd.read_excel(p, header=2)
+        df = pd.read_excel(p, header=hdr)
+        if df is None or df.empty:
+          continue
         if 'Ngày lịch VT' in df.columns:
           df['_plan_date'] = pd.to_datetime(
               df['Ngày lịch VT'], dayfirst=True, errors='coerce'
@@ -745,8 +798,8 @@ def load_visit_schedule():
               df['Ngày VT thực tế'], dayfirst=True, errors='coerce'
           )
         return df
-      except Exception as e:
-        st.warning(f'Không đọc được file lịch VT ({p}): {e}')
+      except Exception:
+        continue
   return pd.DataFrame()
 
 
@@ -1130,8 +1183,12 @@ def set_color_moc_for_kpi(kpi_key, total_pct=None):
   """
   global _CURRENT_SALARY_KPI
   _CURRENT_SALARY_KPI = str(kpi_key)
-  if kpi_key == 'COMBO' and total_pct is not None:
-    set_color_moc(total_pct)
+  if kpi_key == 'COMBO':
+    # Tô màu % theo Timegone (giống các KPI khác)
+    try:
+      set_color_moc(float(_CURRENT_TIMEGONE))
+    except Exception:
+      set_color_moc(100.0)
     return
 
   kpi_key = str(kpi_key)
@@ -1706,6 +1763,7 @@ def build_mcp_nv_summary(
 
   # ----- MTD từ RPT -----
   mtd_map = {}
+  mtd_full_map = {}
   if df_rpt is not None and not getattr(df_rpt, 'empty', True) and report_date is not None:
     d = df_rpt.copy()
     if 'date' in d.columns:
@@ -1765,7 +1823,15 @@ def build_mcp_nv_summary(
             d = d[d['_nv'].isin({_norm_nv(x) for x in filter_nv})]
           else:
             d = d[d['_nv'] == _norm_nv(filter_nv)]
-        mtd_map = d.groupby('_nv')['_val'].sum().to_dict()
+        mtd_full_map = d.groupby('_nv')['_val'].sum().to_dict()
+        # Lọc MTD theo CH đang chọn (VIP/L1/…)
+        c_ma_r = find_col(d, ['Mã CH', 'Mã KH', 'Outlet_code', 'Outlet Code'])
+        if c_ma_r is not None and '_ma' in mcp.columns:
+          allow_ma = set(mcp['_ma'].astype(str).tolist())
+          d = d.copy()
+          d['_ma_r'] = d[c_ma_r].astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
+          d = d[d['_ma_r'].isin(allow_ma)]
+        mtd_map = d.groupby('_nv')['_val'].sum().to_dict() if not d.empty else {}
 
   # ----- Chỉ tiêu từ Performance -----
   target_map = {}
@@ -1919,13 +1985,19 @@ def build_mcp_nv_summary(
   for nv in nvs:
     ct = float(target_map.get(nv, 0) or 0)
     mtd = float(mtd_map.get(nv, 0) or 0)
+    mtd_full = float(mtd_full_map.get(nv, 0) or 0)
+    # Khi lọc nhóm KH (VIP/L1/…): scale chỉ tiêu theo tỷ trọng MTD nhóm / MTD full
+    if mtd_full > 0 and abs(mtd_full - mtd) > 1:
+      ct = ct * (mtd / mtd_full)
+    elif mtd_full > 0 and mtd == 0:
+      ct = 0.0
     pct_ds = round(mtd / ct * 100, 1) if ct > 0 else 0.0
     mcp_n = int(mcp_cnt.get(nv, 0) or 0)
     aso_n = int(aso_map.get(nv, 0) or 0)
     pct_aso = round(aso_n / mcp_n * 100, 1) if mcp_n > 0 else 0.0
     rows.append({
         'Tên NVBH': nv,
-        'Chỉ tiêu Doanh Số': ct,
+        'Chỉ tiêu Doanh Số': round(ct, 0),
         'MTD': mtd,
         '% MTD DS': pct_ds,
         'MCP': mcp_n,
@@ -5897,31 +5969,46 @@ def is_combo_line_t09_on(row):
 
 
 def is_combo_line_t10(row):
-  """Line thuộc CTKM Combo T10:
-  - Tặng 1 chai Tương Ớt Chinsu 250gr (Hàng KM)
-  - Tặng 1 chai Wake UP 247 (Hàng KM)
-  - Chiết khấu 20.000đ
+  """Line thuộc CTKM Combo T10 theo CV 433-300926/HCM-CDGT-MSC:
+
+  OFF (ĐK chính ≥800k MSC+HPC, ĐK phụ ≥100k nhóm SP):
+    → Tặng 1 Chai Tương Ớt Chinsu MN 250gr (Hàng KM)
+
+  ON Bev (ĐK chính ≥300k Bev, ĐK phụ ≥80k Tea365 / WK247 Amazon):
+    → Tặng 1 Chai Wake UP 247 330ml (Hàng thường — không bắt buộc cờ KM)
+
+  ON Nam Ngư (≥500k Gia vị + ≥200k Nam Ngư) / Tam Thái Tử (≥400k + ≥45k):
+    → Tặng 1 Chai Chinsu MN 250gr (KM)
+
+  Homey tiềm năng (≥800k + ≥280k Homey):
+    → Chiết khấu 20.000đ
   """
   sp = str(row.get('Tên SP lower', '') or row.get('Tên sản phẩm', '')).lower()
   km = _get_km_flag(row)
   ck = _get_ck_value(row)
-  is_ck_20k = abs(ck - 20000) < 1 or ck == 20000
+  is_ck_20k = abs(ck - 20000) < 1 or abs(ck - 20_000) < 1
 
-  is_chinsu_250 = km and (
+  # Chinsu MN 250gr — thường là Hàng KM; vẫn nhận nếu tên khớp rõ
+  is_chinsu_250 = (
       ('chinsu' in sp or 'chin-su' in sp or 'chin su' in sp)
       and ('250' in sp)
-      and ('tương' in sp or 'tuong' in sp or 'ớt' in sp or 'ot' in sp or 'sauce' in sp)
   )
-  if km and not is_chinsu_250:
-    is_chinsu_250 = ('chinsu' in sp or 'chin-su' in sp) and '250' in sp
+  if is_chinsu_250 and not km:
+    # chỉ tính khi là line KM hoặc số lượng/đơn giá gần như tặng
+    is_chinsu_250 = km  # bắt buộc KM cho Chinsu OFF
 
-  is_wakeup = km and (
+  # Wake UP 247 — CV ghi Hàng thường (ON Bev), không bắt buộc cờ KM
+  is_wakeup = (
       ('wake' in sp and 'up' in sp and '247' in sp)
-      or 'wakeup 247' in sp.replace(' ', '')
+      or 'wakeup247' in sp.replace(' ', '').replace('-', '')
       or 'wake up 247' in sp
       or ('247' in sp and 'wake' in sp)
   )
-  return is_chinsu_250 or is_wakeup or is_ck_20k
+  # Chỉ lấy chai 330ml tặng (không lấy Amazon 245ml là ĐK phụ)
+  if is_wakeup and '245' in sp and '330' not in sp:
+    is_wakeup = False
+
+  return bool(is_chinsu_250 or is_wakeup or is_ck_20k)
 
 
 
@@ -5997,18 +6084,82 @@ def tag_combo_orders_t10(df_mtd, mcp_df=None):
   else:
     d['is_combo'] = d['_line_combo']
 
+  # CV 433: chỉ tính ĐH đạt ĐK chính theo kênh
+  # OFF ≥800k | ON ≥300k
+  val_col = None
+  for c in ['Thành tiền trước CK', 'Thành tiền trước chiết khấu', 'Tổng tiền', 'Giá trị sau CK']:
+    if c in d.columns:
+      val_col = c
+      break
+  if val_col and 'Mã đơn hàng' in d.columns:
+    d['_line_sales'] = pd.to_numeric(d[val_col], errors='coerce').fillna(0)
+    order_sales = d.groupby(d['Mã đơn hàng'].astype(str))['_line_sales'].transform('sum')
+    ch = d['channel'].astype(str).str.upper() if 'channel' in d.columns else pd.Series('OFF', index=d.index)
+    min_req = ch.map(lambda x: 300000.0 if ('ON' in str(x) and 'OFF' not in str(x)) else 800000.0)
+    d['is_combo'] = d['is_combo'] & (order_sales >= min_req)
+
   combo = d[d['is_combo']].copy()
   return combo
 
+
+def tag_all_orders_with_combo_flag(df_day, mcp_df=None):
+  """Gắn is_combo cho MỌI dòng đơn ngày — không lọc chỉ ĐH Combo.
+  Dùng cho bảng miss (ĐH đạt ĐK chính nhưng thiếu KM / ĐK phụ).
+  """
+  if df_day is None or df_day.empty:
+    return pd.DataFrame()
+  d = df_day.copy()
+  if 'Tên SP lower' not in d.columns and 'Tên sản phẩm' in d.columns:
+    d['Tên SP lower'] = d['Tên sản phẩm'].astype(str).str.lower()
+  elif 'Tên SP lower' not in d.columns:
+    d['Tên SP lower'] = ''
+
+  ch_map = build_mcp_channel_map(mcp_df)
+  if 'Mã CH' in d.columns:
+    d['_ma'] = d['Mã CH'].astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
+    d['channel'] = d['_ma'].map(ch_map)
+    if 'L1' in d.columns:
+      miss = d['channel'].isna()
+      l1s = d.loc[miss, 'L1'].astype(str).str.lower()
+      d.loc[miss & l1s.str.contains('on', na=False) & ~l1s.str.contains('off', na=False), 'channel'] = 'ON'
+      d.loc[miss & l1s.str.contains('off', na=False), 'channel'] = 'OFF'
+    d['channel'] = d['channel'].fillna('OFF')
+  else:
+    d['channel'] = 'OFF'
+
+  is_t09 = get_month_key() == 'Thang09'
+  if is_t09:
+    def _line_t09(r):
+      ch = str(r.get('channel', 'OFF')).upper()
+      if ch == 'ON':
+        return is_combo_line_t09_on(r)
+      return is_combo_line_t09_off(r)
+    d['_line_combo'] = d.apply(_line_t09, axis=1)
+  else:
+    d['_line_combo'] = d.apply(is_combo_line_t10, axis=1)
+
+  if 'Mã đơn hàng' not in d.columns:
+    for c in ['Order No', 'OrderNo', 'Số đơn', 'Order ID', 'Mã ĐH', 'Doc No']:
+      if c in d.columns:
+        d['Mã đơn hàng'] = d[c].astype(str)
+        break
+  if 'Mã đơn hàng' in d.columns:
+    d['is_combo'] = d.groupby('Mã đơn hàng')['_line_combo'].transform('any')
+  else:
+    d['is_combo'] = d['_line_combo']
+  return d
 
 
 def build_combo_matrix(
     df, report_date, df_off_master, df_on_master, filter_nv=None, mcp_df=None
 ):
+  """Matrix Combo OFF/ON: CH (Target/Ngày/MTD/%) + Số Suất (Ngày/MTD)."""
   empty_cols = [
       'STT', 'Tên NVBH',
       'Target (OFF)', 'Phát sinh Ngày (OFF)', 'MTD (OFF)', '% MTD (OFF)',
+      'Suất Ngày (OFF)', 'Suất MTD (OFF)',
       'Target (ON)', 'Phát sinh Ngày (ON)', 'MTD (ON)', '% MTD (ON)',
+      'Suất Ngày (ON)', 'Suất MTD (ON)',
   ]
   if df is None:
     df = pd.DataFrame()
@@ -6021,7 +6172,6 @@ def build_combo_matrix(
     if not df_mtd.empty and 'Tên NVBH' in df_mtd.columns:
       df_mtd = filter_df_by_nv(df_mtd, 'Tên NVBH', filter_nv)
 
-  # Full NV: master combo + RPT + roster (NV không bán vẫn hiện = 0)
   _nv_set = set()
   if not df.empty and 'Tên NVBH' in df.columns:
     _nv_set.update(df['Tên NVBH'].dropna().astype(str).str.strip().tolist())
@@ -6037,59 +6187,94 @@ def build_combo_matrix(
   _nv_set.update([n for n in roster.values() if n])
   nv_list = sorted([x for x in _nv_set if x and x.lower() not in ('nan', 'none', '')])
 
-  off_target_map = {}
-  on_target_map = {}
+  off_target_map, on_target_map = {}, {}
   if (
       not df_off_master.empty
       and 'Tên NV' in df_off_master.columns
       and 'outlet_code' in df_off_master.columns
   ):
-    off_target_map = (
-        df_off_master.groupby('Tên NV')['outlet_code'].nunique().to_dict()
-    )
+    off_target_map = df_off_master.groupby('Tên NV')['outlet_code'].nunique().to_dict()
   if (
       not df_on_master.empty
       and 'Tên NV' in df_on_master.columns
       and 'outlet_code' in df_on_master.columns
   ):
-    on_target_map = (
-        df_on_master.groupby('Tên NV')['outlet_code'].nunique().to_dict()
-    )
+    on_target_map = df_on_master.groupby('Tên NV')['outlet_code'].nunique().to_dict()
 
-  # ===== Logic Combo T10: CTKM + map kênh qua MCP =====
   combo_df = tag_combo_orders_t10(df_mtd, mcp_df=mcp_df)
 
   def _maps_from_combo(combo_sub, report_date):
+    """CH MTD/Ngày + Suất (unique ĐH) MTD/Ngày."""
     empty = {}
     if combo_sub is None or combo_sub.empty or 'Tên NVBH' not in combo_sub.columns:
-      return empty, empty
-    if 'Mã CH' not in combo_sub.columns:
-      return empty, empty
-    mtd = combo_sub.groupby('Tên NVBH')['Mã CH'].nunique().to_dict()
-    first = (
-        combo_sub.groupby(['Tên NVBH', 'Mã CH'])['date'].min().reset_index()
-    )
-    first.columns = ['Tên NVBH', 'Mã CH', 'first_date']
-    ngay = (
-        first[first['first_date'] == report_date]
-        .groupby('Tên NVBH')['Mã CH']
-        .nunique()
-        .to_dict()
-    )
-    return mtd, ngay
+      return empty, empty, empty, empty
+    rd = report_date.date() if hasattr(report_date, 'date') else report_date
+    dsub = combo_sub.copy()
+    if 'date' in dsub.columns:
+      dsub['_d'] = pd.to_datetime(dsub['date'], errors='coerce').dt.date
+    else:
+      dsub['_d'] = rd
 
-  if combo_df.empty:
-    off_mtd, off_ngay, on_mtd, on_ngay = {}, {}, {}, {}
+    if 'Mã CH' in dsub.columns:
+      mtd_ch = dsub.groupby('Tên NVBH')['Mã CH'].nunique().to_dict()
+      # Phát sinh Ngày = CH có first_date = ngày BC (lần đầu phát sinh Combo trong tháng)
+      first = (
+          dsub.groupby(['Tên NVBH', 'Mã CH'])['_d'].min().reset_index()
+      )
+      first.columns = ['Tên NVBH', 'Mã CH', 'first_date']
+      ngay_ch = (
+          first[first['first_date'] == rd]
+          .groupby('Tên NVBH')['Mã CH']
+          .nunique()
+          .to_dict()
+      )
+    else:
+      mtd_ch, ngay_ch = {}, {}
+
+    ma_dh_col = None
+    for c in ['Mã đơn hàng', 'Order No', 'OrderNo', 'Số đơn', 'Order ID', 'Mã ĐH', 'Doc No']:
+      if c in dsub.columns:
+        ma_dh_col = c
+        break
+    if ma_dh_col:
+      mtd_suat = dsub.groupby('Tên NVBH')[ma_dh_col].nunique().to_dict()
+      day = dsub[dsub['_d'] == rd]
+      ngay_suat = day.groupby('Tên NVBH')[ma_dh_col].nunique().to_dict() if not day.empty else {}
+    else:
+      # fallback: 1 suất / CH / ngày
+      if 'Mã CH' in dsub.columns:
+        mtd_suat = dsub.groupby('Tên NVBH')['Mã CH'].nunique().to_dict()
+        day = dsub[dsub['_d'] == rd]
+        ngay_suat = (
+            day.groupby('Tên NVBH')['Mã CH'].nunique().to_dict() if not day.empty else {}
+        )
+      else:
+        mtd_suat, ngay_suat = {}, {}
+    return mtd_ch, ngay_ch, mtd_suat, ngay_suat
+
+  def _ch_mask(s, want):
+    s = s.astype(str).str.upper()
+    if want == 'ON':
+      return s.str.contains('ON', na=False) & ~s.str.contains('OFF', na=False)
+    return s.str.contains('OFF', na=False) | (~s.str.contains('ON', na=False))
+
+  if combo_df is None or combo_df.empty:
+    off_mtd = off_ngay = on_mtd = on_ngay = {}
+    off_suat_mtd = off_suat_ngay = on_suat_mtd = on_suat_ngay = {}
   else:
-    off_mtd, off_ngay = _maps_from_combo(
-        combo_df[combo_df['channel'] == 'OFF'], report_date
+    if 'channel' not in combo_df.columns:
+      combo_df = combo_df.copy()
+      combo_df['channel'] = 'OFF'
+    ch = combo_df['channel']
+    off_mtd, off_ngay, off_suat_mtd, off_suat_ngay = _maps_from_combo(
+        combo_df[_ch_mask(ch, 'OFF')], report_date
     )
-    on_mtd, on_ngay = _maps_from_combo(
-        combo_df[combo_df['channel'] == 'ON'], report_date
+    on_mtd, on_ngay, on_suat_mtd, on_suat_ngay = _maps_from_combo(
+        combo_df[_ch_mask(ch, 'ON')], report_date
     )
 
   rows = []
-  for idx, nv in enumerate(nv_list, 1):
+  for nv in nv_list:
     if nv_selected(filter_nv) and nv not in (
         filter_nv if isinstance(filter_nv, list) else [filter_nv]
     ):
@@ -6098,11 +6283,15 @@ def build_combo_matrix(
     m_off = int(off_mtd.get(nv, 0))
     n_off = int(off_ngay.get(nv, 0))
     pct_off = round(m_off / tgt_off * 100, 1) if tgt_off else 0
+    s_off_n = int(off_suat_ngay.get(nv, 0))
+    s_off_m = int(off_suat_mtd.get(nv, 0))
 
     tgt_on = int(on_target_map.get(nv, 0))
     m_on = int(on_mtd.get(nv, 0))
     n_on = int(on_ngay.get(nv, 0))
     pct_on = round(m_on / tgt_on * 100, 1) if tgt_on else 0
+    s_on_n = int(on_suat_ngay.get(nv, 0))
+    s_on_m = int(on_suat_mtd.get(nv, 0))
 
     rows.append({
         'Tên NVBH': nv,
@@ -6110,11 +6299,15 @@ def build_combo_matrix(
         'Phát sinh Ngày (OFF)': n_off,
         'MTD (OFF)': m_off,
         '% MTD (OFF)': f'{pct_off}%',
+        'Suất Ngày (OFF)': s_off_n,
+        'Suất MTD (OFF)': s_off_m,
         '_pct_off_val': (m_off / tgt_off if tgt_off else 0),
         'Target (ON)': tgt_on,
         'Phát sinh Ngày (ON)': n_on,
         'MTD (ON)': m_on,
         '% MTD (ON)': f'{pct_on}%',
+        'Suất Ngày (ON)': s_on_n,
+        'Suất MTD (ON)': s_on_m,
     })
 
   df_out = pd.DataFrame(rows)
@@ -6129,55 +6322,48 @@ def build_combo_matrix(
   tot_tgt_off = (
       int(sum(off_target_map.values()))
       if not nv_selected(filter_nv)
-      else int(
-          sum(
-              off_target_map.get(v, 0)
-              for v in (
-                  filter_nv if isinstance(filter_nv, list) else [filter_nv]
-              )
-          )
-      )
+      else int(sum(off_target_map.get(v, 0) for v in (
+          filter_nv if isinstance(filter_nv, list) else [filter_nv]
+      )))
   )
   tot_tgt_on = (
       int(sum(on_target_map.values()))
       if not nv_selected(filter_nv)
-      else int(
-          sum(
-              on_target_map.get(v, 0)
-              for v in (
-                  filter_nv if isinstance(filter_nv, list) else [filter_nv]
-              )
-          )
-      )
+      else int(sum(on_target_map.get(v, 0) for v in (
+          filter_nv if isinstance(filter_nv, list) else [filter_nv]
+      )))
   )
 
   tot_m_off = int(df_out['MTD (OFF)'].sum()) if not df_out.empty else 0
-  tot_n_off = (
-      int(df_out['Phát sinh Ngày (OFF)'].sum()) if not df_out.empty else 0
-  )
+  tot_n_off = int(df_out['Phát sinh Ngày (OFF)'].sum()) if not df_out.empty else 0
   tot_pct_off = round(tot_m_off / tot_tgt_off * 100, 1) if tot_tgt_off else 0
+  tot_s_off_n = int(df_out['Suất Ngày (OFF)'].sum()) if not df_out.empty else 0
+  tot_s_off_m = int(df_out['Suất MTD (OFF)'].sum()) if not df_out.empty else 0
 
   tot_m_on = int(df_out['MTD (ON)'].sum()) if not df_out.empty else 0
-  tot_n_on = (
-      int(df_out['Phát sinh Ngày (ON)'].sum()) if not df_out.empty else 0
-  )
+  tot_n_on = int(df_out['Phát sinh Ngày (ON)'].sum()) if not df_out.empty else 0
   tot_pct_on = round(tot_m_on / tot_tgt_on * 100, 1) if tot_tgt_on else 0
+  tot_s_on_n = int(df_out['Suất Ngày (ON)'].sum()) if not df_out.empty else 0
+  tot_s_on_m = int(df_out['Suất MTD (ON)'].sum()) if not df_out.empty else 0
 
   total_row = pd.DataFrame([{
       'STT': '-',
       'Tên NVBH': (
           'SS Trương Thanh Tân Total'
-          if not nv_selected(filter_nv)
-          else nv_label(filter_nv)
+          if not nv_selected(filter_nv) else nv_label(filter_nv)
       ),
       'Target (OFF)': tot_tgt_off,
       'Phát sinh Ngày (OFF)': tot_n_off,
       'MTD (OFF)': tot_m_off,
       '% MTD (OFF)': f'{tot_pct_off}%',
+      'Suất Ngày (OFF)': tot_s_off_n,
+      'Suất MTD (OFF)': tot_s_off_m,
       'Target (ON)': tot_tgt_on,
       'Phát sinh Ngày (ON)': tot_n_on,
       'MTD (ON)': tot_m_on,
       '% MTD (ON)': f'{tot_pct_on}%',
+      'Suất Ngày (ON)': tot_s_on_n,
+      'Suất MTD (ON)': tot_s_on_m,
   }])
   return pd.concat([df_out, total_row], ignore_index=True), tot_tgt_off, tot_tgt_on
 
@@ -8291,14 +8477,21 @@ def build_performance_report(
         if 'channel' not in _combo_day.columns:
           _combo_day['channel'] = 'OFF'
         _ch = _combo_day['channel'].astype(str).str.upper()
-        if 'Mã đơn hàng' in _combo_day.columns:
+        # Đồng bộ Báo Cáo ĐH Combo: unique Mã CH có ĐH Combo trong ngày
+        _ma_col = 'Mã CH' if 'Mã CH' in _combo_day.columns else None
+        if _ma_col is None:
+          for _c in ['Outlet_code', 'Outlet Code', 'Mã KH']:
+            if _c in _combo_day.columns:
+              _ma_col = _c
+              break
+        if _ma_col:
           th_combo_off = int(
-              _combo_day.loc[_ch.str.contains('OFF', na=False), 'Mã đơn hàng'].nunique()
+              _combo_day.loc[_ch.str.contains('OFF', na=False), _ma_col].nunique()
           )
           th_combo_on = int(
               _combo_day.loc[
                   _ch.str.contains('ON', na=False) & ~_ch.str.contains('OFF', na=False),
-                  'Mã đơn hàng',
+                  _ma_col,
               ].nunique()
           )
         else:
@@ -12862,6 +13055,25 @@ def build_combo_orders_detail(df_rpt, report_date, filter_nv=None, mcp_df=None):
         if x and x.lower() not in ('nan', 'none') and x not in promo_names:
           promo_names.append(x)
 
+    # Bằng chứng KM / CK 20k
+    has_ck_20k = False
+    try:
+      for _, rr in g.iterrows():
+        if abs(_get_ck_value(rr) - 20000) < 1:
+          has_ck_20k = True
+        if bool(rr.get('_line_combo', False)) and sp_col:
+          xn = str(rr.get(sp_col, '') or '').strip()
+          if xn and xn.lower() not in ('nan', 'none'):
+            xl = xn.lower()
+            if ('chinsu' in xl or 'wake' in xl) and xn not in promo_names:
+              promo_names.append(xn)
+    except Exception:
+      pass
+
+    # Chỉ giữ ĐH có KM Combo / CK 20k thật
+    if not promo_names and not has_ck_20k:
+      continue
+
     ngay_s = ''
     if 'Ngày tạo đơn hàng' in g.columns:
       ngay = pd.to_datetime(g['Ngày tạo đơn hàng'].iloc[0], errors='coerce')
@@ -12879,7 +13091,10 @@ def build_combo_orders_detail(df_rpt, report_date, filter_nv=None, mcp_df=None):
         'Giá trị ĐH [Doanh Số]': int(round(float(g['_sales'].sum()), 0)),
         'Ngày ĐH': ngay_s,
         'Loại Hình L1': l1,
-        'Sản Phẩm Khuyến Mãi': ' | '.join(promo_names),
+        'Sản Phẩm Khuyến Mãi': (
+            ' | '.join(promo_names) if promo_names
+            else ('Chiết khấu 20.000đ' if has_ck_20k else '')
+        ),
     })
 
   if not rows:
@@ -12895,6 +13110,460 @@ def build_combo_orders_detail(df_rpt, report_date, filter_nv=None, mcp_df=None):
   return out
 
 
+
+
+
+
+
+def build_combo_miss_detail(df_rpt, report_date, df_master, channel, filter_nv=None, mcp_df=None):
+  """ĐH đạt ĐK chính theo CV 433 nhưng thiếu ĐK phụ → không phát sinh KM Combo.
+
+  CV 433-300926/HCM-CDGT-MSC (T10/2026):
+    OFF MSC+HPC: ĐK chính ≥800.000đ · ĐK phụ ≥100.000đ nhóm SP → tặng Chinsu 250
+    ON Bev:      ĐK chính ≥300.000đ · ĐK phụ ≥80.000đ Tea365/WK247 → tặng WK247 330ml
+    ON Nam Ngư:  ĐK chính ≥500.000đ · ĐK phụ ≥200.000đ Nam Ngư → tặng Chinsu
+    ON TTT:      ĐK chính ≥400.000đ · ĐK phụ ≥45.000đ Tam Thái Tử → tặng Chinsu
+    Homey:       ĐK chính ≥800.000đ · ĐK phụ ≥280.000đ Homey → CK 20.000đ
+
+  BẮT BUỘC đối chiếu Mã CH với DS KH Áp Dụng Combo (Combo Kênh OFF/ON — outlet_code).
+  Miss = có trong DS + ĐH ≥ ĐK chính kênh + KHÔNG có line KM Combo.
+  """
+  empty = pd.DataFrame(columns=[
+      'STT', 'Tên NVBH', 'Mã KH', 'Tên KH', 'Mã ĐH',
+      'Giá trị ĐH [Doanh Số]', 'Ngày ĐH', 'Loại Hình L1', 'Ghi chú',
+  ])
+  try:
+    if df_rpt is None or df_rpt.empty or 'date' not in df_rpt.columns:
+      return empty
+    if df_master is None or (hasattr(df_master, 'empty') and df_master.empty):
+      return empty
+
+    min_sales = 800000.0 if str(channel).upper() == 'OFF' else 300000.0
+    rd = report_date.date() if hasattr(report_date, 'date') else report_date
+    month_start = date(rd.year, rd.month, 1)
+    # Chuẩn hoá cột date → date thuần để so sánh MTD
+    d = df_rpt.copy()
+    if 'date' in d.columns:
+      _dd = pd.to_datetime(d['date'], errors='coerce')
+      d['_d'] = _dd.dt.date
+      d = d[(d['_d'] >= month_start) & (d['_d'] <= rd)].copy()
+    else:
+      d = d.iloc[0:0].copy()
+    if d.empty:
+      return empty
+    if nv_selected(filter_nv) and 'Tên NVBH' in d.columns:
+      vals = [str(v).strip() for v in (filter_nv if isinstance(filter_nv, list) else [filter_nv])]
+      d = d[d['Tên NVBH'].astype(str).str.strip().isin(vals)].copy()
+    if d.empty:
+      return empty
+
+    def _nc(x):
+      s = str(x).strip()
+      if not s or s.lower() in ('nan', 'none', ''):
+        return ''
+      if s.endswith('.0'):
+        s = s[:-2]
+      try:
+        # bỏ .0 / scientific
+        f = float(s)
+        if f == int(f):
+          return str(int(f))
+        return str(f)
+      except Exception:
+        return s
+
+    # === DS KH Áp Dụng Combo: outlet_code (cùng build_combo_matrix) ===
+    master = df_master.copy()
+    master.columns = [str(c).strip() for c in master.columns]
+    c_ma_m = None
+    # exact names used by matrix
+    for cand in ['outlet_code', 'Outlet_code', 'Outlet Code', 'OUTLET_CODE']:
+      if cand in master.columns:
+        c_ma_m = cand
+        break
+    if c_ma_m is None:
+      c_ma_m = find_col(master, [
+          'outlet_code', 'Outlet_code', 'Outlet Code', 'Mã CH', 'Mã KH',
+          'Customer Code', 'Ship-to', 'Ship To', 'Ship-To',
+      ])
+    if c_ma_m is None:
+      for c in master.columns:
+        cl = str(c).lower().replace(' ', '').replace('_', '')
+        if 'outlet' in cl or cl in ('mach', 'makh', 'customercode', 'shipto'):
+          c_ma_m = c
+          break
+    if not c_ma_m:
+      return empty
+
+    master['_ma'] = master[c_ma_m].map(_nc)
+    master = master[master['_ma'] != '']
+    master_set = set(master['_ma'].unique())
+    if not master_set:
+      return empty
+
+    # Optional: filter master by NV if master has Tên NV
+    c_nv_m = None
+    for cand in ['Tên NV', 'Tên NVBH', 'SM name', 'Nhân viên']:
+      if cand in master.columns:
+        c_nv_m = cand
+        break
+    if c_nv_m is None:
+      c_nv_m = find_col(master, ['Tên NV', 'Tên NVBH', 'SM name', 'Nhân viên'])
+    if nv_selected(filter_nv) and c_nv_m:
+      vals = [str(v).strip() for v in (filter_nv if isinstance(filter_nv, list) else [filter_nv])]
+      master_nv = master[master[c_nv_m].astype(str).str.strip().isin(vals)]
+      if not master_nv.empty:
+        master_set = set(master_nv['_ma'].unique())
+
+    ma_col = find_col(d, ['Mã CH', 'Mã KH', 'Outlet_code', 'Outlet Code', 'outlet_code'])
+    if not ma_col:
+      return empty
+    d = d.copy()
+    d['_ma'] = d[ma_col].map(_nc)
+
+    # Chỉ giữ ĐH của CH có trong DS KH Áp Dụng Combo
+    d = d[d['_ma'].isin(master_set)].copy()
+    if d.empty:
+      return empty
+
+    # Gắn is_combo trên toàn bộ ĐH (không lọc chỉ combo)
+    tagged = tag_all_orders_with_combo_flag(d, mcp_df=mcp_df)
+    if tagged is None or tagged.empty:
+      return empty
+    if 'Mã đơn hàng' not in tagged.columns:
+      return empty
+
+    val_col = find_col(tagged, [
+        'Thành tiền trước CK', 'Thành tiền trước chiết khấu',
+        'Tổng tiền', 'Giá trị sau CK',
+    ])
+    tagged['_sales'] = pd.to_numeric(tagged[val_col], errors='coerce').fillna(0) if val_col else 0
+    if '_ma' not in tagged.columns:
+      tagged['_ma'] = tagged[ma_col].map(_nc) if ma_col in tagged.columns else ''
+    # double-check still in master
+    tagged = tagged[tagged['_ma'].isin(master_set)].copy()
+    if tagged.empty:
+      return empty
+
+    order_sales = tagged.groupby(tagged['Mã đơn hàng'].astype(str))['_sales'].sum()
+    order_combo = tagged.groupby(tagged['Mã đơn hàng'].astype(str))['is_combo'].any()
+    order_ma = tagged.groupby(tagged['Mã đơn hàng'].astype(str))['_ma'].first()
+    if '_d' in tagged.columns:
+      order_date = tagged.groupby(tagged['Mã đơn hàng'].astype(str))['_d'].first()
+    elif 'date' in tagged.columns:
+      order_date = tagged.groupby(tagged['Mã đơn hàng'].astype(str))['date'].first()
+    else:
+      order_date = pd.Series(dtype=object)
+
+    ten_kh_col = find_col(tagged, ['Tên CH', 'Tên khách hàng', 'Tên Cửa hàng'])
+    nv_col = find_col(tagged, ['Tên NVBH', 'Tên NV', 'SM name', 'Nhân viên'])
+    l1_col = find_col(tagged, ['L1', 'Channel', 'Loại Hình Kinh Doanh'])
+
+    rows = []
+    for ma_dh, sales in order_sales.items():
+      if float(sales) < min_sales:
+        continue
+      if bool(order_combo.get(ma_dh, False)):
+        continue
+      g = tagged[tagged['Mã đơn hàng'].astype(str) == str(ma_dh)]
+      ma_kh = str(order_ma.get(ma_dh, '') or '')
+      if ma_kh not in master_set:
+        continue
+      ten_kh, nv, l1 = '', '', channel
+      if ten_kh_col is not None and not g.empty:
+        vv = g[ten_kh_col].dropna().astype(str).str.strip()
+        if not vv.empty:
+          ten_kh = vv.iloc[0]
+      if nv_col is not None and not g.empty:
+        vv = g[nv_col].dropna().astype(str).str.strip()
+        if not vv.empty:
+          nv = vv.iloc[0]
+      if l1_col is not None and not g.empty:
+        vv = g[l1_col].dropna().astype(str).str.strip()
+        if not vv.empty:
+          l1 = vv.iloc[0]
+      # Ngày ĐH thực tế của đơn
+      od = order_date.get(ma_dh, rd) if len(order_date) else rd
+      try:
+        if hasattr(od, 'strftime'):
+          ngay_str = od.strftime('%d/%m/%Y')
+        else:
+          od2 = pd.to_datetime(od, errors='coerce')
+          ngay_str = od2.strftime('%d/%m/%Y') if pd.notna(od2) else str(od)
+      except Exception:
+        ngay_str = str(od)
+      rows.append({
+          'STT': 0,
+          'Tên NVBH': nv,
+          'Mã KH': ma_kh,
+          'Tên KH': ten_kh,
+          'Mã ĐH': str(ma_dh),
+          'Giá trị ĐH [Doanh Số]': f'{float(sales):,.0f}'.replace(',', '.'),
+          'Ngày ĐH': ngay_str,
+          'Loại Hình L1': l1,
+          'Ghi chú': f'CV433 · DS Combo {channel} · Đạt ĐK chính (≥{min_sales:,.0f}đ) · Thiếu ĐK phụ → chưa KM'.replace(',', '.'),
+          '_sales': float(sales),
+          '_date': od if hasattr(od, 'year') else rd,
+      })
+    if not rows:
+      return empty
+    out = pd.DataFrame(rows).sort_values(['Tên NVBH', 'Mã KH']).reset_index(drop=True)
+    out['STT'] = range(1, len(out) + 1)
+    return out
+  except Exception as e:
+    try:
+      import streamlit as _st
+      _st.caption(f'(Combo miss {channel}: {type(e).__name__}: {e})')
+    except Exception:
+      pass
+    return empty
+
+
+
+def build_combo_miss_summary(df_miss_off, df_miss_on):
+  """Tổng hợp theo NV: số ĐH miss Combo OFF/ON + doanh số."""
+  cols = [
+      'STT', 'Tên NVBH',
+      'Số ĐH miss OFF', 'DS miss OFF',
+      'Số ĐH miss ON', 'DS miss ON',
+      'Tổng ĐH miss', 'Tổng DS miss',
+  ]
+  empty = pd.DataFrame(columns=cols)
+
+  def _agg(df):
+    if df is None or df.empty or 'Tên NVBH' not in df.columns:
+      return {}
+    d = df.copy()
+    if '_sales' not in d.columns:
+      d['_sales'] = (
+          d['Giá trị ĐH [Doanh Số]'].astype(str)
+          .str.replace('.', '', regex=False)
+          .str.replace(',', '', regex=False)
+      )
+      d['_sales'] = pd.to_numeric(d['_sales'], errors='coerce').fillna(0)
+    g = d.groupby('Tên NVBH').agg(n=('Mã ĐH', 'nunique'), ds=('_sales', 'sum'))
+    return g.to_dict('index')
+
+  off = _agg(df_miss_off)
+  on = _agg(df_miss_on)
+  nvs = sorted(set(list(off.keys()) + list(on.keys())))
+  if not nvs:
+    return empty
+  rows = []
+  for nv in nvs:
+    n_off = int(off.get(nv, {}).get('n', 0) or 0)
+    ds_off = float(off.get(nv, {}).get('ds', 0) or 0)
+    n_on = int(on.get(nv, {}).get('n', 0) or 0)
+    ds_on = float(on.get(nv, {}).get('ds', 0) or 0)
+    rows.append({
+        'STT': 0,
+        'Tên NVBH': nv,
+        'Số ĐH miss OFF': n_off,
+        'DS miss OFF': f'{ds_off:,.0f}'.replace(',', '.'),
+        'Số ĐH miss ON': n_on,
+        'DS miss ON': f'{ds_on:,.0f}'.replace(',', '.'),
+        'Tổng ĐH miss': n_off + n_on,
+        'Tổng DS miss': f'{ds_off + ds_on:,.0f}'.replace(',', '.'),
+    })
+  out = pd.DataFrame(rows)
+  out['STT'] = range(1, len(out) + 1)
+  # total
+  tot_off = int(out['Số ĐH miss OFF'].sum())
+  tot_on = int(out['Số ĐH miss ON'].sum())
+  ds_off = sum(float(str(x).replace('.', '')) for x in out['DS miss OFF'])
+  ds_on = sum(float(str(x).replace('.', '')) for x in out['DS miss ON'])
+  out = pd.concat([out, pd.DataFrame([{
+      'STT': '',
+      'Tên NVBH': 'TỔNG CỘNG',
+      'Số ĐH miss OFF': tot_off,
+      'DS miss OFF': f'{ds_off:,.0f}'.replace(',', '.'),
+      'Số ĐH miss ON': tot_on,
+      'DS miss ON': f'{ds_on:,.0f}'.replace(',', '.'),
+      'Tổng ĐH miss': tot_off + tot_on,
+      'Tổng DS miss': f'{ds_off + ds_on:,.0f}'.replace(',', '.'),
+  }])], ignore_index=True)
+  return out
+
+
+
+
+def render_combo_matrix_html(df):
+  """Matrix Combo — cấu trúc 2 tầng OFF/ON, style giống bảng Trưng Bày."""
+  if df is None or df.empty:
+    return '<p style="color:#888;">Không có dữ liệu</p>'
+
+  d = df.copy()
+
+  def g(row, *names, default=0):
+    for n in names:
+      if n in row.index:
+        v = row[n]
+        if pd.isna(v):
+          return default
+        return v
+    return default
+
+  def fmt_num(v):
+    try:
+      if v is None or (isinstance(v, float) and pd.isna(v)):
+        return '-'
+      iv = int(float(v))
+      if iv == 0:
+        return '-'
+      return f'{iv:,}'.replace(',', '.')
+    except Exception:
+      s = str(v).strip()
+      return s if s and s not in ('0', '0.0', 'nan') else '-'
+
+  def fmt_pct(v):
+    try:
+      f = float(str(v).replace('%', '').strip())
+      return f'{f:.2f}%'
+    except Exception:
+      return str(v) if v is not None else '-'
+
+  def pct_class_and_style(v, is_total=False):
+    """Cùng rule tô màu % với Tab KPI theo Timegone (cả dòng Total)."""
+    raw = v
+    try:
+      cls = color_pct_class(raw, moc=_CURRENT_COLOR_MOC) or ''
+    except Exception:
+      cls = ''
+    try:
+      st = color_pct_bg(raw, moc=_CURRENT_COLOR_MOC) or ''
+    except Exception:
+      st = ''
+    if not st:
+      try:
+        f = float(str(raw).replace('%', '').strip())
+        p = float(_CURRENT_COLOR_MOC) if _CURRENT_COLOR_MOC is not None else 100.0
+        if f < p:
+          cls, st = 'pct-red', (
+              'background-color:#fed7d7 !important;color:#742a2a !important;font-weight:700 !important;'
+          )
+        elif f <= p + 5:
+          cls, st = 'pct-green', (
+              'background-color:#c6f6d5 !important;color:#22543d !important;font-weight:700 !important;'
+          )
+        else:
+          cls, st = 'pct-purple', (
+              'background-color:#e9d8fd !important;color:#553c9a !important;font-weight:700 !important;'
+          )
+      except Exception:
+        cls, st = '', ''
+    return cls, st
+
+  # Cột sticky
+  stt_w, nv_w = 48, 180
+  # Ước lượng width tên NV
+  try:
+    max_name = max((len(str(x)) for x in d['Tên NVBH'].astype(str)), default=12)
+    nv_w = max(150, min(260, max_name * 9 + 24))
+  except Exception:
+    pass
+
+  th_base = (
+      'background-color:#1a365d !important;color:#ffffff !important;'
+      'font-weight:800 !important;text-align:center !important;'
+      'border:1px solid #2b6cb0 !important;padding:6px 8px;font-size:11px;'
+      'white-space:nowrap;'
+  )
+  sh = 'box-shadow:3px 0 5px -2px rgba(0,0,0,.22);'
+  td_base = (
+      'border:1px solid #cbd5e0;padding:5px 8px;text-align:center;'
+      'font-size:12px;white-space:nowrap;'
+  )
+
+  html = [
+      '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:8px;">',
+      '<table class="custom-kpi-table" style="border-collapse:separate;border-spacing:0;'
+      'width:max-content;min-width:100%;">',
+      '<thead>',
+      # Row 1
+      '<tr>',
+      f'<th rowspan="2" style="{th_base}position:sticky;left:0;z-index:9;'
+      f'min-width:{stt_w}px;max-width:{stt_w}px;{sh}">STT</th>',
+      f'<th rowspan="2" style="{th_base}position:sticky;left:{stt_w}px;z-index:9;'
+      f'min-width:{nv_w}px;max-width:{nv_w}px;{sh}">Tên NVBH</th>',
+      f'<th colspan="6" style="{th_base}">Kênh OFF</th>',
+      f'<th colspan="6" style="{th_base}">Kênh ON</th>',
+      '</tr>',
+      # Row 2
+      '<tr>',
+  ]
+  sub_cols = [
+      'Target', 'Phát sinh<br>Ngày', 'MTD', '% MTD', 'Số Suất', 'MTD'
+  ] * 2
+  for c in sub_cols:
+    html.append(f'<th style="{th_base}">{c}</th>')
+  html.append('</tr></thead><tbody>')
+
+  for pos, (_, r) in enumerate(d.iterrows()):
+    is_total = (
+        str(r.get('STT', '')).strip() == '-'
+        or 'TOTAL' in str(r.get('Tên NVBH', '')).upper()
+        or 'TỔNG' in str(r.get('Tên NVBH', '')).upper()
+    )
+    if is_total:
+      row_bg, row_fg = '#1a365d', '#ffffff'
+    else:
+      row_bg = '#e6f4fc' if pos % 2 == 0 else '#ffffff'
+      row_fg = '#1a202c'
+
+    stt = str(r.get('STT', ''))
+    nv = str(r.get('Tên NVBH', ''))
+
+    vals = [
+        fmt_num(g(r, 'Target (OFF)')),
+        fmt_num(g(r, 'Phát sinh Ngày (OFF)')),
+        fmt_num(g(r, 'MTD (OFF)')),
+        fmt_pct(g(r, '% MTD (OFF)', default='0%')),
+        fmt_num(g(r, 'Suất Ngày (OFF)')),
+        fmt_num(g(r, 'Suất MTD (OFF)')),
+        fmt_num(g(r, 'Target (ON)')),
+        fmt_num(g(r, 'Phát sinh Ngày (ON)')),
+        fmt_num(g(r, 'MTD (ON)')),
+        fmt_pct(g(r, '% MTD (ON)', default='0%')),
+        fmt_num(g(r, 'Suất Ngày (ON)')),
+        fmt_num(g(r, 'Suất MTD (ON)')),
+    ]
+    pct_idxs = {3, 9}  # % MTD OFF / ON
+
+    html.append('<tr>')
+    # STT sticky
+    html.append(
+        f'<td style="{td_base}position:sticky;left:0;z-index:{"7" if is_total else "5"};'
+        f'min-width:{stt_w}px;max-width:{stt_w}px;'
+        f'background-color:{row_bg} !important;color:{row_fg} !important;'
+        f'font-weight:{"800" if is_total else "600"};{sh}">{stt}</td>'
+    )
+    # NV sticky
+    html.append(
+        f'<td style="{td_base}text-align:left;position:sticky;left:{stt_w}px;'
+        f'z-index:{"7" if is_total else "5"};min-width:{nv_w}px;max-width:{nv_w}px;'
+        f'background-color:{row_bg} !important;color:{row_fg} !important;'
+        f'font-weight:{"800" if is_total else "600"};{sh}">{nv}</td>'
+    )
+    for i_v, v in enumerate(vals):
+      if i_v in pct_idxs:
+        raw_pct = g(r, '% MTD (OFF)' if i_v == 3 else '% MTD (ON)', default='0')
+        cls, st = pct_class_and_style(raw_pct, is_total)
+        html.append(
+            f'<td class="{cls}" data-colored="1" '
+            f'style="{td_base}{st}text-align:center !important;">{v}</td>'
+        )
+      else:
+        html.append(
+            f'<td style="{td_base}background-color:{row_bg} !important;'
+            f'color:{row_fg} !important;font-weight:{"800" if is_total else "500"};">{v}</td>'
+        )
+    html.append('</tr>')
+
+  html.append('</tbody></table></div>')
+  return ''.join(html)
+
+
+
 def render_combo_orders_html(df):
   """Bảng chi tiết ĐH Combo — format giống Chi Tiết ĐH Trái Tuyến."""
   if df is None or df.empty:
@@ -12905,6 +13574,8 @@ def render_combo_orders_html(df):
       'Giá trị ĐH [Doanh Số]', 'Ngày ĐH', 'Loại Hình L1',
       'Sản Phẩm Khuyến Mãi',
   ]
+  if 'Ghi chú' in df.columns:
+    cols = [c for c in cols if c != 'Sản Phẩm Khuyến Mãi'] + ['Ghi chú']
   for c in cols:
     if c not in df.columns:
       df[c] = ''
@@ -12945,6 +13616,95 @@ def render_combo_orders_html(df):
     html.append('</tr>')
   html.append('</tbody></table></div></div>')
   return ''.join(html)
+
+
+
+
+
+def render_combo_miss_table(df, title, key_prefix):
+  """Bảng chi tiết miss Combo — Plotly Table + modebar (camera / fullscreen)."""
+  if df is None or df.empty:
+    return
+  try:
+    import plotly.graph_objects as go
+  except Exception:
+    st.dataframe(df, use_container_width=True)
+    return
+
+  df = df.drop(columns=['Mã NVBH', '_sales', '_date'], errors='ignore').copy()
+  cols = [
+      'STT', 'Tên NVBH', 'Mã KH', 'Tên KH', 'Mã ĐH',
+      'Giá trị ĐH [Doanh Số]', 'Ngày ĐH', 'Loại Hình L1', 'Ghi chú',
+  ]
+  for c in cols:
+    if c not in df.columns:
+      df[c] = ''
+  df = df[[c for c in cols if c in df.columns]].copy()
+  # Giới hạn hiển thị mặc định ~25 dòng trong khung; modebar fullscreen xem hết
+  n = len(df)
+  row_h = 28
+  header_h = 36
+  visible_rows = min(n, 25)
+  fig_h = header_h + visible_rows * row_h + 40
+
+  # Màu xen kẽ
+  fill = [['#e6f4fc' if i % 2 == 0 else '#ffffff' for i in range(n)] for _ in cols]
+
+  fig = go.Figure(
+      data=[
+          go.Table(
+              columnwidth=[40, 130, 80, 120, 120, 100, 80, 110, 220],
+              header=dict(
+                  values=[f'<b>{c}</b>' for c in df.columns],
+                  fill_color='#1a365d',
+                  font=dict(color='white', size=12, family='Arial'),
+                  align='center',
+                  height=header_h,
+                  line_color='#2b6cb0',
+              ),
+              cells=dict(
+                  values=[df[c].astype(str).tolist() for c in df.columns],
+                  fill_color=fill,
+                  font=dict(color='#1a202c', size=11, family='Arial'),
+                  align=['center', 'left', 'center', 'left', 'center',
+                         'center', 'center', 'center', 'left'],
+                  height=row_h,
+                  line_color='#bce2f5',
+              ),
+          )
+      ]
+  )
+  fig.update_layout(
+      title=dict(
+          text=f'<b>📋 {title}</b>',
+          font=dict(size=14, color='#1a365d', family='Arial'),
+          x=0, xanchor='left',
+      ),
+      margin=dict(l=0, r=0, t=40, b=0),
+      height=fig_h,
+      paper_bgcolor='rgba(0,0,0,0)',
+  )
+  st.plotly_chart(
+      fig,
+      use_container_width=True,
+      key=f'{key_prefix}_plot',
+      config={
+          'displayModeBar': True,
+          'displaylogo': False,
+          'modeBarButtonsToRemove': ['lasso2d', 'select2d'],
+          'toImageButtonOptions': {
+              'format': 'png',
+              'filename': key_prefix,
+              'height': max(fig_h, header_h + n * row_h + 40),
+              'width': 1400,
+              'scale': 2,
+          },
+      },
+  )
+  if n > 25:
+      st.caption(
+          f'Tổng {n:,} dòng · Cuộn trong bảng hoặc dùng ⛶ fullscreen / 📷 lưu ảnh trên modebar.'
+      )
 
 
 
@@ -13427,6 +14187,136 @@ def build_hs_monthly_kpi_rows(df, report_date, targets, turnover_targets, filter
   except Exception:
     rows.append({'name': 'Doanh số', 'th': 0, 'ct': 0, 'pct': 0, 'fmt': 'money'})
 
+  # PC BT / Call Plan OFF
+  # CT tháng = Σ (Plan VT OFF mỗi ngày bán hàng trong tháng)
+  # Plan ngày = số CH OFF có lịch VT đúng ngày đó (giống metric card Hiệu Suất)
+  try:
+    df_pc, _, _ = build_report(df, report_date, targets, 'PC_BT', filter_nv, mcp_df=mcp_df)
+    th_pc = 0.0
+    if df_pc is not None and not df_pc.empty:
+      name_col = 'Tên NVBH' if 'Tên NVBH' in df_pc.columns else None
+      body = df_pc
+      if name_col:
+        body = df_pc[~df_pc[name_col].astype(str).str.upper().str.contains('TOTAL|TỔNG', na=False, regex=True)]
+      col_mtd = None
+      for c in body.columns:
+        cl = str(c).lower().strip()
+        if cl == 'mtd' or cl == 'thực hiện' or cl.startswith('mtd'):
+          col_mtd = c
+          break
+      if col_mtd:
+        th_pc = float(pd.to_numeric(body[col_mtd], errors='coerce').fillna(0).sum())
+
+    y, mth = report_date.year, report_date.month
+    # Chỉ cộng đến ngày xem báo cáo (MTD), không lấy full tháng
+    rd = report_date.date() if hasattr(report_date, 'date') else report_date
+    n_days = int(rd.day) if getattr(rd, 'month', mth) == mth and getattr(rd, 'year', y) == y else calendar.monthrange(y, mth)[1]
+    ch_map = build_mcp_channel_map(mcp_df) if mcp_df is not None else {}
+
+    def _thu_to_weekdays(thu_val):
+      s = str(thu_val).strip().replace('.0', '')
+      mapping = {
+          '2': {0}, '3': {1}, '4': {2}, '5': {3}, '6': {4}, '7': {5},
+          '25': {0, 3}, '36': {1, 4}, '47': {2, 5},
+      }
+      if s in mapping:
+        return set(mapping[s])
+      wds = set()
+      for k, v in mapping.items():
+        if k in s:
+          wds |= v
+      return wds
+
+    # --- A. Từ file lịch VT: cộng Plan OFF từng ngày ---
+    plan_from_sched = 0
+    try:
+      vs = load_visit_schedule()
+    except Exception:
+      vs = None
+    if vs is not None and not isinstance(vs, str) and hasattr(vs, 'empty') and not vs.empty:
+      v = vs.copy()
+      c_ma = find_col(v, ['Mã CH', 'Outlet_code', 'Outlet Code', 'Mã KH'])
+      c_nv = find_col(v, ['Tên NVBH', 'Tên NV', 'SM name', 'Nhân viên', 'Tên ĐDKD'])
+      if c_ma:
+        v['_ma'] = v[c_ma].astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
+      if '_plan_date' not in v.columns:
+        c_pd = find_col(v, ['Ngày lịch VT', 'Ngày VT', 'Plan Date'])
+        if c_pd:
+          v['_plan_date'] = pd.to_datetime(v[c_pd], dayfirst=True, errors='coerce').dt.date
+      if '_plan_date' in v.columns:
+        v = v[v['_plan_date'].apply(
+            lambda x: bool(x) and getattr(x, 'year', None) == y and getattr(x, 'month', None) == mth
+        )]
+      if filter_nv and c_nv and not v.empty:
+        if isinstance(filter_nv, (list, tuple, set)):
+          v = v[v[c_nv].astype(str).str.strip().isin([str(x).strip() for x in filter_nv])]
+        else:
+          v = v[v[c_nv].astype(str).str.contains(str(filter_nv), case=False, na=False)]
+      # Cộng từng ngày: unique CH OFF / ngày
+      if '_plan_date' in v.columns and '_ma' in v.columns:
+        for day in range(1, n_days + 1):
+          dt = date(y, mth, day)
+          if dt.weekday() >= 6:
+            continue
+          day_set = set()
+          for _, r in v[v['_plan_date'] == dt].iterrows():
+            ma = str(r.get('_ma', '')).strip()
+            if not ma or ma.lower() in ('nan', 'none'):
+              continue
+            if ch_map.get(ma) == 'ON':
+              continue
+            day_set.add(ma)
+          plan_from_sched += len(day_set)
+
+    # --- B. Từ MCP Thứ VT: cộng Plan OFF từng ngày (chuẩn khi lịch file thiếu) ---
+    plan_from_mcp = 0
+    if mcp_df is not None and not mcp_df.empty:
+      m = mcp_df.copy()
+      c_ma = find_col(m, ['Outlet_code', 'Outlet Code', 'Mã CH', 'Ma CH'])
+      c_sm = find_col(m, ['SM Name', 'SM name', 'Tên NVBH', 'Nhân viên'])
+      c_thu = find_col(m, [
+          'Thứ VT', 'Thu VT', 'Ngày VT', 'Visit Day', 'F',
+          'Tần suất', 'Tan suat', 'Frequency', 'Thứ',
+      ])
+      if filter_nv and c_sm:
+        if isinstance(filter_nv, (list, tuple, set)):
+          m = m[m[c_sm].astype(str).str.strip().isin([str(x).strip() for x in filter_nv])]
+        else:
+          m = m[m[c_sm].astype(str).str.contains(str(filter_nv), case=False, na=False)]
+      ma_wds = {}
+      if c_ma is not None:
+        for _, r in m.iterrows():
+          ma = str(r[c_ma]).strip().replace('.0', '')
+          if not ma or ma.lower() in ('nan', 'none'):
+            continue
+          if ch_map.get(ma) == 'ON':
+            continue
+          wds = _thu_to_weekdays(r[c_thu]) if c_thu is not None else set()
+          if not wds:
+            wds = {0, 3}  # mặc định F4: T2+T5
+          if ma not in ma_wds:
+            ma_wds[ma] = set()
+          ma_wds[ma] |= wds
+      for day in range(1, n_days + 1):
+        dt = date(y, mth, day)
+        wd = dt.weekday()
+        if wd >= 6:
+          continue
+        plan_from_mcp += sum(1 for ma, wds in ma_wds.items() if wd in wds)
+
+    # Ưu tiên nguồn lớn hơn (lịch file thường thiếu ngày)
+    call_plan_off = max(plan_from_sched, plan_from_mcp)
+    pct_pc = (th_pc / call_plan_off * 100) if call_plan_off else 0
+    rows.append({
+        'name': 'PC BT / Call Plan OFF',
+        'th': th_pc,
+        'ct': call_plan_off,
+        'pct': pct_pc,
+        'fmt': 'num',
+    })
+  except Exception:
+    rows.append({'name': 'PC BT / Call Plan OFF', 'th': 0, 'ct': 0, 'pct': 0, 'fmt': 'num'})
+
   kpi_list = [
     ('PC_BT', 'PC BT', 'num'),
     ('LPPC', 'LPPC OFF (trừ Meat, Beer)', 'float'),
@@ -13568,21 +14458,110 @@ st.markdown(
 col_reload, col_empty = st.columns([2, 5])
 with col_reload:
   if st.button('🔄 Xóa Cache & Reload Dữ Liệu'):
-    st.cache_data.clear()
+    try:
+      st.cache_data.clear()
+    except Exception:
+      pass
+    for _k in list(st.session_state.keys()):
+      if str(_k).startswith('prep_') or str(_k).startswith('lazy_'):
+        try:
+          del st.session_state[_k]
+        except Exception:
+          pass
+    st.session_state['_force_reload'] = True
     st.rerun()
 
-with st.spinner('Đang tải dữ liệu...'):
-  df, mcp = load_main_data()
-  targets = get_targets()
-  turnover_targets = get_turnover_targets()
-  df_cat = load_cat_data()
-  df_brand = load_brand_data()
-  df_combo_off, df_combo_on = load_combo_data()
-  df_visit_sched = load_visit_schedule()
 
-  mcp = process_mcp_sales(df, mcp)
-  df_cat = process_cat_sales(df, df_cat)
-  df_brand = process_brand_sales(df, df_brand)
+# ====================== PREPARED DATA (cache gộp — giảm lag) ======================
+@st.cache_data(ttl=600, show_spinner=False)
+def load_prepared_core(_month_key='Thang10'):
+  """Load RPT+MCP + process sales MCP 1 lần / cache hit."""
+  df, mcp = load_main_data(_month_key)
+  mcp2 = process_mcp_sales(df, mcp)
+  return df, mcp2
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def load_prepared_cat(_month_key='Thang10'):
+  df, _ = load_main_data(_month_key)
+  cat = load_cat_data()
+  return process_cat_sales(df, cat)
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def load_prepared_brand(_month_key='Thang10'):
+  df, _ = load_main_data(_month_key)
+  brand = load_brand_data()
+  return process_brand_sales(df, brand)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def cached_combo_matrix(_month_key, date_str, filter_nv_key):
+  """Cache kết quả Matrix Combo theo tháng/ngày/filter."""
+  df, mcp = load_prepared_core(_month_key)
+  df_off, df_on = load_combo_data()
+  try:
+    rd = pd.to_datetime(date_str).date()
+  except Exception:
+    rd = date.today()
+  fnv = None
+  if filter_nv_key and filter_nv_key != '__ALL__':
+    parts = [x for x in str(filter_nv_key).split('||') if x]
+    fnv = parts if len(parts) > 1 else (parts[0] if parts else None)
+  return build_combo_matrix(df, rd, df_off, df_on, fnv, mcp_df=mcp)
+
+
+# ---- DATA: session_state giữ DataFrame giữa các lần click (mượt hơn cache hash) ----
+try:
+  _mk = get_month_key()
+except Exception:
+  _mk = st.session_state.get('report_month_key', 'Thang10')
+
+def _ensure_core_data(month_key):
+  sk = f'prep_core_{month_key}'
+  if st.session_state.get('_force_reload') or sk not in st.session_state:
+    with st.spinner('Đang tải dữ liệu gốc (chỉ lần đầu hoặc sau Reload)...'):
+      _df, _mcp = load_prepared_core(month_key)
+      st.session_state[sk] = (_df, _mcp)
+    st.session_state['_force_reload'] = False
+  return st.session_state[sk]
+
+def _lazy_cat(month_key):
+  sk = f'lazy_cat_{month_key}'
+  if sk not in st.session_state:
+    st.session_state[sk] = load_prepared_cat(month_key)
+  return st.session_state[sk]
+
+def _lazy_brand(month_key):
+  sk = f'lazy_brand_{month_key}'
+  if sk not in st.session_state:
+    st.session_state[sk] = load_prepared_brand(month_key)
+  return st.session_state[sk]
+
+def _lazy_combo(month_key):
+  sk = f'lazy_combo_{month_key}'
+  if sk not in st.session_state:
+    st.session_state[sk] = load_combo_data()
+  return st.session_state[sk]
+
+def _lazy_visit(month_key):
+  sk = f'lazy_visit_{month_key}'
+  cur = st.session_state.get(sk)
+  if cur is None or (hasattr(cur, 'empty') and cur.empty):
+    try:
+      _refresh_paths()
+    except Exception:
+      pass
+    st.session_state[sk] = load_visit_schedule(str(month_key))
+  return st.session_state[sk]
+
+df, mcp = _ensure_core_data(_mk)
+targets = get_targets()
+turnover_targets = get_turnover_targets()
+df_cat = None
+df_brand = None
+df_combo_off, df_combo_on = None, None
+df_visit_sched = None
 
 # Full NV list: RPT + Target_KPI + MCP (NV chưa bán vẫn chọn được / hiện 0)
 _nv_set = set()
@@ -13681,16 +14660,17 @@ with mc1:
 _new_key = [k for k, v in MONTH_OPTIONS.items() if v['label'] == _sel_label][0]
 if _new_key != st.session_state.get('report_month_key'):
   st.session_state['report_month_key'] = _new_key
-  # Đổi tháng → clear cache data
+  for _k in list(st.session_state.keys()):
+    if str(_k).startswith('prep_') or str(_k).startswith('lazy_'):
+      try:
+        del st.session_state[_k]
+      except Exception:
+        pass
+  st.session_state['_force_reload'] = True
   try:
-    load_main_data.clear()
+    _refresh_paths()
   except Exception:
     pass
-  try:
-    st.cache_data.clear()
-  except Exception:
-    pass
-  _refresh_paths()
   st.rerun()
 
 _cfg_m = get_month_cfg()
@@ -13808,6 +14788,26 @@ with f2:
       label_visibility='collapsed',
   )
   selected_kpi = kpi_map[selected_name]
+# Lazy-load đúng data cho KPI đang chọn
+try:
+  _mk_now = get_month_key()
+except Exception:
+  _mk_now = st.session_state.get('report_month_key', 'Thang10')
+_sk = str(selected_kpi)
+if _sk in ('MBS_CAT', 'SUMMARY', 'PERFORMANCE', 'TEA_BATTLE', 'PERF_CAT'):
+  df_cat = _lazy_cat(_mk_now)
+if _sk in ('MBS_BRAND', 'SUMMARY', 'PERFORMANCE', 'PERF_CAT'):
+  df_brand = _lazy_brand(_mk_now)
+if _sk in ('COMBO', 'SUMMARY', 'PERFORMANCE'):
+  df_combo_off, df_combo_on = _lazy_combo(_mk_now)
+if _sk in ('VISIT', 'WEEKLY_PREVIEW', 'SUMMARY', 'ASO_ALL', 'ASO_FOCUS', 'ASO_FOCUS_2'):
+  df_visit_sched = _lazy_visit(_mk_now)
+# Hiệu suất / display thường cần gần như tất cả
+if _sk in ('DISPLAY',) or 'HIEU' in _sk.upper() or 'HS' == _sk:
+  df_cat = _lazy_cat(_mk_now)
+  df_brand = _lazy_brand(_mk_now)
+  df_combo_off, df_combo_on = _lazy_combo(_mk_now)
+  df_visit_sched = _lazy_visit(_mk_now)
 with f3:
   st.markdown(
       '<p class="filter-label">ĐDKD (Nhân viên - Chọn nhiều)</p>',
@@ -13978,17 +14978,32 @@ components.html(
 
 st.markdown('---')
 
-tab_kpi, tab_mcp, tab_cat, tab_brand, tab_dskh_off, tab_dskh_on = st.tabs([
+_nav_opts = [
     '📊 BÁO CÁO KPI',
     '🗺️ MCP VISIT',
     '📦 TRACKING MBS - CAT',
     '🏷️ TRACKING MBS - BRAND',
     '📋 DSKH_Combo OFF',
     '📋 DSKH_Combo ON',
-])
+]
+_nav = st.radio(
+    'Section', _nav_opts, horizontal=True,
+    key='main_nav_section', label_visibility='collapsed',
+)
 
 # ----- TAB KPI -----
-with tab_kpi:
+if _nav == '📊 BÁO CÁO KPI':
+  # Fallback rỗng nếu KPI không cần (tránh NoneType)
+  if df_cat is None:
+    df_cat = pd.DataFrame()
+  if df_brand is None:
+    df_brand = pd.DataFrame()
+  if df_combo_off is None:
+    df_combo_off = pd.DataFrame()
+  if df_combo_on is None:
+    df_combo_on = pd.DataFrame()
+  if df_visit_sched is None:
+    df_visit_sched = pd.DataFrame()
   # Báo cáo hỗ trợ lọc Mã KH / Tên KH (có thông tin cửa hàng)
   _KPI_SUPPORT_KH = {
       'MBS_CAT', 'MBS_BRAND', 'VISIT', 'COMBO', 'SUMMARY',
@@ -15157,10 +16172,32 @@ with tab_kpi:
 
   elif selected_kpi == 'PERFORMANCE':
     set_color_moc_for_kpi('SUMMARY')
-    if df_visit_sched is None or df_visit_sched.empty:
+    try:
+      _mk_p = get_month_key()
+    except Exception:
+      _mk_p = st.session_state.get('report_month_key', 'Thang10')
+    try:
+      _refresh_paths()
+    except Exception:
+      pass
+    # Xóa cache rỗng nếu có
+    for _k in list(st.session_state.keys()):
+      if str(_k).startswith('lazy_visit'):
+        _v = st.session_state.get(_k)
+        if _v is None or (hasattr(_v, 'empty') and _v.empty):
+          try:
+            del st.session_state[_k]
+          except Exception:
+            pass
+    try:
+      load_visit_schedule.clear()
+    except Exception:
+      pass
+    df_visit_sched = load_visit_schedule(_mk_p)
+    if df_visit_sched is None or getattr(df_visit_sched, 'empty', True):
       st.warning(
-          '⚠️ Chưa có file **DanhSachLichViengTham.xlsx** trong thư mục `data/`. '
-          'Upload file lịch viếng thăm lên GitHub rồi bấm **Xóa Cache & Reload**.'
+          '⚠️ Không tìm thấy **DanhSachLichViengTham.xlsx** trong `data/Thang10/` '
+          'hoặc `data/`. Kiểm tra tên file trên GitHub rồi **Xóa Cache & Reload**.'
       )
     else:
       df_perf, title_perf = build_performance_report(
@@ -16241,10 +17278,24 @@ with tab_kpi:
     df_off = pd.DataFrame()
     df_on = pd.DataFrame()
     try:
-      sales_hist = load_weekly_sales()
-      df_off, df_on = build_weekly_preview(
-          mcp, sales_hist, df_rpt=df, filter_nv=filter_nv
+      try:
+        _mk_w = get_month_key()
+      except Exception:
+        _mk_w = st.session_state.get('report_month_key', 'Thang10')
+      _fnv_w = (
+          '||'.join([str(x) for x in filter_nv]) if isinstance(filter_nv, list)
+          else (str(filter_nv) if filter_nv else '__ALL__')
       )
+      _wk = f'weekly_prev_{_mk_w}_{_fnv_w}_{report_date}'
+      if _wk in st.session_state and not st.session_state.get('_force_reload'):
+        df_off, df_on, sales_hist = st.session_state[_wk]
+      else:
+        with st.spinner('Đang tính Weekly Review (lần đầu sẽ chậm hơn)...'):
+          sales_hist = load_weekly_sales()
+          df_off, df_on = build_weekly_preview(
+              mcp, sales_hist, df_rpt=df, filter_nv=filter_nv
+          )
+          st.session_state[_wk] = (df_off, df_on, sales_hist)
     except Exception as e:
       st.error('Lỗi chạy Weekly Preview: ' + str(e))
       st.exception(e)
@@ -16551,8 +17602,18 @@ with tab_kpi:
     )
 
   else:
-    df_combo, target_off_total, target_on_total = build_combo_matrix(
-        df, report_date, df_combo_off, df_combo_on, filter_nv, mcp_df=mcp
+    _fnv_key = (
+        '||'.join([str(x) for x in filter_nv]) if isinstance(filter_nv, list)
+        else (str(filter_nv) if filter_nv else '__ALL__')
+    )
+    if not _fnv_key or _fnv_key in ('None', 'nan'):
+      _fnv_key = '__ALL__'
+    try:
+      _mk2 = get_month_key()
+    except Exception:
+      _mk2 = 'Thang10'
+    df_combo, target_off_total, target_on_total = cached_combo_matrix(
+        _mk2, str(report_date), _fnv_key
     )
     total_row = df_combo.iloc[-1]
     # Mốc tô màu Combo = % MTD dòng Total (trung bình OFF/ON nếu có)
@@ -16567,6 +17628,10 @@ with tab_kpi:
     total_on = int(total_row['MTD (ON)'])
     ngay_off = int(total_row['Phát sinh Ngày (OFF)'])
     ngay_on = int(total_row['Phát sinh Ngày (ON)'])
+    suat_off_n = int(total_row.get('Suất Ngày (OFF)', 0) or 0)
+    suat_off_m = int(total_row.get('Suất MTD (OFF)', 0) or 0)
+    suat_on_n = int(total_row.get('Suất Ngày (ON)', 0) or 0)
+    suat_on_m = int(total_row.get('Suất MTD (ON)', 0) or 0)
 
     pct_off_team = (
         round(total_off / target_off_total * 100, 1)
@@ -16604,6 +17669,18 @@ with tab_kpi:
     with c4:
       render_metric_card('Phát sinh Ngày (ON)', f'+{ngay_on}')
 
+    c5, c6 = st.columns(2)
+    with c5:
+      render_metric_card(
+          'Số Suất OFF (TH Ngày / MTD)',
+          f'{suat_off_n:,} / {suat_off_m:,}',
+      )
+    with c6:
+      render_metric_card(
+          'Số Suất ON (TH Ngày / MTD)',
+          f'{suat_on_n:,} / {suat_on_m:,}',
+      )
+
     df_eval_off = df_combo.iloc[:-1].copy()
     df_eval_off['_pct_val_off'] = (
         df_eval_off['% MTD (OFF)'].str.replace('%', '').astype(float)
@@ -16624,13 +17701,196 @@ with tab_kpi:
         ]
     )
 
-    st.markdown(render_html_table(df_combo), unsafe_allow_html=True)
+    # Đảm bảo mốc màu % đã set trước khi render bảng
+    try:
+      set_color_moc_for_kpi('COMBO', total_pct=_combo_moc)
+    except Exception:
+      pass
+    st.markdown(render_combo_matrix_html(df_combo), unsafe_allow_html=True)
 
     # Chi tiết đơn hàng Combo phát sinh đúng ngày đang chọn, format giống Báo Cáo Hiệu Suất.
     df_combo_orders = build_combo_orders_detail(
         df, report_date, filter_nv, mcp_df=mcp
     )
     st.markdown(render_combo_orders_html(df_combo_orders), unsafe_allow_html=True)
+
+    # KH DS Combo có ĐH ≥ ngưỡng DS nhưng không có KM Combo
+    df_miss_off = build_combo_miss_detail(
+        df, report_date, df_combo_off, 'OFF', filter_nv, mcp_df=mcp
+    )
+    df_miss_on = build_combo_miss_detail(
+        df, report_date, df_combo_on, 'ON', filter_nv, mcp_df=mcp
+    )
+
+    # ---- Bộ lọc chung cho 3 bảng miss ----
+    _miss_all = pd.concat(
+        [x for x in [df_miss_off, df_miss_on] if x is not None and not x.empty],
+        ignore_index=True,
+    ) if (
+        (df_miss_off is not None and not df_miss_off.empty)
+        or (df_miss_on is not None and not df_miss_on.empty)
+    ) else pd.DataFrame()
+
+    def _opts(col):
+      if _miss_all.empty or col not in _miss_all.columns:
+        return []
+      return sorted([
+          str(x) for x in _miss_all[col].dropna().astype(str).str.strip().unique()
+          if str(x).strip() and str(x).strip().lower() not in ('nan', 'none', '')
+      ])
+
+    st.markdown(
+        '<p style="font-weight:800;color:#034ea2;margin:12px 0 4px 0;font-size:13px;">'
+        '🔎 Bộ lọc bảng Miss Combo (áp dụng chung 3 bảng)</p>',
+        unsafe_allow_html=True,
+    )
+    f1, f2, f3 = st.columns(3)
+    with f1:
+      st.markdown('<p class="filter-label">👤 Tên NVBH</p>', unsafe_allow_html=True)
+      miss_f_nv = st.multiselect(
+          'miss_nv', _opts('Tên NVBH'), default=[],
+          key='combo_miss_nv', label_visibility='collapsed',
+      )
+    with f2:
+      st.markdown('<p class="filter-label">🆔 Mã KH</p>', unsafe_allow_html=True)
+      miss_f_ma = st.multiselect(
+          'miss_ma', _opts('Mã KH'), default=[],
+          key='combo_miss_ma', label_visibility='collapsed',
+      )
+    with f3:
+      st.markdown('<p class="filter-label">🏪 Tên KH</p>', unsafe_allow_html=True)
+      miss_f_ten = st.multiselect(
+          'miss_ten', _opts('Tên KH'), default=[],
+          key='combo_miss_ten', label_visibility='collapsed',
+      )
+    f4, f5, f6 = st.columns(3)
+    with f4:
+      st.markdown('<p class="filter-label">📅 Ngày ĐH (lịch tháng)</p>', unsafe_allow_html=True)
+      _rd = report_date.date() if hasattr(report_date, 'date') else report_date
+      _ms = date(_rd.year, _rd.month, 1)
+      try:
+        miss_f_ngay = st.date_input(
+            'miss_ngay',
+            value=(_ms, _rd),
+            min_value=_ms,
+            max_value=_rd,
+            format='DD/MM/YYYY',
+            key='combo_miss_ngay',
+            label_visibility='collapsed',
+        )
+      except Exception:
+        miss_f_ngay = st.date_input(
+            'miss_ngay',
+            value=_rd,
+            min_value=_ms,
+            max_value=_rd,
+            format='DD/MM/YYYY',
+            key='combo_miss_ngay',
+            label_visibility='collapsed',
+        )
+    with f5:
+      st.markdown('<p class="filter-label">🏷️ L1</p>', unsafe_allow_html=True)
+      miss_f_l1 = st.multiselect(
+          'miss_l1', _opts('Loại Hình L1'), default=[],
+          key='combo_miss_l1', label_visibility='collapsed',
+      )
+    with f6:
+      st.write('')
+
+    def _apply_miss_filters(df_in):
+      if df_in is None or df_in.empty:
+        return df_in if df_in is not None else pd.DataFrame()
+      out = df_in.copy()
+      if miss_f_nv and 'Tên NVBH' in out.columns:
+        out = out[out['Tên NVBH'].astype(str).str.strip().isin(miss_f_nv)]
+      if miss_f_ma and 'Mã KH' in out.columns:
+        out = out[out['Mã KH'].astype(str).str.strip().isin(miss_f_ma)]
+      if miss_f_ten and 'Tên KH' in out.columns:
+        out = out[out['Tên KH'].astype(str).str.strip().isin(miss_f_ten)]
+      # Ngày ĐH: lịch tháng (range hoặc 1 ngày)
+      if miss_f_ngay is not None and 'Ngày ĐH' in out.columns:
+        try:
+          if isinstance(miss_f_ngay, (list, tuple)) and len(miss_f_ngay) == 2:
+            d0, d1 = miss_f_ngay[0], miss_f_ngay[1]
+            if d0 is not None and d1 is not None:
+              def _in_range(s):
+                try:
+                  dt = pd.to_datetime(str(s), dayfirst=True, errors='coerce')
+                  if pd.isna(dt):
+                    return False
+                  dd = dt.date() if hasattr(dt, 'date') else dt
+                  return d0 <= dd <= d1
+                except Exception:
+                  return False
+              out = out[out['Ngày ĐH'].apply(_in_range)]
+          elif hasattr(miss_f_ngay, 'strftime'):
+            # single date
+            ds = miss_f_ngay.strftime('%d/%m/%Y')
+            out = out[out['Ngày ĐH'].astype(str).str.strip() == ds]
+        except Exception:
+          pass
+      if miss_f_l1 and 'Loại Hình L1' in out.columns:
+        out = out[out['Loại Hình L1'].astype(str).str.strip().isin(miss_f_l1)]
+      if not out.empty and 'STT' in out.columns:
+        out = out.reset_index(drop=True)
+        # giữ dòng TỔNG nếu có
+        is_tot = out['Tên NVBH'].astype(str).str.upper().str.contains('TỔNG|TOTAL', na=False)
+        body = out[~is_tot].copy()
+        if not body.empty and 'STT' in body.columns:
+          body['STT'] = range(1, len(body) + 1)
+        tot = out[is_tot]
+        out = pd.concat([body, tot], ignore_index=True) if not tot.empty else body
+      return out
+
+    df_miss_off_f = _apply_miss_filters(df_miss_off)
+    df_miss_on_f = _apply_miss_filters(df_miss_on)
+    df_miss_sum = build_combo_miss_summary(df_miss_off_f, df_miss_on_f)
+
+    if df_miss_sum is not None and not df_miss_sum.empty:
+      st.markdown(
+          '<p style="font-weight:800;color:#034ea2;margin:14px 0 6px 0;">'
+          '📊 TỔNG HỢP THEO NHÂN VIÊN — ĐH đạt ngưỡng DS nhưng chưa có KM Combo'
+          ' <span style="font-weight:600;font-size:12px;color:#718096;">'
+          '(OFF ≥ 800.000đ · ON ≥ 300.000đ)</span></p>',
+          unsafe_allow_html=True,
+      )
+      st.markdown(render_html_table(df_miss_sum), unsafe_allow_html=True)
+    else:
+      st.caption('Không có dữ liệu tổng hợp miss Combo với bộ lọc hiện tại.')
+
+    _n_off = 0 if df_combo_off is None or df_combo_off.empty else len(df_combo_off)
+    _n_on = 0 if df_combo_on is None or df_combo_on.empty else len(df_combo_on)
+    if df_miss_off_f is not None and not df_miss_off_f.empty:
+      render_combo_miss_table(
+          df_miss_off_f, 'CHI TIẾT ĐH COMBO OFF', 'combo_miss_off'
+      )
+      st.caption(
+          f'Đối chiếu DS Combo OFF ({_n_off:,} CH) · {len(df_miss_off_f):,} đơn hàng'
+      )
+    else:
+      st.markdown(
+          '<p style="font-weight:800;color:#1a365d;margin:8px 0 4px 0;">'
+          '📋 CHI TIẾT ĐH COMBO OFF</p>',
+          unsafe_allow_html=True,
+      )
+      st.caption('Không có KH trong DS Combo OFF đạt ĐK chính mà thiếu KM Combo (theo bộ lọc).')
+
+    st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
+    if df_miss_on_f is not None and not df_miss_on_f.empty:
+      render_combo_miss_table(
+          df_miss_on_f, 'CHI TIẾT ĐH COMBO ON', 'combo_miss_on'
+      )
+      st.caption(
+          f'Đối chiếu DS Combo ON ({_n_on:,} CH) · {len(df_miss_on_f):,} đơn hàng'
+      )
+    else:
+      st.markdown(
+          '<p style="font-weight:800;color:#1a365d;margin:8px 0 4px 0;">'
+          '📋 CHI TIẾT ĐH COMBO ON</p>',
+          unsafe_allow_html=True,
+      )
+      st.caption('Không có KH trong DS Combo ON đạt ĐK chính mà thiếu KM Combo (theo bộ lọc).')
+
 
     st.markdown(
         f"""
@@ -17183,7 +18443,7 @@ def render_mbs_data_summary(df_summary, title):
 # ----- TAB MCP -----
 
 
-with tab_mcp:
+if _nav == '🗺️ MCP VISIT':
   st.markdown(
       '<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
       ' font-size: 15px;">🗺️ MCP VISIT & MAPPING DOANH SỐ BÁN HÀNG</h3>',
@@ -17813,7 +19073,9 @@ with tab_mcp:
 
 
 # ----- TAB CAT -----
-with tab_cat:
+if _nav == '📦 TRACKING MBS - CAT':
+  if df_cat is None:
+    df_cat = _lazy_cat(get_month_key() if True else "Thang10")
   st.markdown(
       '<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
       ' font-size: 15px;">🎯 TRACKING MBS - THEO NGÀNH HÀNG (CATEGORY)</h3>',
@@ -17971,7 +19233,9 @@ with tab_cat:
     render_mbs_data_summary(df_cat_summary, 'DATA_CAT SUMMARY')
 
 # ----- TAB BRAND -----
-with tab_brand:
+if _nav == '🏷️ TRACKING MBS - BRAND':
+  if df_brand is None:
+    df_brand = _lazy_brand(get_month_key() if True else "Thang10")
   st.markdown(
       '<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
       ' font-size: 15px;">🏷️ TRACKING MBS - THEO THƯƠNG HIỆU (BRAND)</h3>',
@@ -18129,7 +19393,9 @@ with tab_brand:
     render_mbs_data_summary(df_brand_summary, 'DATA_BRAND SUMMARY')
 
 # ----- TAB DSKH_Combo OFF -----
-with tab_dskh_off:
+if _nav == '📋 DSKH_Combo OFF':
+  if df_combo_off is None:
+    df_combo_off, df_combo_on = _lazy_combo(get_month_key() if True else "Thang10")
   st.markdown(
       '<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
       ' font-size: 15px;">📋 DANH SÁCH KHÁCH HÀNG COMBO OFF (TÂN_COMBO KÊNH'
@@ -18282,7 +19548,9 @@ with tab_dskh_off:
     st.caption(f'Hiển thị: {len(df_off_f):,} / {len(df_combo_off):,} cửa hàng')
 
 # ----- TAB DSKH_Combo ON -----
-with tab_dskh_on:
+if _nav == '📋 DSKH_Combo ON':
+  if df_combo_on is None:
+    df_combo_off, df_combo_on = _lazy_combo(get_month_key() if True else "Thang10")
   st.markdown(
       '<h3 style="color: #034ea2; font-weight: 800; margin-bottom: 0px;'
       ' font-size: 15px;">📋 DANH SÁCH KHÁCH HÀNG COMBO ON (TÂN_COMBO KÊNH'
