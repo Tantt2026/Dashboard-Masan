@@ -14394,43 +14394,85 @@ def build_hs_combo_mbs_summary(df, report_date, df_combo_off, df_combo_on, cat_d
   except Exception:
     pass
 
-  def _mbs_info(mbs_df):
+  def _mbs_info(mbs_df, kind='CAT'):
+    """Phân CAT1/2/3 hoặc BRAND1/2/3: số CH đạt / tổng CH.
+    Đạt = Nhóm 1 (Đã đạt MBS) theo logic Báo Cáo MBS Cat/Brand.
+    """
     if mbs_df is None or getattr(mbs_df, 'empty', True):
       return None
-    d = mbs_df.copy()
-    c_nv = find_col(d, ['SM Name', 'SM name', 'Tên NVBH', 'Nhân viên'])
-    if nv_selected(filter_nv) and c_nv:
-      d = filter_df_by_nv(d, c_nv, filter_nv)
-    c_type = find_col(d, ['Member Type', 'Member type', 'Loại', 'Group', 'Nhóm'])
-    c_actual = find_col(d, [
-        'Doanh số thực đạt của CAT', 'Doanh số thực đạt CAT',
-        'Doanh số thực đạt của BRAND', 'Doanh số thực đạt BRAND',
-        'Doanh số thực đạt', 'Actual',
-    ])
-    c_ct = find_col(d, [
-        'Doanh số nền tảng của OUTLET', 'Chỉ tiêu của CAT', 'Chỉ tiêu CAT',
-        'Chỉ tiêu của BRAND', 'Chỉ tiêu BRAND', 'Target',
-    ])
-    groups = {}
+    try:
+      if kind == 'BRAND':
+        rep = build_mbs_brand_report(mbs_df, filter_nv=filter_nv, mcp_df=mcp_df)
+      else:
+        rep = build_mbs_cat_report(mbs_df, filter_nv=filter_nv, mcp_df=mcp_df)
+    except Exception:
+      return None
+    det = rep.get('df_detail') if rep else None
+    if det is None or getattr(det, 'empty', True):
+      return None
+
+    d = det.copy()
+    # Member type column
+    c_mem = None
+    for c in d.columns:
+      if str(c).strip().lower() in ('member type', 'member_type', 'member type'):
+        c_mem = c
+        break
+    if c_mem is None:
+      c_mem = find_col(d, ['Member type', 'Member Type', 'Phân loại CAT', 'Phân loại'])
+
+    c_nhom = 'Nhóm' if 'Nhóm' in d.columns else find_col(d, ['Nhóm', 'Nhom', 'Group'])
+    if not c_mem or not c_nhom:
+      total = len(d)
+      dat = int((pd.to_numeric(d[c_nhom], errors='coerce') == 1).sum()) if c_nhom else 0
+      return {'groups': {}, 'dat': dat, 'total': total}
+
+    d['_mem'] = d[c_mem].astype(str).str.strip()
+    d['_nhom'] = pd.to_numeric(d[c_nhom], errors='coerce').fillna(0).astype(int)
+    d['_dat'] = (d['_nhom'] == 1).astype(int)
+
+    # Chỉ lấy CAT1/2/3 hoặc BRAND1/2/3
+    prefix = 'BRAND' if kind == 'BRAND' else 'CAT'
+    order = [f'{prefix}{i}' for i in (1, 2, 3)]
+
+    groups_out = {}
     dat = total = 0
-    if c_type:
-      for gname, gdf in d.groupby(d[c_type].astype(str).str.strip()):
-        if not gname or gname.lower() in ('nan', 'none', ''):
-          continue
-        n = len(gdf)
-        n_dat = 0
-        if c_actual and c_ct:
-          act = pd.to_numeric(gdf[c_actual], errors='coerce').fillna(0)
-          ct = pd.to_numeric(gdf[c_ct], errors='coerce').fillna(0)
-          n_dat = int(((act >= ct) & (ct > 0)).sum())
-        groups[gname] = f'{n_dat}/{n}'
+    for key in order:
+      # match linh hoạt: CAT1, Cat 1, CAT 1...
+      mask = d['_mem'].str.upper().str.replace(' ', '', regex=False) == key.upper()
+      if not mask.any():
+        # fallback contains
+        mask = d['_mem'].str.upper().str.replace(' ', '', regex=False).str.contains(
+            key.upper(), na=False
+        )
+      sub = d.loc[mask]
+      n = int(len(sub))
+      n_dat = int(sub['_dat'].sum()) if n else 0
+      if n > 0:
+        groups_out[key] = f'{n_dat}/{n}'
         dat += n_dat
         total += n
-    else:
-      total = len(d)
-    return {'groups': groups, 'dat': dat, 'total': total}
 
-  return combo_off, combo_on, _mbs_info(cat_df), _mbs_info(brand_df)
+    # Nếu không match được CAT1/2/3 — group theo giá trị Member type gốc
+    if not groups_out:
+      for gname, gdf in d.groupby('_mem'):
+        gn = str(gname).strip()
+        if not gn or gn.lower() in ('nan', 'none', ''):
+          continue
+        n = len(gdf)
+        n_dat = int(gdf['_dat'].sum())
+        groups_out[gn] = f'{n_dat}/{n}'
+        dat += n_dat
+        total += n
+
+    return {'groups': groups_out, 'dat': dat, 'total': total}
+
+  return (
+      combo_off,
+      combo_on,
+      _mbs_info(cat_df, 'CAT'),
+      _mbs_info(brand_df, 'BRAND'),
+  )
 
 def render_performance_html(df):
   if df is None or df.empty:
