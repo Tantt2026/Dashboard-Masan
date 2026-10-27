@@ -5969,46 +5969,67 @@ def is_combo_line_t09_on(row):
 
 
 def is_combo_line_t10(row):
-  """Line thuộc CTKM Combo T10 theo CV 433-300926/HCM-CDGT-MSC:
+  """Line QUÀ tặng CTKM Combo T10 (không đếm hàng bán thường).
 
-  OFF (ĐK chính ≥800k MSC+HPC, ĐK phụ ≥100k nhóm SP):
-    → Tặng 1 Chai Tương Ớt Chinsu MN 250gr (Hàng KM)
+  Dấu hiệu quà (bắt buộc ≥1):
+    - Hàng KM = Y  OR  Đơn giá = 0  OR  Thành tiền = 0  OR  Giá trị hàng KM > 0
 
-  ON Bev (ĐK chính ≥300k Bev, ĐK phụ ≥80k Tea365 / WK247 Amazon):
-    → Tặng 1 Chai Wake UP 247 330ml (Hàng thường — không bắt buộc cờ KM)
+  Quà hợp lệ:
+    - Tương ớt Chinsu MN 250gr (OFF + ON Nhà hàng)
+    - Wake UP 247 330ml (ON Bev) — CHỈ khi là quà, không đếm hàng bán đủ giá
+    - Chiết khấu 20.000đ (Homey)
 
-  ON Nam Ngư (≥500k Gia vị + ≥200k Nam Ngư) / Tam Thái Tử (≥400k + ≥45k):
-    → Tặng 1 Chai Chinsu MN 250gr (KM)
-
-  Homey tiềm năng (≥800k + ≥280k Homey):
-    → Chiết khấu 20.000đ
+  Đối chiếu RPT: Wake UP bán (KM=N, giá 8000) ≠ Combo; chỉ KM=Y/giá 0 mới tính.
   """
   sp = str(row.get('Tên SP lower', '') or row.get('Tên sản phẩm', '')).lower()
   km = _get_km_flag(row)
   ck = _get_ck_value(row)
   is_ck_20k = abs(ck - 20000) < 1 or abs(ck - 20_000) < 1
 
-  # Chinsu MN 250gr — thường là Hàng KM; vẫn nhận nếu tên khớp rõ
-  is_chinsu_250 = (
-      ('chinsu' in sp or 'chin-su' in sp or 'chin su' in sp)
-      and ('250' in sp)
-  )
-  if is_chinsu_250 and not km:
-    # chỉ tính khi là line KM hoặc số lượng/đơn giá gần như tặng
-    is_chinsu_250 = km  # bắt buộc KM cho Chinsu OFF
+  # Đơn giá / thành tiền
+  try:
+    dg = float(row.get('Đơn giá', row.get('Don gia', 0)) or 0)
+  except Exception:
+    dg = 0.0
+  try:
+    tt = float(
+        row.get('Thành tiền trước CK', row.get('Thanh tien truoc CK', 0)) or 0
+    )
+  except Exception:
+    tt = 0.0
+  try:
+    gkm = float(row.get('Giá trị hàng KM', row.get('Gia tri hang KM', 0)) or 0)
+  except Exception:
+    gkm = 0.0
 
-  # Wake UP 247 — CV ghi Hàng thường (ON Bev), không bắt buộc cờ KM
-  is_wakeup = (
-      ('wake' in sp and 'up' in sp and '247' in sp)
-      or 'wakeup247' in sp.replace(' ', '').replace('-', '')
-      or 'wake up 247' in sp
-      or ('247' in sp and 'wake' in sp)
+  is_free = bool(km) or abs(dg) < 1e-6 or abs(tt) < 1e-6 or gkm > 0
+  if not is_free and not is_ck_20k:
+    return False
+
+  # Chinsu 250 tương ớt
+  is_chinsu_250 = (
+      ('chinsu' in sp or 'chin-su' in sp or 'chin su' in sp or 'chin-su' in sp)
+      and ('250' in sp)
+      and ('ớt' in sp or 'ot ' in sp or 'ớt' in sp or 'tuong ot' in sp.replace('ơ', 'o'))
   )
-  # Chỉ lấy chai 330ml tặng (không lấy Amazon 245ml là ĐK phụ)
-  if is_wakeup and '245' in sp and '330' not in sp:
+  # fallback chinsu 250 without strict ớt
+  if not is_chinsu_250:
+    is_chinsu_250 = (
+        ('chinsu' in sp or 'chin-su' in sp or 'chin su' in sp)
+        and ('250' in sp)
+        and ('tương' in sp or 'tuong' in sp)
+    )
+
+  # Wake UP 247 330ml — chỉ quà, loại Amazon 245
+  sp_ns = sp.replace(' ', '').replace('-', '')
+  is_wakeup = (
+      ('wake' in sp and '247' in sp)
+      or 'wakeup247' in sp_ns
+  )
+  if is_wakeup and ('245' in sp or 'amazon' in sp) and '330' not in sp:
     is_wakeup = False
 
-  return bool(is_chinsu_250 or is_wakeup or is_ck_20k)
+  return bool((is_chinsu_250 or is_wakeup) and is_free) or is_ck_20k
 
 
 
@@ -6084,18 +6105,38 @@ def tag_combo_orders_t10(df_mtd, mcp_df=None):
   else:
     d['is_combo'] = d['_line_combo']
 
-  # CV 433: chỉ tính ĐH đạt ĐK chính theo kênh
-  # OFF ≥800k | ON ≥300k
-  val_col = None
-  for c in ['Thành tiền trước CK', 'Thành tiền trước chiết khấu', 'Tổng tiền', 'Giá trị sau CK']:
+  # CV 433: ĐK chính theo kênh — OFF ≥800k | ON ≥300k
+  # Cộng dồn nhiều cột giá trị nếu có để tránh thiếu doanh số đơn
+  val_cols = []
+  for c in [
+      'Thành tiền trước CK', 'Thành tiền trước chiết khấu',
+      'Tổng tiền', 'Giá trị sau CK', 'Thành tiền', 'Doanh số',
+      'TOTAL VALUE', 'Amount',
+  ]:
     if c in d.columns:
-      val_col = c
-      break
-  if val_col and 'Mã đơn hàng' in d.columns:
-    d['_line_sales'] = pd.to_numeric(d[val_col], errors='coerce').fillna(0)
+      val_cols.append(c)
+  if not val_cols:
+    for c in d.columns:
+      cl = str(c).lower()
+      if 'thành tiền' in cl or 'doanh số' in cl or 'tổng tiền' in cl:
+        val_cols.append(c)
+        break
+
+  if val_cols and 'Mã đơn hàng' in d.columns:
+    d['_line_sales'] = 0.0
+    for c in val_cols:
+      d['_line_sales'] = d['_line_sales'] + pd.to_numeric(d[c], errors='coerce').fillna(0)
+    # nếu cộng nhiều cột bị double-count → lấy max từng cột thay vì sum
+    if len(val_cols) > 1:
+      _mx = pd.to_numeric(d[val_cols[0]], errors='coerce').fillna(0)
+      for c in val_cols[1:]:
+        _mx = np.maximum(_mx, pd.to_numeric(d[c], errors='coerce').fillna(0))
+      d['_line_sales'] = _mx
+
     order_sales = d.groupby(d['Mã đơn hàng'].astype(str))['_line_sales'].transform('sum')
     ch = d['channel'].astype(str).str.upper() if 'channel' in d.columns else pd.Series('OFF', index=d.index)
-    min_req = ch.map(lambda x: 300000.0 if ('ON' in str(x) and 'OFF' not in str(x)) else 800000.0)
+    is_on = ch.str.contains('ON', na=False) & ~ch.str.contains('OFF', na=False)
+    min_req = np.where(is_on, 300000.0, 800000.0)
     d['is_combo'] = d['is_combo'] & (order_sales >= min_req)
 
   combo = d[d['is_combo']].copy()
@@ -6204,7 +6245,7 @@ def build_combo_matrix(
   combo_df = tag_combo_orders_t10(df_mtd, mcp_df=mcp_df)
 
   def _maps_from_combo(combo_sub, report_date):
-    """CH MTD/Ngày + Suất (unique ĐH) MTD/Ngày."""
+    """CH MTD/Ngày = unique cửa hàng; Suất = unique mã đơn hàng."""
     empty = {}
     if combo_sub is None or combo_sub.empty or 'Tên NVBH' not in combo_sub.columns:
       return empty, empty, empty, empty
@@ -6215,16 +6256,38 @@ def build_combo_matrix(
     else:
       dsub['_d'] = rd
 
-    if 'Mã CH' in dsub.columns:
-      mtd_ch = dsub.groupby('Tên NVBH')['Mã CH'].nunique().to_dict()
-      # Phát sinh Ngày = CH có first_date = ngày BC (lần đầu phát sinh Combo trong tháng)
+    # Chuẩn hoá cột mã CH
+    ma_ch_col = None
+    for c in ['Mã CH', 'Outlet Code', 'Outlet_code', 'OutletCode', 'Mã KH', 'Poscode']:
+      if c in dsub.columns:
+        ma_ch_col = c
+        break
+    if ma_ch_col is None:
+      for c in dsub.columns:
+        cl = str(c).lower().replace(' ', '')
+        if cl in ('mãch', 'mach', 'outletcode', 'outlet_code', 'mãkh'):
+          ma_ch_col = c
+          break
+
+    def _norm_ch(x):
+      s = str(x).strip()
+      if s.endswith('.0'):
+        s = s[:-2]
+      return s
+
+    if ma_ch_col is not None:
+      dsub['_ma_ch'] = dsub[ma_ch_col].map(_norm_ch)
+      dsub = dsub[dsub['_ma_ch'].notna() & ~dsub['_ma_ch'].isin(('', 'nan', 'None', 'none'))]
+      # MTD = số CH unique có mua Combo trong tháng (KHÔNG đếm suất)
+      mtd_ch = dsub.groupby('Tên NVBH')['_ma_ch'].nunique().to_dict()
+      # Phát sinh Ngày = CH first_date = ngày BC
       first = (
-          dsub.groupby(['Tên NVBH', 'Mã CH'])['_d'].min().reset_index()
+          dsub.groupby(['Tên NVBH', '_ma_ch'])['_d'].min().reset_index()
       )
-      first.columns = ['Tên NVBH', 'Mã CH', 'first_date']
+      first.columns = ['Tên NVBH', '_ma_ch', 'first_date']
       ngay_ch = (
           first[first['first_date'] == rd]
-          .groupby('Tên NVBH')['Mã CH']
+          .groupby('Tên NVBH')['_ma_ch']
           .nunique()
           .to_dict()
       )
@@ -6237,19 +6300,21 @@ def build_combo_matrix(
         ma_dh_col = c
         break
     if ma_dh_col:
-      mtd_suat = dsub.groupby('Tên NVBH')[ma_dh_col].nunique().to_dict()
+      dsub['_ma_dh'] = dsub[ma_dh_col].astype(str).str.strip()
+      mtd_suat = dsub.groupby('Tên NVBH')['_ma_dh'].nunique().to_dict()
       day = dsub[dsub['_d'] == rd]
-      ngay_suat = day.groupby('Tên NVBH')[ma_dh_col].nunique().to_dict() if not day.empty else {}
+      ngay_suat = (
+          day.groupby('Tên NVBH')['_ma_dh'].nunique().to_dict() if not day.empty else {}
+      )
     else:
-      # fallback: 1 suất / CH / ngày
-      if 'Mã CH' in dsub.columns:
-        mtd_suat = dsub.groupby('Tên NVBH')['Mã CH'].nunique().to_dict()
+      # fallback suất: không lấy nunique CH làm suất MTD tháng (tránh nhầm với MTD CH)
+      mtd_suat, ngay_suat = {}, {}
+      if ma_ch_col is not None:
         day = dsub[dsub['_d'] == rd]
+        # ước suất ngày = CH có ĐH trong ngày (tối đa 1/CH/ngày khi thiếu mã ĐH)
         ngay_suat = (
-            day.groupby('Tên NVBH')['Mã CH'].nunique().to_dict() if not day.empty else {}
+            day.groupby('Tên NVBH')['_ma_ch'].nunique().to_dict() if not day.empty else {}
         )
-      else:
-        mtd_suat, ngay_suat = {}, {}
     return mtd_ch, ngay_ch, mtd_suat, ngay_suat
 
   def _ch_mask(s, want):
@@ -13492,7 +13557,7 @@ def render_combo_matrix_html(df):
       '<tr>',
   ]
   sub_cols = [
-      'Target', 'Phát sinh<br>Ngày', 'MTD', '% MTD', 'Số Suất', 'MTD'
+      'Target', 'Phát sinh<br>Ngày', 'MTD CH', '% MTD', 'Suất Ngày', 'Suất MTD'
   ] * 2
   for c in sub_cols:
     html.append(f'<th style="{th_base}">{c}</th>')
@@ -14449,7 +14514,10 @@ def build_hs_combo_mbs_summary(df, report_date, df_combo_off, df_combo_on, cat_d
       n = int(len(sub))
       n_dat = int(sub['_dat'].sum()) if n else 0
       if n > 0:
-        groups_out[key] = f'{n_dat}/{n}'
+        pct_g = (n_dat / n * 100) if n else 0
+        # Format: 4/51/7,8% (dùng dấu phẩy thập phân VN)
+        pct_s = f'{pct_g:.1f}'.replace('.', ',')
+        groups_out[key] = f'{n_dat}/{n}/{pct_s}%'
         dat += n_dat
         total += n
 
@@ -14461,7 +14529,9 @@ def build_hs_combo_mbs_summary(df, report_date, df_combo_off, df_combo_on, cat_d
           continue
         n = len(gdf)
         n_dat = int(gdf['_dat'].sum())
-        groups_out[gn] = f'{n_dat}/{n}'
+        pct_g = (n_dat / n * 100) if n else 0
+        pct_s = f'{pct_g:.1f}'.replace('.', ',')
+        groups_out[gn] = f'{n_dat}/{n}/{pct_s}%'
         dat += n_dat
         total += n
 
