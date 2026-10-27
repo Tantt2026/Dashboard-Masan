@@ -189,12 +189,33 @@ st.markdown(
     .custom-kpi-table td.pct-red {
         background-color: #fed7d7 !important;
         color: #742a2a !important;
-        font-weight: 700 !important;
+        font-weight: 800 !important;
+    }
+    .custom-kpi-table td.pct-orange {
+        background-color: #feebc8 !important;
+        color: #c05621 !important;
+        font-weight: 800 !important;
     }
     .custom-kpi-table td.pct-green {
         background-color: #c6f6d5 !important;
         color: #22543d !important;
-        font-weight: 700 !important;
+        font-weight: 800 !important;
+    }
+    /* Đảm bảo class màu % thắng zebra + row-total */
+    .custom-kpi-table tbody tr td.pct-red,
+    .custom-kpi-table tbody tr.row-total td.pct-red {
+        background-color: #fed7d7 !important;
+        color: #742a2a !important;
+    }
+    .custom-kpi-table tbody tr td.pct-orange,
+    .custom-kpi-table tbody tr.row-total td.pct-orange {
+        background-color: #feebc8 !important;
+        color: #c05621 !important;
+    }
+    .custom-kpi-table tbody tr td.pct-green,
+    .custom-kpi-table tbody tr.row-total td.pct-green {
+        background-color: #c6f6d5 !important;
+        color: #22543d !important;
     }
     .custom-kpi-table td.pct-purple {
         background-color: #e9d8fd !important;
@@ -1492,6 +1513,7 @@ def process_mcp_sales(df_rpt, df_mcp):
   return df_out.drop(columns=drop_cols)
 
 
+@st.cache_data(ttl=600, show_spinner=False)
 def build_mcp_sales_detail(df_rpt, df_mcp, report_date=None):
   """Giữ NGUYÊN mọi cột Data_MCP + thêm Sub Division, Group STD SKU, Tên sản phẩm, Doanh Số MTD chi tiết."""
   if df_mcp is None or df_mcp.empty:
@@ -7985,6 +8007,300 @@ def format_trieu(v):
     return '0,0'
 
 
+def _mbs_rpt_sales_by_outlet(df_rpt, report_date):
+  """Doanh số RPT theo Mã CH từ đầu tháng → ngày BC (bỏ đơn huỷ)."""
+  empty = {}
+  if df_rpt is None or df_rpt.empty or report_date is None:
+    return empty
+  d = df_rpt.copy()
+  status = find_col(d, ['Tình trạng đơn hàng', 'Trạng thái', 'Status'])
+  if status:
+    d = d[~d[status].astype(str).str.contains('hủy|huy|cancel', case=False, na=False)]
+  c_ma = find_col(d, ['Mã CH', 'Outlet Code', 'Outlet_code', 'Mã KH'])
+  c_val = find_col(d, ['Tổng tiền', 'Giá trị sau CK', 'Doanh thu', 'Thành tiền', 'Sales Before Discount'])
+  c_dt = find_col(d, ['Ngày', 'Order Date', 'ORDER_DATE', 'Ngày đơn', 'date'])
+  if not c_ma or not c_val:
+    return empty
+  d['_ma'] = d[c_ma].astype(str).str.strip().map(
+      lambda x: x[:-2] if isinstance(x, str) and x.endswith('.0') else x
+  )
+  d['_val'] = pd.to_numeric(d[c_val], errors='coerce').fillna(0)
+  if c_dt:
+    d['_dt'] = pd.to_datetime(d[c_dt], errors='coerce')
+    rd = report_date.date() if hasattr(report_date, 'date') else report_date
+    start = date(rd.year, rd.month, 1)
+    d = d[(d['_dt'].dt.date >= start) & (d['_dt'].dt.date <= rd)]
+  return d.groupby('_ma')['_val'].sum().to_dict()
+
+
+def build_mbs_nv_summary_asof(df_detail, df_rpt, report_date, filter_nv=None):
+  """Tổng hợp theo NV: chốt đạt MBS theo Actual RPT đầu tháng → ngày BC.
+
+  Giữ Target + Đạt nhiệm vụ từ Data_Cat/Brand; thay Actual bằng DS RPT MTD→ngày BC;
+  phân lại 6 nhóm rồi aggregate theo NV.
+  """
+  cols = [
+      'STT', 'Tên NVBH', 'Tổng KH', 'KH Đạt (N1)', '% Đạt',
+      'KH N2', 'KH N5', 'Actual', 'Target', '% TH',
+  ]
+  empty = pd.DataFrame(columns=cols)
+  if df_detail is None or df_detail.empty:
+    return empty
+
+  det = df_detail.copy()
+  if filter_nv:
+    nvs = filter_nv if isinstance(filter_nv, (list, tuple, set)) else [filter_nv]
+    det = det[det['Tên NVBH'].astype(str).isin([str(x) for x in nvs])]
+  if det.empty:
+    return empty
+
+  sales_map = _mbs_rpt_sales_by_outlet(df_rpt, report_date)
+
+  def _norm_ma(x):
+    s = str(x).strip()
+    return s[:-2] if s.endswith('.0') else s
+
+  rows = []
+  for _, r in det.iterrows():
+    ma = _norm_ma(r.get('Outlet Code', r.get('Mã KH', '')))
+    target = float(pd.to_numeric(r.get('Target', 0), errors='coerce') or 0)
+    actual = float(sales_map.get(ma, 0) or 0)
+    mission = str(r.get('Đạt nhiệm vụ', '')).strip() in ('Có', 'CO', 'Yes', '1', 'True', '✓')
+    pct = (actual / target * 100) if target > 0 else (100.0 if actual > 0 else 0.0)
+    if actual <= 0:
+      nhom = 5
+    elif actual >= target and mission:
+      nhom = 1
+    elif actual >= target and not mission:
+      nhom = 2
+    elif pct >= 50 and actual < target and mission:
+      nhom = 3
+    elif pct >= 60 and actual < target and not mission:
+      nhom = 4
+    else:
+      nhom = 6
+    rows.append({
+        'Tên NVBH': str(r.get('Tên NVBH', '')).strip(),
+        'Outlet Code': ma,
+        'Actual': actual,
+        'Target': target,
+        'Nhóm': nhom,
+    })
+  d = pd.DataFrame(rows)
+  if d.empty:
+    return empty
+
+  out_rows = []
+  for nv, g in d.groupby('Tên NVBH', sort=True):
+    total = len(g)
+    n1 = int((g['Nhóm'] == 1).sum())
+    n2 = int((g['Nhóm'] == 2).sum())
+    n5 = int((g['Nhóm'] == 5).sum())
+    act = float(g['Actual'].sum())
+    tgt = float(g['Target'].sum())
+    pct_dat = round(n1 / total * 100, 1) if total else 0.0
+    pct_th = round(act / tgt * 100, 1) if tgt > 0 else 0.0
+    out_rows.append({
+        'Tên NVBH': nv,
+        'Tổng KH': total,
+        'KH Đạt (N1)': n1,
+        '% Đạt': pct_dat,
+        'KH N2': n2,
+        'KH N5': n5,
+        'Actual': act,
+        'Target': tgt,
+        '% TH': pct_th,
+    })
+  out = pd.DataFrame(out_rows).sort_values('KH Đạt (N1)', ascending=False).reset_index(drop=True)
+  out.insert(0, 'STT', range(1, len(out) + 1))
+  # Dòng tổng
+  tot = {
+      'STT': '',
+      'Tên NVBH': 'TỔNG CỘNG',
+      'Tổng KH': int(out['Tổng KH'].sum()),
+      'KH Đạt (N1)': int(out['KH Đạt (N1)'].sum()),
+      '% Đạt': round(out['KH Đạt (N1)'].sum() / out['Tổng KH'].sum() * 100, 1) if out['Tổng KH'].sum() else 0.0,
+      'KH N2': int(out['KH N2'].sum()),
+      'KH N5': int(out['KH N5'].sum()),
+      'Actual': float(out['Actual'].sum()),
+      'Target': float(out['Target'].sum()),
+      '% TH': round(out['Actual'].sum() / out['Target'].sum() * 100, 1) if out['Target'].sum() else 0.0,
+  }
+  out = pd.concat([out, pd.DataFrame([tot])], ignore_index=True)
+  return out
+
+
+def compute_mbs_day_metric(df_detail, df_rpt, report_date):
+  """KH Đạt / Tổng KH / % Đạt theo lịch VT của ngày BC.
+
+  Thứ 2→2&25 | 3→3&36 | 4→4&47 | 5→5&25 | 6→6&36 | 7→7&47
+  Actual = RPT đầu tháng→ngày BC; Target + nhiệm vụ từ Data MBS.
+  """
+  empty = (0, 0, 0.0)
+  if df_detail is None or df_detail.empty or report_date is None:
+    return empty
+  try:
+    wd = report_date.weekday()  # Mon=0 … Sun=6
+  except Exception:
+    return empty
+  thu_by_wd = {
+      0: {'2', '25'},
+      1: {'3', '36'},
+      2: {'4', '47'},
+      3: {'5', '25'},
+      4: {'6', '36'},
+      5: {'7', '47'},
+      6: set(),
+  }
+  valid = thu_by_wd.get(wd, set())
+  if not valid or 'Thứ VT' not in df_detail.columns:
+    return empty
+
+  det = df_detail.copy()
+  thu_s = det['Thứ VT'].astype(str).str.strip()
+  det = det[thu_s.isin(valid)]
+  if det.empty:
+    return empty
+
+  sales_map = _mbs_rpt_sales_by_outlet(df_rpt, report_date)
+
+  def _norm_ma(x):
+    s = str(x).strip()
+    return s[:-2] if s.endswith('.0') else s
+
+  n1 = 0
+  total = 0
+  for _, r in det.iterrows():
+    ma = _norm_ma(r.get('Outlet Code', r.get('Mã KH', '')))
+    if not ma:
+      continue
+    total += 1
+    target = float(pd.to_numeric(r.get('Target', 0), errors='coerce') or 0)
+    actual = float(sales_map.get(ma, 0) or 0)
+    mission = str(r.get('Đạt nhiệm vụ', '')).strip() in (
+        'Có', 'CO', 'Yes', '1', 'True', '✓', '✔'
+    )
+    if mission and actual >= target and (target > 0 or actual > 0):
+      n1 += 1
+  pct = round(n1 / total * 100, 1) if total else 0.0
+  return int(n1), int(total), float(pct)
+
+
+def render_mbs_nv_summary_html(df, title='TỔNG HỢP THEO NV — CHỐT ĐẠT THEO NGÀY BC'):
+  """Format giống Báo Cáo Trưng Bày.
+  % Đạt / % TH dùng class pct-red / pct-orange / pct-green (CSS global).
+  """
+  if df is None or df.empty:
+    return ''
+  cols = [c for c in [
+      'STT', 'Tên NVBH', 'Tổng KH', 'KH Đạt (N1)', '% Đạt',
+      'KH N2', 'KH N5', 'Actual', 'Target', '% TH',
+  ] if c in df.columns]
+
+  max_name = 12
+  if 'Tên NVBH' in df.columns:
+    for n in df['Tên NVBH'].astype(str):
+      max_name = max(max_name, len(n))
+  name_w = max(140, min(280, max_name * 9 + 24))
+  stt_w = 44
+
+  th = (
+      'background-color:#1a365d !important;color:#ffffff !important;'
+      'font-weight:800 !important;text-align:center !important;'
+      'border:1px solid #2b6cb0 !important;padding:6px 5px;font-size:11px;'
+  )
+  td = 'border:1px solid #bce2f5 !important;padding:5px 4px;font-size:12px;'
+  tot_style = (
+      'background-color:#1a365d !important;color:#ffffff !important;'
+      'font-weight:900 !important;border:1px solid #2b6cb0 !important;'
+      'padding:5px 4px;font-size:12px;'
+  )
+  sticky_stt_h = (
+      f'{th}position:sticky;left:0;z-index:6;min-width:{stt_w}px;max-width:{stt_w}px;'
+  )
+  sticky_ten_h = (
+      f'{th}position:sticky;left:{stt_w}px;z-index:6;min-width:{name_w}px;'
+  )
+  sticky_stt_c = f'position:sticky;left:0;z-index:2;min-width:{stt_w}px;max-width:{stt_w}px;'
+  sticky_ten_c = f'position:sticky;left:{stt_w}px;z-index:2;min-width:{name_w}px;'
+
+  def _pct_class(v):
+    try:
+      v = float(str(v).replace('%', '').replace(',', '.').strip())
+    except Exception:
+      return 'pct-red'
+    if v < 50:
+      return 'pct-red'
+    if v < 100:
+      return 'pct-orange'
+    return 'pct-green'
+
+  html = [
+      '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:10px;">',
+      f'<h4 style="color:#1a365d;font-weight:800;margin:10px 0 6px 0;">📋 {title}</h4>',
+      '<table class="custom-kpi-table" style="border-collapse:separate;border-spacing:0;'
+      'width:max-content;min-width:100%;font-family:Arial,sans-serif;">',
+      '<thead style="position:sticky;top:0;z-index:5;"><tr>',
+      f'<th style="{sticky_stt_h}">STT</th>',
+      f'<th style="{sticky_ten_h}">Tên NVBH</th>',
+  ]
+  for c in cols:
+    if c in ('STT', 'Tên NVBH'):
+      continue
+    html.append(f'<th style="{th}">{c}</th>')
+  html.append('</tr></thead><tbody>')
+
+  for pos, (_, row) in enumerate(df.iterrows()):
+    ten_u = str(row.get('Tên NVBH', '')).upper()
+    is_tot = ('TỔNG' in ten_u) or ('TONG CONG' in ten_u) or (ten_u.strip() == 'TOTAL')
+    bg = '#e6f4fc' if pos % 2 == 0 else '#ffffff'
+    tr_cls = ' class="row-total"' if is_tot else ''
+    html.append(f'<tr{tr_cls}>')
+    for c in cols:
+      raw = row.get(c, '')
+      if pd.isna(raw):
+        raw = ''
+      sticky = ''
+      if c == 'STT':
+        sticky = sticky_stt_c
+      elif c == 'Tên NVBH':
+        sticky = sticky_ten_c
+
+      if c in ('% Đạt', '% TH'):
+        try:
+          v = float(str(raw).replace('%', '').replace(',', '.').strip())
+          val_s = f'{v:.1f}%'
+        except Exception:
+          v, val_s = 0.0, str(raw)
+        cls = _pct_class(v)
+        # class CSS + data-colored để không bị zebra/row-total đè
+        html.append(
+            f'<td data-colored="1" class="{cls}" '
+            f'style="{td}{sticky}text-align:center !important;">{val_s}</td>'
+        )
+      else:
+        val = raw
+        if c in ('Actual', 'Target') and val != '' and not isinstance(val, str):
+          try:
+            val = format_number_vn(float(val))
+          except Exception:
+            val = str(val)
+        al = 'left' if c == 'Tên NVBH' else 'center'
+        if is_tot:
+          html.append(
+              f'<td class="row-total-cell" style="{tot_style}{sticky}'
+              f'text-align:{al} !important;white-space:nowrap;">{val}</td>'
+          )
+        else:
+          fw = '600' if c == 'Tên NVBH' else '400'
+          html.append(
+              f'<td style="{td}{sticky}background:{bg} !important;color:#1a202c !important;'
+              f'font-weight:{fw};text-align:{al};white-space:nowrap;">{val}</td>'
+          )
+    html.append('</tr>')
+  html.append('</tbody></table></div>')
+  return ''.join(html)
+
 
 
 def build_mbs_brand_report(df_brand, filter_nv=None, mcp_df=None):
@@ -13966,8 +14282,8 @@ def _pct_color(pct, timegone=None):
   return '#e53e3e'
 
 
-def render_hs_daily_metric_cards(df_perf, report_date, lppc_moc=4.3, aso_off=None, aso_on=None):
-  """Bảng 1: Metric card KPI theo ngày — 2 hàng × 5 card, responsive mobile."""
+def render_hs_daily_metric_cards(df_perf, report_date, lppc_moc=4.3, aso_off=None, aso_on=None, mbs_cat=None, mbs_brand=None):
+  """Bảng 1: Metric card KPI theo ngày — 2 hàng × 6 card, responsive mobile."""
   if df_perf is None or df_perf.empty:
     return ''
   tot = df_perf.iloc[-1]
@@ -14086,6 +14402,20 @@ def render_hs_daily_metric_cards(df_perf, report_date, lppc_moc=4.3, aso_off=Non
       '#c05621',
     ),
   ]
+  # MBS Cat / Brand — theo lịch VT ngày BC
+  def _mbs_card(label, tup, color):
+    if not tup:
+      dat, tong, pct = 0, 0, 0.0
+    else:
+      dat, tong, pct = tup
+    return (
+        label,
+        f'{int(dat)}/{int(tong)}/{pct:.1f}%'.replace('.', ','),
+        'KH Đạt/Tổng KH/% Đạt',
+        color,
+    )
+  cards.append(_mbs_card('MBS CAT', mbs_cat, '#9f7aea'))
+  cards.append(_mbs_card('MBS BRAND', mbs_brand, '#ed64a6'))
 
   wd = report_date.strftime('%d/%m') if hasattr(report_date, 'strftime') else str(report_date)
   try:
@@ -14096,14 +14426,12 @@ def render_hs_daily_metric_cards(df_perf, report_date, lppc_moc=4.3, aso_off=Non
 
   html = [
     '<style>'
-    '.hs-day-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}'
-    '@media(max-width:900px){.hs-day-grid{grid-template-columns:repeat(2,1fr)!important;}}'
-    '@media(max-width:480px){.hs-day-grid{grid-template-columns:1fr!important;}}'
-    '.hs-day-card{background:#fff;border-radius:12px;padding:12px 14px;'
-    'box-shadow:0 1px 4px rgba(0,0,0,.08);border-top:3px solid #cbd5e0;}'
-    '.hs-day-card .t{font-size:11px;font-weight:700;color:#718096;letter-spacing:.3px;}'
-    '.hs-day-card .m{font-size:20px;font-weight:800;color:#1a202c;margin:4px 0;}'
-    '.hs-day-card .s{font-size:12px;color:#4a5568;}'
+    '.hs-day-grid{display:grid;width:100%;gap:10px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));}'
+    '@media(min-width:1400px){.hs-day-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));}}'
+    '.hs-day-card{background:#fff;border-radius:12px;padding:clamp(8px,1.2vw,12px) clamp(8px,1.2vw,14px);box-shadow:0 1px 4px rgba(0,0,0,.08);border-top:3px solid #cbd5e0;min-width:0;text-align:center;}'
+    '.hs-day-card .t{font-size:clamp(9px,1.1vw,12px);font-weight:700;color:#718096;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;}'
+    '.hs-day-card .m{font-size:clamp(13px,1.6vw,18px);font-weight:800;color:#1a202c;margin:4px 0;line-height:1.25;word-break:break-word;text-align:center;}'
+    '.hs-day-card .s{font-size:clamp(10px,1.1vw,12px);color:#4a5568;text-align:center;}'
     '</style>',
     f'<div style="margin:18px 0 8px 0;">'
     f'<div style="font-size:16px;font-weight:800;color:#1a365d;margin-bottom:10px;">'
@@ -14635,42 +14963,37 @@ except Exception:
   _mk = st.session_state.get('report_month_key', 'Thang10')
 
 def _ensure_core_data(month_key):
-  sk = f'prep_core_{month_key}'
-  if st.session_state.get('_force_reload') or sk not in st.session_state:
-    with st.spinner('Đang tải dữ liệu gốc (chỉ lần đầu hoặc sau Reload)...'):
-      _df, _mcp = load_prepared_core(month_key)
-      st.session_state[sk] = (_df, _mcp)
-    st.session_state['_force_reload'] = False
-  return st.session_state[sk]
-
-def _lazy_cat(month_key):
-  sk = f'lazy_cat_{month_key}'
-  if sk not in st.session_state:
-    st.session_state[sk] = load_prepared_cat(month_key)
-  return st.session_state[sk]
-
-def _lazy_brand(month_key):
-  sk = f'lazy_brand_{month_key}'
-  if sk not in st.session_state:
-    st.session_state[sk] = load_prepared_brand(month_key)
-  return st.session_state[sk]
-
-def _lazy_combo(month_key):
-  sk = f'lazy_combo_{month_key}'
-  if sk not in st.session_state:
-    st.session_state[sk] = load_combo_data()
-  return st.session_state[sk]
-
-def _lazy_visit(month_key):
-  sk = f'lazy_visit_{month_key}'
-  cur = st.session_state.get(sk)
-  if cur is None or (hasattr(cur, 'empty') and cur.empty):
+  """Chỉ dùng @st.cache_data — KHÔNG nhét DataFrame lớn vào session_state
+  (tránh Streamlit serialize lại mỗi lần đổi tab → đứng máy).
+  """
+  if st.session_state.get('_force_reload'):
     try:
-      _refresh_paths()
+      load_prepared_core.clear()
+      load_prepared_cat.clear()
+      load_prepared_brand.clear()
+      load_combo_data.clear()
+      load_visit_schedule.clear()
+      load_main_data.clear()
     except Exception:
       pass
-    st.session_state[sk] = load_visit_schedule(str(month_key))
-  return st.session_state[sk]
+    st.session_state['_force_reload'] = False
+  return load_prepared_core(month_key)
+
+def _lazy_cat(month_key):
+  return load_prepared_cat(month_key)
+
+def _lazy_brand(month_key):
+  return load_prepared_brand(month_key)
+
+def _lazy_combo(month_key):
+  return load_combo_data()
+
+def _lazy_visit(month_key):
+  try:
+    _refresh_paths()
+  except Exception:
+    pass
+  return load_visit_schedule(str(month_key))
 
 df, mcp = _ensure_core_data(_mk)
 targets = get_targets()
@@ -14905,26 +15228,13 @@ with f2:
       label_visibility='collapsed',
   )
   selected_kpi = kpi_map[selected_name]
-# Lazy-load đúng data cho KPI đang chọn
+# Lazy-load: CHỈ đánh dấu — load thật khi vào đúng tab/KPI (tránh đứng khi đổi tab)
 try:
   _mk_now = get_month_key()
 except Exception:
   _mk_now = st.session_state.get('report_month_key', 'Thang10')
 _sk = str(selected_kpi)
-if _sk in ('MBS_CAT', 'SUMMARY', 'PERFORMANCE', 'TEA_BATTLE', 'PERF_CAT'):
-  df_cat = _lazy_cat(_mk_now)
-if _sk in ('MBS_BRAND', 'SUMMARY', 'PERFORMANCE', 'PERF_CAT'):
-  df_brand = _lazy_brand(_mk_now)
-if _sk in ('COMBO', 'SUMMARY', 'PERFORMANCE'):
-  df_combo_off, df_combo_on = _lazy_combo(_mk_now)
-if _sk in ('VISIT', 'WEEKLY_PREVIEW', 'SUMMARY', 'ASO_ALL', 'ASO_FOCUS', 'ASO_FOCUS_2'):
-  df_visit_sched = _lazy_visit(_mk_now)
-# Hiệu suất / display thường cần gần như tất cả
-if _sk in ('DISPLAY',) or 'HIEU' in _sk.upper() or 'HS' == _sk:
-  df_cat = _lazy_cat(_mk_now)
-  df_brand = _lazy_brand(_mk_now)
-  df_combo_off, df_combo_on = _lazy_combo(_mk_now)
-  df_visit_sched = _lazy_visit(_mk_now)
+# df_cat / brand / combo / visit giữ None ở đây; load bên trong nhánh KPI
 with f3:
   st.markdown(
       '<p class="filter-label">ĐDKD (Nhân viên - Chọn nhiều)</p>',
@@ -15079,10 +15389,14 @@ components.html(
   }
 
   apply();
-  setInterval(apply, 600);
+  setInterval(apply, 4000);
   try {
-    var obs = new MutationObserver(function() { apply(); });
-    obs.observe(doc.body, { childList: true, subtree: true });
+    var _t = null;
+    var obs = new MutationObserver(function() {
+      if (_t) clearTimeout(_t);
+      _t = setTimeout(apply, 800);
+    });
+    obs.observe(doc.body, { childList: true, subtree: false });
   } catch (err) {}
   doc.addEventListener('touchstart', function() { setTimeout(apply, 20); }, true);
 })();
@@ -15110,7 +15424,26 @@ _nav = st.radio(
 
 # ----- TAB KPI -----
 if _nav == '📊 BÁO CÁO KPI':
-  # Fallback rỗng nếu KPI không cần (tránh NoneType)
+  # Load data phụ CHỈ khi đang ở tab KPI + đúng báo cáo cần
+  try:
+    _mk_now = get_month_key()
+  except Exception:
+    _mk_now = st.session_state.get('report_month_key', 'Thang10')
+  _sk = str(selected_kpi)
+  if _sk in ('MBS_CAT', 'SUMMARY', 'PERFORMANCE', 'TEA_BATTLE', 'PERF_CAT'):
+    df_cat = _lazy_cat(_mk_now)
+  if _sk in ('MBS_BRAND', 'SUMMARY', 'PERFORMANCE', 'PERF_CAT'):
+    df_brand = _lazy_brand(_mk_now)
+  if _sk in ('COMBO', 'SUMMARY', 'PERFORMANCE'):
+    df_combo_off, df_combo_on = _lazy_combo(_mk_now)
+  if _sk in ('VISIT', 'WEEKLY_PREVIEW', 'SUMMARY', 'ASO_ALL', 'ASO_FOCUS', 'ASO_FOCUS_2'):
+    df_visit_sched = _lazy_visit(_mk_now)
+  if _sk in ('DISPLAY',) or 'HIEU' in _sk.upper() or 'HS' == _sk:
+    df_cat = _lazy_cat(_mk_now)
+    df_brand = _lazy_brand(_mk_now)
+    df_combo_off, df_combo_on = _lazy_combo(_mk_now)
+    df_visit_sched = _lazy_visit(_mk_now)
+  # Fallback rỗng
   if df_cat is None:
     df_cat = pd.DataFrame()
   if df_brand is None:
@@ -15795,6 +16128,29 @@ if _nav == '📊 BÁO CÁO KPI':
         df_html = df_show[[c for c in cols_show if c in df_show.columns]].copy()
         st.markdown(render_html_table(df_html), unsafe_allow_html=True)
         st.caption(f'Hiển thị: {len(df_show):,} / {total_kh:,} KH')
+        # Tổng hợp theo NV — chốt đạt theo ngày BC (Actual RPT MTD→ngày)
+        try:
+          df_nv_sum = build_mbs_nv_summary_asof(
+              df_detail, df, report_date, filter_nv=filter_nv
+          )
+          if df_nv_sum is not None and not df_nv_sum.empty:
+            st.markdown(
+                render_mbs_nv_summary_html(
+                    df_nv_sum,
+                    title=(
+                        f'TỔNG HỢP THEO NV — CHỐT ĐẠT MBS CAT '
+                        f'(Actual RPT đến {report_date.strftime("%d/%m/%Y") if hasattr(report_date, "strftime") else report_date})'
+                    ),
+                ),
+                unsafe_allow_html=True,
+            )
+            st.caption(
+                'Actual = Doanh số RPT từ đầu tháng → ngày BC | '
+                'Target & Nhiệm vụ lấy từ Data_Cat | '
+                'KH Đạt (N1) = Actual ≥ Target và đạt nhiệm vụ'
+            )
+        except Exception as _e_mbs_nv:
+          st.warning(f'Không dựng được bảng tổng hợp NV MBS CAT: {_e_mbs_nv}')
         render_mbs_pie_chart(df_show, title='Tỷ lệ KH theo Nhóm — MBS CAT')
         st.download_button(
             label='⬇️ Xuất file CSV - Chi tiết MBS CAT',
@@ -16029,6 +16385,28 @@ if _nav == '📊 BÁO CÁO KPI':
         df_html = df_show[[c for c in cols_show if c in df_show.columns]].copy()
         st.markdown(render_html_table(df_html), unsafe_allow_html=True)
         st.caption(f'Hiển thị: {len(df_show):,} / {total_kh:,} KH')
+        try:
+          df_nv_sum = build_mbs_nv_summary_asof(
+              df_detail, df, report_date, filter_nv=filter_nv
+          )
+          if df_nv_sum is not None and not df_nv_sum.empty:
+            st.markdown(
+                render_mbs_nv_summary_html(
+                    df_nv_sum,
+                    title=(
+                        f'TỔNG HỢP THEO NV — CHỐT ĐẠT MBS BRAND '
+                        f'(Actual RPT đến {report_date.strftime("%d/%m/%Y") if hasattr(report_date, "strftime") else report_date})'
+                    ),
+                ),
+                unsafe_allow_html=True,
+            )
+            st.caption(
+                'Actual = Doanh số RPT từ đầu tháng → ngày BC | '
+                'Target & Nhiệm vụ lấy từ Data_Brand | '
+                'KH Đạt (N1) = Actual ≥ Target và đạt nhiệm vụ'
+            )
+        except Exception as _e_mbs_nv:
+          st.warning(f'Không dựng được bảng tổng hợp NV MBS BRAND: {_e_mbs_nv}')
         render_mbs_pie_chart(df_show, title='Tỷ lệ KH theo Nhóm — MBS BRAND')
         st.download_button(
             label='⬇️ Xuất file CSV - Chi tiết MBS BRAND',
@@ -16479,15 +16857,30 @@ if _nav == '📊 BÁO CÁO KPI':
           except Exception:
             pass
 
-          st.markdown(
-              render_hs_daily_metric_cards(
-                  df_perf, report_date, lppc_moc=_moc,
-                  aso_off=_aso_off, aso_on=_aso_on,
-              ),
-              unsafe_allow_html=True,
+          # MBS Cat/Brand metric theo Thứ VT ngày BC
+          _mbs_cat_m = _mbs_brand_m = None
+          try:
+            if df_cat is not None and not df_cat.empty:
+              _rc = build_mbs_cat_report(df_cat, filter_nv, mcp_df=mcp)
+              _mbs_cat_m = compute_mbs_day_metric(
+                  _rc.get('df_detail'), df, report_date
+              )
+            if df_brand is not None and not df_brand.empty:
+              _rb = build_mbs_brand_report(df_brand, filter_nv, mcp_df=mcp)
+              _mbs_brand_m = compute_mbs_day_metric(
+                  _rb.get('df_detail'), df, report_date
+              )
+          except Exception:
+            pass
+          _html_day = render_hs_daily_metric_cards(
+              df_perf, report_date, lppc_moc=_moc,
+              aso_off=_aso_off, aso_on=_aso_on,
+              mbs_cat=_mbs_cat_m, mbs_brand=_mbs_brand_m,
           )
         except Exception as _e_daily:
+          _html_day = ''
           st.caption(f'(Metric ngày) {_e_daily}')
+        _html_mon = ''
         try:
           _rd = report_date if isinstance(report_date, date) else pd.Timestamp(report_date).date()
           _wd, _el, _rem, _tg = get_timegone_stats(_rd)
@@ -16503,15 +16896,36 @@ if _nav == '📊 BÁO CÁO KPI':
               df_combo_off, df_combo_on, df_cat, df_brand,
               mcp, filter_nv,
           )
-          st.markdown(
-              render_hs_monthly_kpi_table(
-                  _rows, _tg, combo_off=_co, combo_on=_cn,
-                  mbs_cat=_mc, mbs_brand=_mb, report_date=_rd,
-              ),
-              unsafe_allow_html=True,
+          _html_mon = render_hs_monthly_kpi_table(
+              _rows, _tg, combo_off=_co, combo_on=_cn,
+              mbs_cat=_mc, mbs_brand=_mb, report_date=_rd,
           )
         except Exception as _e_mon:
           st.caption(f'(Bảng tháng) {_e_mon}')
+
+        # Khung gộp: Kết quả ngày + Lũy kế + Combo/MBS
+        _hs_inner = (_html_day or '') + (_html_mon or '')
+        if _hs_inner.strip():
+          _hs_wrap = (
+              '<div class="hs-report-frame">'
+              '<div class="hs-report-body" id="hs-report-snap">'
+              + _hs_inner
+              + '</div></div>'
+              '<style>'
+              '.hs-report-frame{border:2px solid #2b6cb0;border-radius:14px;background:#fff;'
+              'box-shadow:0 2px 10px rgba(26,54,93,.12);overflow:hidden;margin:8px 0 16px 0;position:relative;}'
+              '.hs-report-body{padding:12px 14px 16px 14px;transform-origin:top center;'
+              'transition:transform .15s ease;word-spacing:0.04em;letter-spacing:0.01em;}'
+              '.hs-report-body .hs-day-card .t,.hs-report-body .hs-day-card .m,.hs-report-body .hs-day-card .s{letter-spacing:0.02em;word-spacing:0.06em;}'
+              '.hs-report-frame:fullscreen,.hs-report-frame:-webkit-full-screen{'
+              'background:#fff;overflow:auto;padding:12px;}'
+              '</style>'
+          )
+          st.markdown(_hs_wrap, unsafe_allow_html=True)
+          components.html(
+'<!DOCTYPE html><html><head><meta charset="utf-8"/><script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script><style>html,body{margin:0;padding:0;background:transparent}.bar{display:flex;justify-content:flex-end;gap:4px;padding:4px 6px;background:linear-gradient(180deg,#f7fafc,#edf2f7);border:1px solid #cbd5e0;border-radius:8px}button{width:34px;height:30px;border:1px solid #e2e8f0;background:#fff;border-radius:6px;cursor:pointer;font-size:14px;color:#4a5568}button:hover{background:#edf2f7;color:#1a365d;border-color:#a0aec0}</style></head><body><div class="bar"><button type="button" id="bPng" title="Tai PNG">&#128247;</button><button type="button" id="bIn" title="Zoom in">+</button><button type="button" id="bOut" title="Zoom out">-</button><button type="button" id="bReset" title="Reset">&#8962;</button><button type="button" id="bFull" title="Fullscreen">&#9974;</button></div><script>(function(){var z=1;function bodyEl(){try{var d=window.parent.document;return d.getElementById("hs-report-snap")||d.querySelector(".hs-report-body");}catch(e){return null;}}function frameEl(){try{return window.parent.document.querySelector(".hs-report-frame");}catch(e){return null;}}function applyZ(){var el=bodyEl();if(el)el.style.transform="scale("+z+")";}document.getElementById("bIn").onclick=function(){z=Math.min(1.8,z+0.1);applyZ();};document.getElementById("bOut").onclick=function(){z=Math.max(0.6,z-0.1);applyZ();};document.getElementById("bReset").onclick=function(){z=1;applyZ();};document.getElementById("bFull").onclick=function(){var f=frameEl();if(!f)return;try{if(!window.parent.document.fullscreenElement){(f.requestFullscreen||f.webkitRequestFullscreen).call(f);}else{(window.parent.document.exitFullscreen||window.parent.document.webkitExitFullscreen).call(window.parent.document);}}catch(e){}};document.getElementById("bPng").onclick=async function(){var el=frameEl()||bodyEl();if(!el){alert("Khong tim thay khung");return;}try{var body=bodyEl();var prev=(body&&body.style.transform)||"";if(body)body.style.transform="none";z=1;var canvas=await html2canvas(el,{scale:3,backgroundColor:"#ffffff",useCORS:true,logging:false,allowTaint:true,scrollX:0,scrollY:0,onclone:function(doc,node){try{var root=doc.getElementById("hs-report-snap")||doc.querySelector(".hs-report-body")||node;if(root){root.style.transform="none";root.style.zoom="1";}var all=doc.querySelectorAll(".hs-report-frame,.hs-report-body,.hs-day-card,.hs-day-grid,td,th,div,span,p,b");for(var i=0;i<all.length;i++){var n=all[i];n.style.letterSpacing="0.02em";n.style.wordSpacing="0.05em";n.style.textRendering="geometricPrecision";}var cards=doc.querySelectorAll(".hs-day-card .m,.hs-day-card .t,.hs-day-card .s");for(var j=0;j<cards.length;j++){cards[j].style.whiteSpace="normal";cards[j].style.overflow="visible";}}catch(err){}}});if(body)body.style.transform=prev;var TARGET=2560;var out=canvas;if(Math.max(canvas.width,canvas.height)<TARGET){var k=TARGET/Math.max(canvas.width,canvas.height);out=document.createElement("canvas");out.width=Math.round(canvas.width*k);out.height=Math.round(canvas.height*k);var ctx=out.getContext("2d");ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.fillStyle="#ffffff";ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(canvas,0,0,out.width,out.height);}var a=document.createElement("a");a.download="Hieu_Suat_Ban_Hang_2K.png";a.href=out.toDataURL("image/png");a.click();}catch(e){alert("Loi PNG: "+e);}};})();</script></body></html>',
+              height=42,
+          )
 
         # ===== Chart mức độ hoàn thành KPI theo ngày (từ dòng TOTAL 2 bảng) =====
         try:
