@@ -2184,6 +2184,13 @@ def process_brand_sales(df_rpt, df_brand):
     if pd.isna(sku_str):
       return 'Khác'
     s = str(sku_str).lower()
+    # Wake up xét trước: 'Wake up 247' = Nước tăng lực; 'Wake up' = Cà phê Wake up Sài Gòn
+    # (nếu không, chữ 'Sài Gòn' bị luật Vinacafe bên dưới bắt nhầm)
+    if 'wake up' in s or 'wake-up' in s or 'wakeup' in s:
+      want = 'wake up 247' if '247' in s else 'wake up'
+      for b in brands_list:
+        if str(b).strip().lower() == want:
+          return b
     sorted_brands = sorted(brands_list, key=len, reverse=True)
     for b in sorted_brands:
       b_clean = str(b).lower()
@@ -16104,10 +16111,23 @@ if _nav == '📊 BÁO CÁO KPI':
       if mission_selected and 'Đạt nhiệm vụ' in df_show.columns:
         df_show = df_show[df_show['Đạt nhiệm vụ'].astype(str).str.strip().isin(mission_selected)]
 
+      sort_nv_az = st.checkbox(
+          '🔤 Sort Tên NVBH A → Z',
+          value=False,
+          key='mbs_cat_sort_nv_az',
+      )
+
       if not df_show.empty:
-        df_show = df_show.sort_values(
-            ['Nhóm', 'Actual'], ascending=[True, False]
-        ).reset_index(drop=True)
+        if sort_nv_az and 'Tên NVBH' in df_show.columns:
+          df_show = df_show.assign(
+              _nv_sort=df_show['Tên NVBH'].astype(str).str.strip().str.lower()
+          ).sort_values(
+              ['_nv_sort', 'Nhóm', 'Actual'], ascending=[True, True, False]
+          ).drop(columns=['_nv_sort']).reset_index(drop=True)
+        else:
+          df_show = df_show.sort_values(
+              ['Nhóm', 'Actual'], ascending=[True, False]
+          ).reset_index(drop=True)
         df_show.insert(0, 'STT', range(1, len(df_show) + 1))
         def _fmt_num(x):
           try:
@@ -16369,10 +16389,23 @@ if _nav == '📊 BÁO CÁO KPI':
       if mission_selected_b and 'Đạt nhiệm vụ' in df_show.columns:
         df_show = df_show[df_show['Đạt nhiệm vụ'].astype(str).str.strip().isin(mission_selected_b)]
 
+      sort_nv_az_b = st.checkbox(
+          '🔤 Sort Tên NVBH A → Z',
+          value=False,
+          key='mbs_brand_sort_nv_az',
+      )
+
       if not df_show.empty:
-        df_show = df_show.sort_values(
-            ['Nhóm', 'Actual'], ascending=[True, False]
-        ).reset_index(drop=True)
+        if sort_nv_az_b and 'Tên NVBH' in df_show.columns:
+          df_show = df_show.assign(
+              _nv_sort=df_show['Tên NVBH'].astype(str).str.strip().str.lower()
+          ).sort_values(
+              ['_nv_sort', 'Nhóm', 'Actual'], ascending=[True, True, False]
+          ).drop(columns=['_nv_sort']).reset_index(drop=True)
+        else:
+          df_show = df_show.sort_values(
+              ['Nhóm', 'Actual'], ascending=[True, False]
+          ).reset_index(drop=True)
         df_show.insert(0, 'STT', range(1, len(df_show) + 1))
         def _fmt_num_b(x):
           try:
