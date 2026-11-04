@@ -5796,7 +5796,9 @@ def build_turnover_report(df, report_date, turnover_targets, filter_nv=None):
     })
 
   df_out = (
-      pd.DataFrame(results)
+      # vị trí trống / NV không có chỉ tiêu → bảng rỗng vẫn đủ cột (không lỗi KeyError '_ratio')
+      pd.DataFrame(results, columns=['Mã NVBH', 'Tên NVBH', 'Chỉ Tiêu Doanh Số', 'Thực Hiện Ngày',
+                                     'Doanh Số MTD', '% MTD', 'GAP', 'Bình quân ngày', '_ratio'])
       .sort_values('_ratio', ascending=True)
       .drop(columns=['_ratio'])
       .reset_index(drop=True)
